@@ -132,8 +132,11 @@ class Database:
         assert self._conn is not None
         applied = self._get_schema_version()
         for i, sql in enumerate(MIGRATIONS[applied:], start=applied + 1):
+            # executescript issues an implicit COMMIT before executing, so we
+            # cannot wrap it in our transaction() context manager.  Run the DDL
+            # first, then record the version in a separate explicit transaction.
+            self._conn.executescript(sql)
             with self.transaction():
-                self._conn.executescript(sql)
                 self._conn.execute(
                     "INSERT INTO schema_version(version, applied_at, description) "
                     "VALUES (?, ?, ?)",

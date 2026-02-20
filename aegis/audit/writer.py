@@ -120,19 +120,15 @@ def _read_last_hash(path: Path) -> str | None:
     """Read the ``hash`` field of the final line without loading the whole file."""
     try:
         with open(path, "rb") as f:
-            # Seek backwards to find the last non-empty line
             f.seek(0, 2)  # end
             size = f.tell()
             if size == 0:
                 return None
-            pos = size - 1
-            while pos > 0:
-                f.seek(pos)
-                ch = f.read(1)
-                if ch == b"\n" and pos < size - 1:
-                    break
-                pos -= 1
-            line = f.read().strip()
+            # Read up to the last 4 KB to find the final line efficiently
+            f.seek(max(0, size - 4096))
+            content = f.read().rstrip(b"\n")
+            last_nl = content.rfind(b"\n")
+            line = content[last_nl + 1:] if last_nl != -1 else content
         if not line:
             return None
         obj = json.loads(line)

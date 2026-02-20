@@ -155,6 +155,8 @@ class AegisConfig(BaseModel):
 
 
 def _config_file_path() -> Path:
+    if env_path := os.environ.get("AEGIS_CONFIG"):
+        return Path(env_path)
     return aegis_dir() / CONFIG_FILENAME
 
 
