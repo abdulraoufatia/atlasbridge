@@ -1,15 +1,24 @@
-# Aegis Threat Model (STRIDE)
+# Aegis Implementation Notes: Relay Correctness
 
-**Version:** 0.1.0
-**Status:** Design
+**Version:** 0.2.0
+**Status:** Reference
 **Last updated:** 2026-02-20
-**Classification:** Public
+
+> **Important:** Aegis is not a security product. It is a remote interactive prompt relay. The notes below document correctness invariants and potential misuse scenarios for the relay mechanism — not a security posture claim.
 
 ---
 
 ## Overview
 
-This document applies the STRIDE threat modeling framework to Aegis. Each threat category is analyzed with concrete attack scenarios, affected assets, current mitigations, and residual risks.
+This document covers correctness concerns for the Aegis relay: how the system could behave incorrectly, and what implementation measures prevent that.
+
+It does not claim Aegis is a security firewall or that it protects against any class of attack.
+
+---
+
+## STRIDE analysis (retained for reference)
+
+The original STRIDE analysis below was written when Aegis was positioned as a "CLI firewall". It is retained as an implementation reference but should be read with the understanding that Aegis is a prompt relay, not a security enforcement layer.
 
 STRIDE = **S**poofing · **T**ampering · **R**epudiation · **I**nformation Disclosure · **D**enial of Service · **E**levation of Privilege
 

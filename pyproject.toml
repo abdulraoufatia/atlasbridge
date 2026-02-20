@@ -5,22 +5,20 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "aegis-cli"
 version = "0.1.0"
-description = "A secure, vendor-neutral, open-source CLI firewall and approval layer for AI coding agents"
+description = "Remote interactive prompt relay for AI CLI tools — forward prompts to your phone, reply from anywhere"
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [{ name = "Aegis Contributors" }]
-keywords = ["ai", "cli", "security", "approval", "firewall", "claude", "openai"]
+keywords = ["ai", "cli", "telegram", "relay", "interactive", "claude", "pty", "remote"]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
-    "Operating System :: POSIX",
     "Operating System :: MacOS",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Topic :: Security",
     "Topic :: Software Development :: Libraries :: Application Frameworks",
     "Topic :: Utilities",
 ]

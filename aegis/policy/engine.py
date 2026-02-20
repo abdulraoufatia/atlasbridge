@@ -1,13 +1,11 @@
 """
-Aegis policy engine — decides what to do with a detected prompt.
+Aegis prompt router — decides how to handle a detected prompt.
 
-For v0.x the engine is intentionally simple:
-  - All prompts are routed to the user via Telegram (ROUTE_TO_USER).
-  - No plaintext TOML rules are evaluated yet (future roadmap).
-  - The only hard-coded deny: prompts that exceed the queue limit.
+For v0.x the router is simple:
+  - Route all prompts to the user via Telegram (ROUTE_TO_USER).
+  - Exception: TYPE_FREE_TEXT when disabled in config → auto-inject empty string.
 
-The engine is synchronous; the async bridge calls it before creating a DB
-record or sending a Telegram message.
+The engine is synchronous; the async PTY supervisor calls it after detection.
 """
 
 from __future__ import annotations
@@ -28,13 +26,13 @@ class PolicyDecision:
 
 class PolicyEngine:
     """
-    Evaluate a DetectionResult and return a PolicyDecision.
+    Route a detected prompt to the appropriate handler.
 
     Parameters
     ----------
     free_text_enabled:
-        Whether TYPE_FREE_TEXT prompts are forwarded to the user.
-        If False, they fall back to the safe default (empty string).
+        Whether TYPE_FREE_TEXT prompts are forwarded to the user via Telegram.
+        If False, the safe default (empty string) is injected immediately.
     """
 
     def __init__(self, free_text_enabled: bool = False) -> None:

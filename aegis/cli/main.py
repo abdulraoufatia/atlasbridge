@@ -3,15 +3,15 @@ Aegis CLI — entry point for all user-facing commands.
 
 Commands
 --------
-setup           Interactive setup wizard (Telegram token, user IDs)
-run             Launch a tool under Aegis supervision (foreground)
-status          Show daemon / session status
-doctor          Check environment and config health
-approvals       List pending or recent prompts
-logs            Tail the Aegis log file
-install-service Install macOS launchd service
+setup             Interactive setup wizard (Telegram token, user IDs)
+run               Run a tool under Aegis prompt relay (foreground)
+status            Show active sessions
+doctor            Check environment and config health
+approvals         List pending or recent prompts
+logs              Tail the Aegis log file
+install-service   Install macOS launchd service
 uninstall-service Remove macOS launchd service
-audit verify    Verify the audit log hash chain
+audit verify      Verify the audit log hash chain
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ log = logging.getLogger(__name__)
 @click.option("--debug", is_flag=True, envvar="AEGIS_DEBUG", help="Enable debug logging.")
 @click.pass_context
 def cli(ctx: click.Context, debug: bool) -> None:
-    """Aegis — secure remote interactive bridge for AI CLI tools."""
+    """Aegis — remote interactive prompt relay for AI CLI tools."""
     ctx.ensure_object(dict)
     ctx.obj["debug"] = debug
     _configure_logging(debug)
@@ -115,9 +115,10 @@ def setup(token: str | None, users: str | None, timeout: int, free_text: bool) -
 @click.pass_context
 def run(ctx: click.Context, command: tuple[str, ...], session_id: str | None) -> None:
     """
-    Launch COMMAND under Aegis supervision.
+    Run COMMAND under Aegis prompt relay.
 
-    All prompts will be routed to your Telegram before being answered.
+    When the command pauses for input, Aegis forwards the prompt to your
+    phone via Telegram. Reply from your phone. The command resumes.
 
     Examples:
 
