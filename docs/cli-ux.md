@@ -755,7 +755,7 @@ Examples:
   aegis approvals list
   aegis doctor
 
-Documentation: https://github.com/aegis-cli/aegis-cli
+Documentation: https://github.com/abdulraoufatia/aegis-cli
 ```
 
 ---

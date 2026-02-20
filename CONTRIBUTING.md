@@ -27,7 +27,7 @@ By participating, you agree to our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 1. Fork the repository
 2. Clone your fork: `git clone https://github.com/<you>/aegis-cli.git`
-3. Add upstream: `git remote add upstream https://github.com/aegis-cli/aegis-cli.git`
+3. Add upstream: `git remote add upstream https://github.com/abdulraoufatia/aegis-cli.git`
 4. Create a feature branch (see [Branching Strategy](#branching-strategy))
 
 ---

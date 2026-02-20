@@ -1,26 +1,24 @@
 [build-system]
 requires = ["setuptools>=68", "setuptools-scm>=8"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "aegis-cli"
 version = "0.1.0"
-description = "A secure, vendor-neutral, open-source CLI firewall and approval layer for AI coding agents"
+description = "Remote interactive prompt relay for AI CLI tools — forward prompts to your phone, reply from anywhere"
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [{ name = "Aegis Contributors" }]
-keywords = ["ai", "cli", "security", "approval", "firewall", "claude", "openai"]
+keywords = ["ai", "cli", "telegram", "relay", "interactive", "claude", "pty", "remote"]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
-    "Operating System :: POSIX",
     "Operating System :: MacOS",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Topic :: Security",
     "Topic :: Software Development :: Libraries :: Application Frameworks",
     "Topic :: Utilities",
 ]
@@ -73,11 +71,11 @@ dev = [
 aegis = "aegis.cli.main:cli"
 
 [project.urls]
-Homepage = "https://github.com/aegis-cli/aegis-cli"
-Repository = "https://github.com/aegis-cli/aegis-cli"
-Issues = "https://github.com/aegis-cli/aegis-cli/issues"
-Changelog = "https://github.com/aegis-cli/aegis-cli/blob/main/CHANGELOG.md"
-Security = "https://github.com/aegis-cli/aegis-cli/blob/main/SECURITY.md"
+Homepage = "https://github.com/abdulraoufatia/aegis-cli"
+Repository = "https://github.com/abdulraoufatia/aegis-cli"
+Issues = "https://github.com/abdulraoufatia/aegis-cli/issues"
+Changelog = "https://github.com/abdulraoufatia/aegis-cli/blob/main/CHANGELOG.md"
+Security = "https://github.com/abdulraoufatia/aegis-cli/blob/main/SECURITY.md"
 
 # ---------------------------------------------------------------------------
 # Tool configuration

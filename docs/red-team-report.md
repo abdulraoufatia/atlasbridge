@@ -1,16 +1,20 @@
-# Aegis Red Team Analysis Report
+# Aegis Relay Misuse Analysis
 
-**Version:** 0.1.0
-**Status:** Design
+**Version:** 0.2.0
+**Status:** Reference
 **Last updated:** 2026-02-20
-**Classification:** Public
-**Analyst role:** Red Team (adversarial perspective)
+
+> **Important:** Aegis is not a security product. This document was written when the product was positioned as a "CLI firewall". It is retained for reference. The scenarios below describe ways the relay mechanism could be abused or behave incorrectly — not security threat coverage.
 
 ---
 
-## Executive Summary
+## Overview
 
-This report documents adversarial analysis of the Aegis system from the perspective of a motivated attacker. The goal is to identify attack paths that could lead to unauthorized code execution, secret exfiltration, approval bypass, or audit log subversion.
+This document identifies scenarios where the Aegis relay could be misused or behave unexpectedly. It is implementation reference, not a security posture claim.
+
+## Original analysis (retained for reference)
+
+The analysis below was written when Aegis was framed as an "approval and security layer". It is retained as-is for completeness.
 
 **Key findings:**
 
