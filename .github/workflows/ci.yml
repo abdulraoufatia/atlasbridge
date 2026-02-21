@@ -34,7 +34,7 @@ jobs:
         run: ruff format --check .
 
       - name: Run mypy (type checker)
-        run: mypy aegis/
+        run: mypy src/aegis/
 
   test:
     name: Tests (Python ${{ matrix.python-version }})
@@ -84,7 +84,7 @@ jobs:
         run: pip install bandit[toml]
 
       - name: Run bandit (security linter)
-        run: bandit -r aegis/ -c pyproject.toml
+        run: bandit -r src/ -c pyproject.toml
 
   build:
     name: Build Distribution
