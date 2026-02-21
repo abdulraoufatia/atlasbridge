@@ -180,3 +180,49 @@ jobs:
 
       - name: Check dist
         run: twine check dist/*
+
+  packaging-smoke:
+    name: Packaging Smoke Test
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build wheel
+        run: |
+          pip install build
+          python -m build --wheel
+
+      - name: Install wheel into clean venv
+        run: |
+          python -m venv /tmp/smoke-venv
+          /tmp/smoke-venv/bin/pip install dist/*.whl
+
+      - name: Verify .tcss assets via importlib.resources
+        run: |
+          /tmp/smoke-venv/bin/python -c "
+          from importlib.resources import files
+
+          # UI CSS (Textual TUI)
+          ui_css = files('atlasbridge.ui.css').joinpath('atlasbridge.tcss').read_text('utf-8')
+          assert len(ui_css) > 100, f'UI CSS too short: {len(ui_css)} chars'
+          assert 'Screen' in ui_css, 'UI CSS missing Screen selector'
+          print(f'  atlasbridge.ui.css/atlasbridge.tcss: {len(ui_css)} chars OK')
+
+          # Legacy TUI CSS
+          tui_css = files('atlasbridge.tui').joinpath('app.tcss').read_text('utf-8')
+          assert len(tui_css) > 0, 'TUI CSS is empty'
+          print(f'  atlasbridge.tui/app.tcss: {len(tui_css)} chars OK')
+
+          print('All UI assets verified.')
+          "
+
+      - name: Verify CLI entry point works
+        run: |
+          /tmp/smoke-venv/bin/atlasbridge --version
+          /tmp/smoke-venv/bin/atlasbridge --help

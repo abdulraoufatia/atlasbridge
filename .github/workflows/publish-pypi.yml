@@ -1,0 +1,70 @@
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-pypi-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    name: Build & Publish to PyPI
+    runs-on: ubuntu-latest
+    environment: pypi
+    # Guard: never publish release candidates to PyPI
+    if: "!contains(github.ref_name, 'rc')"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Print release info
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION=$(python -c "
+          import tomllib
+          with open('pyproject.toml', 'rb') as f:
+              print(tomllib.load(f)['project']['version'])
+          ")
+          echo "========================================="
+          echo "  Tag:             ${TAG}"
+          echo "  Package version: ${VERSION}"
+          echo "  Target index:    PyPI (production)"
+          echo "========================================="
+
+      - name: Install build tools
+        run: pip install build twine
+
+      - name: Build sdist and wheel
+        run: python -m build
+
+      - name: Verify .tcss assets in wheel
+        run: |
+          python -c "
+          import zipfile, sys, glob
+          whl = glob.glob('dist/*.whl')[0]
+          with zipfile.ZipFile(whl) as z:
+              tcss = [n for n in z.namelist() if n.endswith('.tcss')]
+              print(f'Found {len(tcss)} .tcss file(s) in {whl}:')
+              for f in tcss:
+                  print(f'  {f}')
+              if not tcss:
+                  print('ERROR: No .tcss files found in wheel!')
+                  sys.exit(1)
+          "
+
+      - name: Check dist metadata
+        run: twine check dist/*
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
