@@ -19,6 +19,7 @@ Version history:
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Callable
 from pathlib import Path
 
 import structlog
@@ -143,7 +144,7 @@ def _migrate_0_to_1(conn: sqlite3.Connection) -> None:
 # Migration registry (version_from → callable)
 # ---------------------------------------------------------------------------
 
-_MIGRATIONS: dict[int, callable] = {
+_MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     0: _migrate_0_to_1,
 }
 

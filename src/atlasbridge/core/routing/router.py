@@ -208,7 +208,12 @@ class PromptRouter:
                         session_id=sm.event.session_id,
                     )
 
-            log.info("reply_injected", value_length=len(reply.value))
+            latency = sm.latency_ms
+            log.info(
+                "reply_injected",
+                value_length=len(reply.value),
+                latency_ms=round(latency, 1) if latency else None,
+            )
             await self._resolve_next(sm.event.session_id)
 
         except Exception as exc:  # noqa: BLE001

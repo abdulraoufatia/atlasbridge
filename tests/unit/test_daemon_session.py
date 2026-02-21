@@ -35,7 +35,7 @@ def _make_mock_adapter(chunks: list[bytes] | None = None) -> MagicMock:
     """
     adapter = MagicMock()
     adapter.snapshot_context.return_value = {"pid": 1, "alive": False}
-    adapter._detectors = {}
+    adapter.get_detector.return_value = None
     adapter.start_session = AsyncMock()
     adapter.terminate_session = AsyncMock()
     adapter.inject_reply = AsyncMock()

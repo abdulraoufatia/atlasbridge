@@ -19,11 +19,51 @@ that the PromptRouter delivers to the correct session's PTY supervisor.
 
 from __future__ import annotations
 
+import time
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from typing import Any
 
 from atlasbridge.core.prompt.models import PromptEvent, Reply
+
+
+class ChannelCircuitBreaker:
+    """
+    Lightweight circuit breaker for channel send operations.
+
+    After *threshold* consecutive failures the circuit opens and
+    ``is_open`` returns True.  The circuit auto-closes after
+    *recovery_seconds* so the next send attempt is allowed through
+    (half-open probe).
+    """
+
+    def __init__(self, threshold: int = 3, recovery_seconds: float = 30.0) -> None:
+        self.threshold = threshold
+        self.recovery_seconds = recovery_seconds
+        self._failures = 0
+        self._opened_at: float | None = None
+
+    @property
+    def is_open(self) -> bool:
+        if self._failures < self.threshold:
+            return False
+        # Auto-reset after recovery window (half-open probe)
+        if self._opened_at and (time.monotonic() - self._opened_at) >= self.recovery_seconds:
+            return False
+        return True
+
+    def record_success(self) -> None:
+        self._failures = 0
+        self._opened_at = None
+
+    def record_failure(self) -> None:
+        self._failures += 1
+        if self._failures >= self.threshold and self._opened_at is None:
+            self._opened_at = time.monotonic()
+
+    def reset(self) -> None:
+        self._failures = 0
+        self._opened_at = None
 
 
 class BaseChannel(ABC):
@@ -32,6 +72,10 @@ class BaseChannel(ABC):
 
     One channel instance is shared across all sessions.
     The channel routes prompts and replies by session_id and prompt_id.
+
+    Includes a ``circuit_breaker`` that subclasses should consult before
+    sending.  After 3 consecutive send failures the breaker opens for
+    30 s, giving the backend time to recover before retrying.
     """
 
     #: Short identifier used in config and logs (e.g. "telegram")
@@ -39,6 +83,15 @@ class BaseChannel(ABC):
 
     #: Human-readable name shown in `atlasbridge channel list`
     display_name: str = ""
+
+    @property
+    def circuit_breaker(self) -> ChannelCircuitBreaker:
+        """Per-instance circuit breaker (lazy-initialised)."""
+        cb = getattr(self, "_circuit_breaker", None)
+        if cb is None:
+            cb = ChannelCircuitBreaker()
+            self._circuit_breaker = cb  # type: ignore[attr-defined]
+        return cb
 
     # ------------------------------------------------------------------
     # Lifecycle

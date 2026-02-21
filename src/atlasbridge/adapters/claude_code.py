@@ -85,6 +85,10 @@ class ClaudeCodeAdapter(BaseAdapter):
         """Return the PromptDetector to use for this adapter. Override in subclasses."""
         return PromptDetector(session_id)
 
+    def get_detector(self, session_id: str) -> PromptDetector | None:
+        """Return the PromptDetector for *session_id*, or None."""
+        return self._detectors.get(session_id)
+
     async def terminate_session(self, session_id: str, timeout_s: float = 5.0) -> None:
         tty = self._supervisors.pop(session_id, None)
         if tty:

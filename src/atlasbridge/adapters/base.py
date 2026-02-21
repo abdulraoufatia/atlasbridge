@@ -119,6 +119,23 @@ class BaseAdapter(ABC):
         return {}
 
     # ------------------------------------------------------------------
+    # Detector access
+    # ------------------------------------------------------------------
+
+    def get_detector(self, session_id: str) -> Any:
+        """
+        Return the PromptDetector for *session_id*, or None if not tracked.
+
+        The DaemonManager calls this to share the same detector instance
+        that inject_reply() uses for echo suppression.  Adapters that
+        maintain a per-session detector dict should override this.
+
+        Returns:
+            PromptDetector instance, or None.
+        """
+        return None
+
+    # ------------------------------------------------------------------
     # Health check
     # ------------------------------------------------------------------
 

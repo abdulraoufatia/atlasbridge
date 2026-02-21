@@ -143,10 +143,17 @@ class AuditWriter:
         prompt_id: str,
         prompt_type: str,
         value: str,
+        latency_ms: float | None = None,
     ) -> None:
+        payload: dict[str, Any] = {
+            "prompt_type": prompt_type,
+            "value_length": len(value),
+        }
+        if latency_ms is not None:
+            payload["latency_ms"] = round(latency_ms, 1)
         self._write(
             "response_injected",
-            {"prompt_type": prompt_type, "value_length": len(value)},
+            payload,
             session_id=session_id,
             prompt_id=prompt_id,
         )

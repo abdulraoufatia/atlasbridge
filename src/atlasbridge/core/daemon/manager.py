@@ -64,6 +64,7 @@ class DaemonManager:
             await self._init_database()
             await self._reload_pending_prompts()
             await self._init_channel()
+            await self._renotify_pending()
             await self._init_session_manager()
             await self._init_router()
             await self._init_autopilot()
@@ -102,7 +103,32 @@ class DaemonManager:
         pending = self._db.list_pending_prompts()
         if pending:
             logger.info("daemon_restarted_with_pending", count=len(pending))
-        # TODO: renotify via channel after channel is initialised
+            self._pending_renotify = pending  # saved for _renotify_pending()
+
+    async def _renotify_pending(self) -> None:
+        """Re-send pending prompts to the channel after restart.
+
+        Called after channel initialisation so that humans see any prompts
+        that were awaiting reply when the previous daemon instance died.
+        """
+        pending = getattr(self, "_pending_renotify", [])
+        if not pending or self._channel is None:
+            return
+
+        count = 0
+        for row in pending:
+            try:
+                await self._channel.notify(
+                    f"⚠ Pending prompt (restart recovery): {row['excerpt'][:120]}",
+                    session_id=row["session_id"],
+                )
+                count += 1
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("renotify_failed", prompt_id=row["id"], error=str(exc))
+
+        if count:
+            logger.info("renotify_complete", sent=count, total=len(pending))
+        self._pending_renotify = []
 
     async def _init_channel(self) -> None:
         channel_config = self._config.get("channels", {})
@@ -235,7 +261,7 @@ class DaemonManager:
         # Re-use the detector the adapter already created for this session.
         # This ensures inject_reply() → mark_injected() shares the same state
         # as our analyse() calls (echo suppression depends on this).
-        detector = adapter._detectors.get(session_id)  # type: ignore[attr-defined]
+        detector = adapter.get_detector(session_id)
         if detector is None:
             from atlasbridge.core.prompt.detector import PromptDetector
 

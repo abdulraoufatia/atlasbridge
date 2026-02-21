@@ -55,11 +55,14 @@ class PromptStateMachine:
     expires_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     history: list[tuple[PromptStatus, str]] = field(default_factory=list)
     on_transition: Callable[[PromptStatus, PromptStatus], None] | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    resolved_at: datetime | None = None
 
     def __post_init__(self) -> None:
         from datetime import timedelta
 
         self.expires_at = datetime.now(UTC) + timedelta(seconds=self.event.ttl_seconds)
+        self.created_at = datetime.now(UTC)
 
     @property
     def is_terminal(self) -> bool:
@@ -68,6 +71,13 @@ class PromptStateMachine:
     @property
     def is_expired(self) -> bool:
         return datetime.now(UTC) > self.expires_at
+
+    @property
+    def latency_ms(self) -> float | None:
+        """Milliseconds from creation to resolution, or None if not yet resolved."""
+        if self.resolved_at is None:
+            return None
+        return (self.resolved_at - self.created_at).total_seconds() * 1000
 
     def transition(self, new_status: PromptStatus, reason: str = "") -> None:
         """Advance state; raise ValueError on invalid transition."""
@@ -79,6 +89,8 @@ class PromptStateMachine:
         old = self.status
         self.status = new_status
         self.history.append((new_status, reason or f"{old} → {new_status}"))
+        if new_status == PromptStatus.RESOLVED:
+            self.resolved_at = datetime.now(UTC)
         if self.on_transition:
             self.on_transition(old, new_status)
 
