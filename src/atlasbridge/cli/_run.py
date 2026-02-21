@@ -46,8 +46,18 @@ def cmd_run(
     channel_str = " + ".join(channel_parts) or "no channel configured"
 
     console.print(f"[bold]AtlasBridge[/bold] supervising: [cyan]{' '.join(command)}[/cyan]")
-    console.print(f"Session will forward prompts via {channel_str}")
-    console.print("Press Ctrl+C to stop.\n")
+    console.print(f"Prompts will arrive via: {channel_str}")
+    console.print()
+    console.print("[dim]How it works:[/dim]")
+    console.print("  When the CLI asks a question, AtlasBridge sends it to your channel.")
+    console.print("  Reply there (tap a button or type a response) to answer the prompt.")
+    console.print()
+    console.print("[dim]Useful commands:[/dim]")
+    console.print("  [cyan]atlasbridge sessions[/cyan]  — list active sessions")
+    console.print("  [cyan]atlasbridge status[/cyan]    — check daemon status")
+    console.print("  [cyan]atlasbridge logs[/cyan]      — view audit log")
+    console.print("  [cyan]Ctrl+C[/cyan]               — stop this session")
+    console.print()
 
     # Validate policy file if provided
     if policy_file:

@@ -174,7 +174,7 @@ class TestHandleReply:
         assert sm.status == PromptStatus.RESOLVED
 
     @pytest.mark.asyncio
-    async def test_unknown_prompt_id_notified(
+    async def test_unknown_prompt_id_silently_dropped(
         self,
         router: PromptRouter,
         session: Session,
@@ -182,7 +182,8 @@ class TestHandleReply:
     ) -> None:
         reply = _reply("unknown-prompt-id", session.session_id)
         await router.handle_reply(reply)
-        mock_channel.notify.assert_called_once()
+        # Unknown prompts are silently dropped (no spam to channel)
+        mock_channel.notify.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_disallowed_identity_rejected(

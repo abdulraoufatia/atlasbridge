@@ -65,6 +65,13 @@ This index helps you find the right document fast, whether you are a new user, a
 | [threat-model.md](threat-model.md) | Contributor | STRIDE-based relay correctness analysis, trust boundaries, threat scenarios | For correctness review or architecture audits | Current |
 | [tool-adapter.md](tool-adapter.md) | Contributor | Adapter abstraction design goals and interface (early design doc) | For historical context on adapter design decisions | Reference |
 | [tool-interception-design.md](tool-interception-design.md) | Contributor | Strategy analysis: wrapper vs PTY interception; rationale for PTY approach | For historical context on interception strategy | Reference |
+| [telegram-setup.md](telegram-setup.md) | User | Step-by-step Telegram bot setup: BotFather, /start, chat_id, verification | During first-time Telegram setup | Current |
+| [troubleshooting.md](troubleshooting.md) | User | Common issues and solutions: adapters, Telegram 409/400, doctor, upgrade | When something goes wrong | Current |
+| [upgrade.md](upgrade.md) | User | Upgrading safely: config preservation, migration, verification | Before or after `pip install -U` | Current |
+| [enterprise-architecture.md](enterprise-architecture.md) | Contributor | Enterprise architecture overview: editions, RBAC, risk, governance | When working on enterprise features | Experimental |
+| [enterprise-saas-architecture.md](enterprise-saas-architecture.md) | Contributor | Phase C SaaS design: multi-tenant, dashboard, trust boundaries | For future cloud planning | Design Only |
+| [enterprise-transition-contracts.md](enterprise-transition-contracts.md) | Contributor | Phase A→B→C transition contracts and migration paths | When planning phase transitions | Design Only |
+| [enterprise-trust-boundaries.md](enterprise-trust-boundaries.md) | Contributor | 6 trust domains, secret handling, transport security | For security review | Design Only |
 
 ---
 
@@ -114,6 +121,9 @@ This index helps you find the right document fast, whether you are a new user, a
 | Regression or known failure | [qa-top-20-failure-scenarios.md](qa-top-20-failure-scenarios.md) — canonical failure list |
 | Generating a support bundle | Run `atlasbridge debug bundle` — see [cli-ux.md](cli-ux.md) |
 | Channel token / connectivity | [channel-token-setup.md](channel-token-setup.md) |
+| Telegram 400/409 errors | [telegram-setup.md](telegram-setup.md) and [troubleshooting.md](troubleshooting.md) |
+| Adapter not found | [troubleshooting.md](troubleshooting.md) — Adapter Issues section |
+| Upgrade problems | [upgrade.md](upgrade.md) — config preservation and verification |
 | Correctness invariant violated | [threat-model.md](threat-model.md) and [architecture.md](architecture.md) — invariants section |
 
 ---

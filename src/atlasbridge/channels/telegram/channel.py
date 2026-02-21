@@ -142,6 +142,12 @@ class TelegramChannel(BaseChannel):
             resp = await self._api("sendMessage", payload)
             if resp:
                 responses.append(str(resp.get("message_id", "")))
+            else:
+                logger.warning(
+                    "Failed to send prompt to user %s. "
+                    "Ensure the user has started a chat with the bot by sending /start.",
+                    uid,
+                )
 
         return responses[0] if responses else ""
 
@@ -311,16 +317,25 @@ class TelegramChannel(BaseChannel):
             data = resp.json()
             if data.get("ok"):
                 return data.get("result")
-            # Detect 409 Conflict — another getUpdates poller
             error_code = data.get("error_code")
             description = data.get("description", "")
+            # 409 Conflict — another getUpdates poller
             if error_code == 409 and "getUpdates" in description:
                 raise TelegramConflictError(description)
-            logger.warning("Telegram API error: %s", data)
+            # 400 "chat not found" — user hasn't messaged the bot yet
+            if error_code == 400 and "chat not found" in description.lower():
+                logger.error(
+                    "Telegram: chat not found for chat_id=%s. "
+                    "The user must open Telegram and send /start to your bot first. "
+                    "See: https://core.telegram.org/bots#how-do-i-create-a-bot",
+                    payload.get("chat_id"),
+                )
+            else:
+                logger.warning("Telegram API error (%s %s): %s", method, error_code, description)
         except TelegramConflictError:
             raise
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Telegram API request failed: %s", exc)
+            logger.warning("Telegram API request failed (%s): %s", method, exc)
         return None
 
     @staticmethod

@@ -54,10 +54,23 @@ def run_setup(
     from_env: bool = False,
 ) -> None:
     """Run the AtlasBridge setup wizard."""
-    from atlasbridge.core.config import atlasbridge_dir, save_config
+    from atlasbridge.core.config import _config_file_path, atlasbridge_dir, save_config
     from atlasbridge.core.exceptions import ConfigError
 
     console.print("[bold]AtlasBridge Setup[/bold]")
+
+    # Detect existing config — preserve on upgrade
+    cfg_path = _config_file_path()
+    if cfg_path.exists() and not from_env and not non_interactive:
+        console.print(f"\nExisting config found: [cyan]{cfg_path}[/cyan]")
+        keep = Confirm.ask(
+            "Keep existing configuration?",
+            default=True,
+        )
+        if keep:
+            console.print("[green]Config preserved.[/green] Your tokens and settings are intact.")
+            console.print("Run [cyan]atlasbridge run claude[/cyan] to start supervising.")
+            return
 
     if from_env:
         config_data = _setup_from_env(console)
@@ -95,7 +108,12 @@ def run_setup(
         _maybe_install_systemd(console, str(cfg_path))
 
     console.print("\n[green]Setup complete.[/green]")
-    console.print("Run [cyan]atlasbridge run claude[/cyan] to start supervising Claude Code.")
+    if channel == "telegram":
+        console.print(
+            "\n[bold]Important:[/bold] Open Telegram and send [cyan]/start[/cyan] to your bot."
+        )
+        console.print("This is required before AtlasBridge can deliver prompts to you.")
+    console.print("\nRun [cyan]atlasbridge run claude[/cyan] to start supervising Claude Code.")
 
 
 # ---------------------------------------------------------------------------

@@ -47,7 +47,9 @@ def _config_path() -> Path:
     """Return the canonical config file path (respects ATLASBRIDGE_CONFIG env var)."""
     from atlasbridge.core.config import _config_file_path
 
-    return _config_file_path()
+    result = _config_file_path()
+    # Ensure we always return a Path, even if upstream returns a string
+    return Path(result) if not isinstance(result, Path) else result
 
 
 def _check_config() -> dict:
@@ -289,6 +291,14 @@ def cmd_doctor(fix: bool, as_json: bool, console: Console) -> None:
         fails = [c for c in checks if c["status"] == "fail"]
         warns = [c for c in checks if c["status"] == "warn"]
         if fails:
-            console.print("[red]Some checks failed. Run with --fix to auto-repair.[/red]")
+            console.print("[red]Some checks failed.[/red]")
+            if not fix:
+                console.print("Run [cyan]atlasbridge doctor --fix[/cyan] to auto-repair.")
         elif warns:
             console.print("[yellow]Some checks have warnings. Review above for details.[/yellow]")
+
+    if not all_pass:
+        console.print("\nNext steps:")
+        console.print("  1. [cyan]atlasbridge setup[/cyan] — configure Telegram or Slack")
+        console.print("  2. [cyan]atlasbridge doctor --fix[/cyan] — auto-repair config issues")
+        console.print("  3. [cyan]atlasbridge run claude[/cyan] — start supervising")
