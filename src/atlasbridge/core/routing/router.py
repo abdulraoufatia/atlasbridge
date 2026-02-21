@@ -130,13 +130,22 @@ class PromptRouter:
 
     async def handle_reply(self, reply: Reply) -> None:
         """Process an incoming Reply from the channel."""
+        # Free-text replies have empty prompt_id — resolve to active prompt
+        if not reply.prompt_id:
+            resolved = self._resolve_free_text_reply(reply)
+            if resolved is None:
+                logger.debug("Free-text reply dropped — no active prompt for any session")
+                return
+            reply = resolved
+
         sm = self._machines.get(reply.prompt_id)
         if sm is None:
-            logger.warning("Reply for unknown prompt %s", reply.prompt_id)
-            await self._channel.notify(
-                "Unknown prompt ID. This may be an old or invalid request.",
-                session_id=reply.session_id,
-            )
+            logger.debug("Reply for unknown/expired prompt %s — ignoring", reply.prompt_id)
+            return
+
+        # Already resolved — silently discard duplicate callbacks
+        if sm.is_terminal:
+            logger.debug("Duplicate reply for already-resolved prompt %s", reply.prompt_id)
             return
 
         # TTL check
@@ -200,6 +209,21 @@ class PromptRouter:
         except Exception as exc:  # noqa: BLE001
             sm.transition(PromptStatus.FAILED, str(exc))
             logger.error("Injection failed for prompt %s: %s", reply.prompt_id, exc)
+
+    def _resolve_free_text_reply(self, reply: Reply) -> Reply | None:
+        """Resolve a free-text reply (empty prompt_id) to the active prompt."""
+        for prompt_id, sm in self._machines.items():
+            if not sm.is_terminal and sm.event.session_id:
+                return Reply(
+                    prompt_id=prompt_id,
+                    session_id=sm.event.session_id,
+                    value=reply.value,
+                    nonce=reply.nonce,
+                    channel_identity=reply.channel_identity,
+                    timestamp=reply.timestamp,
+                    newline_policy=reply.newline_policy,
+                )
+        return None
 
     async def _resolve_next(self, session_id: str) -> None:
         """After a prompt resolves, dispatch the next queued prompt if any."""
