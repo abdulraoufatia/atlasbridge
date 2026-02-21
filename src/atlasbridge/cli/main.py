@@ -44,7 +44,9 @@ err_console = Console(stderr=True)
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 @click.version_option(__version__, "--version", "-V", message="atlasbridge %(version)s")
-@click.option("--log-level", default="WARNING", hidden=True, help="Log level for structured logging.")
+@click.option(
+    "--log-level", default="WARNING", hidden=True, help="Log level for structured logging."
+)
 @click.option("--log-json", is_flag=True, default=False, hidden=True, help="Emit JSON log lines.")
 @click.pass_context
 def cli(ctx: click.Context, log_level: str, log_json: bool) -> None:
@@ -321,7 +323,9 @@ def adapters_cmd(as_json: bool) -> None:
     registry = AdapterRegistry.list_all()
 
     if not registry:
-        err_console.print("[red]Error:[/red] No adapters found. Reinstall: pip install -U atlasbridge")
+        err_console.print(
+            "[red]Error:[/red] No adapters found. Reinstall: pip install -U atlasbridge"
+        )
         raise SystemExit(1)
 
     if as_json:
@@ -329,15 +333,17 @@ def adapters_cmd(as_json: bool) -> None:
 
         rows = []
         for name, cls in sorted(registry.items()):
-            rows.append({
-                "name": name,
-                "kind": "llm",
-                "enabled": bool(shutil.which(cls.tool_name) if cls.tool_name else False),
-                "source": "builtin",
-                "tool_name": cls.tool_name,
-                "description": cls.description,
-                "min_version": cls.min_tool_version,
-            })
+            rows.append(
+                {
+                    "name": name,
+                    "kind": "llm",
+                    "enabled": bool(shutil.which(cls.tool_name) if cls.tool_name else False),
+                    "source": "builtin",
+                    "tool_name": cls.tool_name,
+                    "description": cls.description,
+                    "min_version": cls.min_tool_version,
+                }
+            )
         click.echo(json.dumps({"adapters": rows, "count": len(rows)}, indent=2))
     else:
         console.print("\n[bold]Installed Adapters[/bold]\n")
