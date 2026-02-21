@@ -1,4 +1,4 @@
-"""Unit tests for aegis.core.config — AegisConfig loading and validation."""
+"""Unit tests for atlasbridge.core.config — AtlasBridgeConfig loading and validation."""
 
 from __future__ import annotations
 

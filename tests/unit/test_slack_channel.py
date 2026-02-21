@@ -74,10 +74,10 @@ class TestFormatPrompt:
 
     def test_excerpt_truncated_at_120(self) -> None:
         # _format_prompt slices excerpt to [:120] — full 200-char text must not appear
-        long_text = "A" * 120 + "B" * 80  # unique suffix 'B's beyond 120 chars
+        long_text = "X" * 120 + "Z" * 80  # unique suffix 'Z's beyond 120 chars
         event = _make_event(excerpt=long_text)
         text = SlackChannel._format_prompt(event)
-        assert "B" not in text, "Excerpt beyond 120 chars should be truncated"
+        assert "Z" not in text, "Excerpt beyond 120 chars should be truncated"
 
 
 # ---------------------------------------------------------------------------
