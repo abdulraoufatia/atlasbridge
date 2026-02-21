@@ -24,8 +24,12 @@ def _make_event(
     excerpt: str = "Continue? [y/n]",
     choices: list[str] | None = None,
     confidence: Confidence = Confidence.HIGH,
+    tool: str = "",
+    cwd: str = "",
+    session_label: str = "",
+    ttl_seconds: int = 300,
 ) -> PromptEvent:
-    return PromptEvent(
+    event = PromptEvent(
         prompt_id="aabbccdd112233",
         session_id="sess-1234-5678-abcd-efab",
         prompt_type=prompt_type,
@@ -33,7 +37,12 @@ def _make_event(
         choices=choices or [],
         confidence=confidence,
         idempotency_key="nonce123",
+        ttl_seconds=ttl_seconds,
     )
+    event.tool = tool
+    event.cwd = cwd
+    event.session_label = session_label
+    return event
 
 
 # ---------------------------------------------------------------------------
@@ -42,42 +51,73 @@ def _make_event(
 
 
 class TestFormatPrompt:
-    def test_yes_no_label(self) -> None:
-        event = _make_event(PromptType.TYPE_YES_NO)
-        text = SlackChannel._format_prompt(event)
-        assert "Yes / No" in text
-        assert event.excerpt[:30] in text
-
-    def test_confirm_enter_label(self) -> None:
-        event = _make_event(PromptType.TYPE_CONFIRM_ENTER, excerpt="Press Enter to continue")
-        text = SlackChannel._format_prompt(event)
-        assert "Press Enter" in text
-
-    def test_multiple_choice_label(self) -> None:
-        event = _make_event(
-            PromptType.TYPE_MULTIPLE_CHOICE,
-            excerpt="Choose: 1) foo  2) bar",
-            choices=["foo", "bar"],
-        )
-        text = SlackChannel._format_prompt(event)
-        assert "Multiple Choice" in text
-
-    def test_free_text_label(self) -> None:
-        event = _make_event(PromptType.TYPE_FREE_TEXT, excerpt="Enter your message:")
-        text = SlackChannel._format_prompt(event)
-        assert "Free Text" in text
+    def test_contains_input_required(self) -> None:
+        text = SlackChannel._format_prompt(_make_event())
+        assert "Input Required" in text
 
     def test_session_prefix(self) -> None:
         event = _make_event()
         text = SlackChannel._format_prompt(event)
         assert event.session_id[:8] in text
 
+    def test_yes_no_label(self) -> None:
+        text = SlackChannel._format_prompt(_make_event(PromptType.TYPE_YES_NO))
+        assert "Yes / No" in text
+
+    def test_confirm_enter_label(self) -> None:
+        text = SlackChannel._format_prompt(
+            _make_event(PromptType.TYPE_CONFIRM_ENTER, excerpt="Press Enter to continue")
+        )
+        assert "Press Enter" in text
+
+    def test_multiple_choice_label(self) -> None:
+        text = SlackChannel._format_prompt(
+            _make_event(
+                PromptType.TYPE_MULTIPLE_CHOICE,
+                excerpt="Choose: 1) foo  2) bar",
+                choices=["foo", "bar"],
+            )
+        )
+        assert "Multiple Choice" in text
+
+    def test_free_text_label(self) -> None:
+        text = SlackChannel._format_prompt(
+            _make_event(PromptType.TYPE_FREE_TEXT, excerpt="Enter your message:")
+        )
+        assert "Free Text" in text
+
     def test_excerpt_truncated_at_120(self) -> None:
-        # _format_prompt slices excerpt to [:120] — full 200-char text must not appear
-        long_text = "X" * 120 + "Z" * 80  # unique suffix 'Z's beyond 120 chars
-        event = _make_event(excerpt=long_text)
-        text = SlackChannel._format_prompt(event)
+        long_text = "X" * 120 + "Z" * 80
+        text = SlackChannel._format_prompt(_make_event(excerpt=long_text))
         assert "Z" not in text, "Excerpt beyond 120 chars should be truncated"
+
+
+class TestFormatPromptContext:
+    def test_tool_shown_when_set(self) -> None:
+        text = SlackChannel._format_prompt(_make_event(tool="claude"))
+        assert "Tool: claude" in text
+
+    def test_tool_absent_when_empty(self) -> None:
+        text = SlackChannel._format_prompt(_make_event(tool=""))
+        assert "Tool:" not in text
+
+    def test_cwd_shown_when_set(self) -> None:
+        text = SlackChannel._format_prompt(_make_event(cwd="/Users/ara/projects/my-app"))
+        assert "/Users/ara/projects/my-app" in text
+
+    def test_cwd_absent_when_empty(self) -> None:
+        text = SlackChannel._format_prompt(_make_event(cwd=""))
+        assert "Workspace" not in text
+
+
+class TestFormatPromptTTL:
+    def test_default_ttl(self) -> None:
+        text = SlackChannel._format_prompt(_make_event())
+        assert "5 min" in text
+
+    def test_custom_ttl(self) -> None:
+        text = SlackChannel._format_prompt(_make_event(ttl_seconds=600))
+        assert "10 min" in text
 
 
 # ---------------------------------------------------------------------------
@@ -85,13 +125,46 @@ class TestFormatPrompt:
 # ---------------------------------------------------------------------------
 
 
+def _find_block(blocks, block_type):
+    """Find the first block of the given type."""
+    return next((b for b in blocks if b["type"] == block_type), None)
+
+
+def _find_all_blocks(blocks, block_type):
+    """Find all blocks of the given type."""
+    return [b for b in blocks if b["type"] == block_type]
+
+
 class TestBuildBlocks:
+    def test_starts_and_ends_with_divider(self) -> None:
+        blocks = SlackChannel._build_blocks(_make_event())
+        assert blocks[0]["type"] == "divider"
+        assert blocks[-1]["type"] == "divider"
+
+    def test_has_header_section(self) -> None:
+        blocks = SlackChannel._build_blocks(_make_event())
+        sections = _find_all_blocks(blocks, "section")
+        assert len(sections) >= 2  # header + question at minimum
+        header = sections[0]
+        assert "Input Required" in header["text"]["text"]
+
+    def test_has_question_section(self) -> None:
+        blocks = SlackChannel._build_blocks(_make_event(excerpt="Do you want to proceed?"))
+        sections = _find_all_blocks(blocks, "section")
+        question = sections[1]
+        assert "Do you want to proceed?" in question["text"]["text"]
+
+    def test_has_context_block_with_ttl(self) -> None:
+        blocks = SlackChannel._build_blocks(_make_event())
+        ctx = _find_block(blocks, "context")
+        assert ctx is not None
+        text = ctx["elements"][0]["text"]
+        assert "5 minutes" in text
+
     def test_yes_no_has_two_buttons(self) -> None:
-        event = _make_event(PromptType.TYPE_YES_NO)
-        blocks = SlackChannel._build_blocks(event)
-        assert len(blocks) == 2  # section + actions
-        actions = blocks[1]
-        assert actions["type"] == "actions"
+        blocks = SlackChannel._build_blocks(_make_event(PromptType.TYPE_YES_NO))
+        actions = _find_block(blocks, "actions")
+        assert actions is not None
         elements = actions["elements"]
         assert len(elements) == 2
         values = [e["value"] for e in elements]
@@ -99,49 +172,51 @@ class TestBuildBlocks:
         assert any(v.endswith(":n") for v in values)
 
     def test_yes_no_button_styles(self) -> None:
-        event = _make_event(PromptType.TYPE_YES_NO)
-        blocks = SlackChannel._build_blocks(event)
-        elements = blocks[1]["elements"]
+        blocks = SlackChannel._build_blocks(_make_event(PromptType.TYPE_YES_NO))
+        actions = _find_block(blocks, "actions")
+        elements = actions["elements"]
         styles = {e["text"]["text"]: e.get("style") for e in elements}
         assert styles["Yes"] == "primary"
         assert styles["No"] == "danger"
 
     def test_confirm_enter_has_two_buttons(self) -> None:
-        event = _make_event(PromptType.TYPE_CONFIRM_ENTER)
-        blocks = SlackChannel._build_blocks(event)
-        elements = blocks[1]["elements"]
+        blocks = SlackChannel._build_blocks(_make_event(PromptType.TYPE_CONFIRM_ENTER))
+        actions = _find_block(blocks, "actions")
+        elements = actions["elements"]
         assert len(elements) == 2
         labels = [e["text"]["text"] for e in elements]
         assert "Send Enter" in labels
         assert "Cancel" in labels
 
     def test_confirm_enter_value(self) -> None:
-        event = _make_event(PromptType.TYPE_CONFIRM_ENTER)
-        blocks = SlackChannel._build_blocks(event)
-        values = [e["value"] for e in blocks[1]["elements"]]
+        blocks = SlackChannel._build_blocks(_make_event(PromptType.TYPE_CONFIRM_ENTER))
+        actions = _find_block(blocks, "actions")
+        values = [e["value"] for e in actions["elements"]]
         assert any(v.endswith(":enter") for v in values)
         assert any(v.endswith(":cancel") for v in values)
 
     def test_multiple_choice_button_count(self) -> None:
-        event = _make_event(PromptType.TYPE_MULTIPLE_CHOICE, choices=["alpha", "beta", "gamma"])
-        blocks = SlackChannel._build_blocks(event)
-        elements = blocks[1]["elements"]
+        blocks = SlackChannel._build_blocks(
+            _make_event(PromptType.TYPE_MULTIPLE_CHOICE, choices=["alpha", "beta", "gamma"])
+        )
+        actions = _find_block(blocks, "actions")
+        elements = actions["elements"]
         assert len(elements) == 3
         labels = [e["text"]["text"] for e in elements]
         assert labels == ["1", "2", "3"]
 
     def test_free_text_has_no_actions_block(self) -> None:
-        event = _make_event(PromptType.TYPE_FREE_TEXT, excerpt="Describe the task:")
-        blocks = SlackChannel._build_blocks(event)
-        # Free text has no interactive buttons — only the section block
-        assert len(blocks) == 1
-        assert blocks[0]["type"] == "section"
+        blocks = SlackChannel._build_blocks(
+            _make_event(PromptType.TYPE_FREE_TEXT, excerpt="Describe the task:")
+        )
+        actions = _find_block(blocks, "actions")
+        assert actions is None
 
     def test_callback_value_format(self) -> None:
         event = _make_event(PromptType.TYPE_YES_NO)
         blocks = SlackChannel._build_blocks(event)
-        value = blocks[1]["elements"][0]["value"]
-        # Should be: ans:{prompt_id}:{session_id}:{idempotency_key}:{choice}
+        actions = _find_block(blocks, "actions")
+        value = actions["elements"][0]["value"]
         parts = value.split(":")
         assert parts[0] == "ans"
         assert parts[1] == event.prompt_id
@@ -149,16 +224,64 @@ class TestBuildBlocks:
         assert parts[3] == event.idempotency_key
 
     def test_section_contains_mrkdwn(self) -> None:
-        event = _make_event()
-        blocks = SlackChannel._build_blocks(event)
-        section = blocks[0]
-        assert section["type"] == "section"
-        assert section["text"]["type"] == "mrkdwn"
+        blocks = SlackChannel._build_blocks(_make_event())
+        sections = _find_all_blocks(blocks, "section")
+        for section in sections:
+            assert section["text"]["type"] == "mrkdwn"
 
-    def test_section_excerpt_in_text(self) -> None:
-        event = _make_event(excerpt="Do you want to proceed?")
-        blocks = SlackChannel._build_blocks(event)
-        assert "Do you want to proceed?" in blocks[0]["text"]["text"]
+
+class TestBuildBlocksContext:
+    def test_tool_in_header_when_set(self) -> None:
+        blocks = SlackChannel._build_blocks(_make_event(tool="claude"))
+        sections = _find_all_blocks(blocks, "section")
+        header_text = sections[0]["text"]["text"]
+        assert "Tool: claude" in header_text
+
+    def test_tool_absent_when_empty(self) -> None:
+        blocks = SlackChannel._build_blocks(_make_event(tool=""))
+        sections = _find_all_blocks(blocks, "section")
+        header_text = sections[0]["text"]["text"]
+        assert "Tool:" not in header_text
+
+    def test_cwd_in_header_when_set(self) -> None:
+        blocks = SlackChannel._build_blocks(_make_event(cwd="/Users/ara/projects/my-app"))
+        sections = _find_all_blocks(blocks, "section")
+        header_text = sections[0]["text"]["text"]
+        assert "/Users/ara/projects/my-app" in header_text
+
+    def test_cwd_absent_when_empty(self) -> None:
+        blocks = SlackChannel._build_blocks(_make_event(cwd=""))
+        sections = _find_all_blocks(blocks, "section")
+        header_text = sections[0]["text"]["text"]
+        assert "Workspace" not in header_text
+
+
+class TestBuildBlocksResponseInstructions:
+    def test_yes_no_instruction(self) -> None:
+        blocks = SlackChannel._build_blocks(_make_event(PromptType.TYPE_YES_NO))
+        sections = _find_all_blocks(blocks, "section")
+        all_text = " ".join(s["text"]["text"] for s in sections)
+        assert "Tap *Yes* or *No* below" in all_text
+
+    def test_confirm_enter_instruction(self) -> None:
+        blocks = SlackChannel._build_blocks(_make_event(PromptType.TYPE_CONFIRM_ENTER))
+        sections = _find_all_blocks(blocks, "section")
+        all_text = " ".join(s["text"]["text"] for s in sections)
+        assert "Tap *Send Enter* below to continue" in all_text
+
+    def test_multiple_choice_instruction(self) -> None:
+        blocks = SlackChannel._build_blocks(
+            _make_event(PromptType.TYPE_MULTIPLE_CHOICE, choices=["a", "b"])
+        )
+        sections = _find_all_blocks(blocks, "section")
+        all_text = " ".join(s["text"]["text"] for s in sections)
+        assert "Tap a numbered option below" in all_text
+
+    def test_free_text_instruction(self) -> None:
+        blocks = SlackChannel._build_blocks(_make_event(PromptType.TYPE_FREE_TEXT))
+        sections = _find_all_blocks(blocks, "section")
+        all_text = " ".join(s["text"]["text"] for s in sections)
+        assert "Type your response and send it as a message" in all_text
 
 
 # ---------------------------------------------------------------------------
@@ -183,7 +306,6 @@ class TestIsAllowed:
         assert ch.is_allowed("slack:U9999999999") is False
 
     def test_telegram_identity_rejected(self) -> None:
-        # Slack allowed_user_ids use U... format; a Telegram numeric ID won't match
         ch = self._make_channel(["U1234567890"])
         assert ch.is_allowed("telegram:12345678") is False
 

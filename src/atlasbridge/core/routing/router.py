@@ -91,6 +91,13 @@ class PromptRouter:
 
     async def _dispatch(self, event: PromptEvent) -> None:
         """Send event to channel and register state machine."""
+        # Enrich event with session context before dispatch
+        session = self._sessions.get_or_none(event.session_id)
+        if session:
+            event.tool = session.tool
+            event.cwd = session.cwd
+            event.session_label = session.label
+
         sm = PromptStateMachine(event=event)
         self._machines[event.prompt_id] = sm
 

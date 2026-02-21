@@ -336,14 +336,39 @@ class TelegramChannel(BaseChannel):
             Confidence.MED: "medium",
             Confidence.LOW: "low (ambiguous)",
         }
+        response_instructions = {
+            PromptType.TYPE_YES_NO: "Tap <b>Yes</b> or <b>No</b> below.",
+            PromptType.TYPE_CONFIRM_ENTER: "Tap <b>Send Enter</b> below to continue.",
+            PromptType.TYPE_MULTIPLE_CHOICE: "Tap a numbered option below.",
+            PromptType.TYPE_FREE_TEXT: "Type your response and send it as a message.",
+        }
         label = type_labels.get(event.prompt_type, event.prompt_type)
         conf = confidence_labels.get(event.confidence, event.confidence)
-        return (
-            f"<b>AtlasBridge</b> — session <code>{event.session_id[:8]}</code> "
-            f"is waiting for input\n\n"
-            f"<pre>{event.excerpt}</pre>\n\n"
-            f"Type: {label} | Confidence: {conf}"
-        )
+        instruction = response_instructions.get(event.prompt_type, "")
+        ttl_min = event.ttl_seconds // 60
+
+        lines = [
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            "<b>AtlasBridge</b> — Input Required\n",
+            f"Session: <code>{event.session_id[:8]}</code>",
+        ]
+
+        if event.tool:
+            lines.append(f"Tool: {event.tool}")
+
+        if event.cwd:
+            lines.append(f"\nWorkspace:\n{event.cwd}")
+
+        lines.append(f"\nQuestion:\n<pre>{event.excerpt}</pre>")
+
+        if instruction:
+            lines.append(f"\nHow to respond:\n{instruction}")
+
+        lines.append(f"\n⏱ Expires in {ttl_min} minutes.")
+        lines.append(f"Type: {label} | Confidence: {conf}")
+        lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+        return "\n".join(lines)
 
     @staticmethod
     def _build_keyboard(event: PromptEvent) -> list[list[dict[str, str]]]:

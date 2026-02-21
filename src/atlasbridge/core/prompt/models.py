@@ -58,6 +58,11 @@ class PromptEvent:
     )  # Original terminal bytes (not sent to channel)
     ttl_seconds: int = 300  # Default 5 min TTL
 
+    # Session context — populated by PromptRouter before dispatch
+    tool: str = ""  # Adapter name (e.g. "claude", "openai", "gemini")
+    cwd: str = ""  # Working directory of the session
+    session_label: str = ""  # Optional human label (e.g. git branch name)
+
     @classmethod
     def create(
         cls,
