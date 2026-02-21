@@ -1,4 +1,4 @@
-"""aegis debug bundle — create a redacted support bundle."""
+"""atlasbridge debug bundle — create a redacted support bundle."""
 
 from __future__ import annotations
 

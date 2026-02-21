@@ -1,4 +1,4 @@
-"""aegis lab — Prompt Lab CLI commands."""
+"""atlasbridge lab — Prompt Lab CLI commands."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from rich.console import Console
 
 def _ensure_tests_importable() -> None:
     """Add project root to sys.path so tests.prompt_lab can be imported."""
-    # This file: src/aegis/cli/_lab.py  →  parents[3] = project root
+    # This file: src/atlasbridge/cli/_lab.py  →  parents[3] = project root
     project_root = Path(__file__).parents[3]
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))

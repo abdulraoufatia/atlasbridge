@@ -1,4 +1,4 @@
-"""aegis sessions — list active sessions."""
+"""atlasbridge sessions — list active sessions."""
 
 from __future__ import annotations
 

@@ -13,7 +13,7 @@ Planned implementation:
   - CRLF normalization (\\r\\n → \\n) in the output stream
   - inject_reply() uses CRLF (\\r\\n) on Windows
 
-Feature flag: aegis.config.experimental.conpty_backend
+Feature flag: atlasbridge.config.experimental.conpty_backend
 """
 
 from __future__ import annotations
@@ -39,8 +39,8 @@ class WindowsTTY(BaseTTY):
             )
         raise NotImplementedError(
             "WindowsTTY (ConPTY) is not yet implemented. "
-            "It is planned for Aegis v0.5.0. "
-            "Track progress: https://github.com/aegis-cli/aegis/issues/XX"
+            "It is planned for AtlasBridge v0.9.0. "
+            "Track progress: https://github.com/abdulraoufatia/atlasbridge/issues"
         )
 
     async def start(self) -> None:

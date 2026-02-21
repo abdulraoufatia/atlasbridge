@@ -362,21 +362,21 @@ def _maybe_install_systemd(console: Console, config_path: str) -> None:
     console.print()
     install = Confirm.ask(
         "[bold]Install systemd user service?[/bold] "
-        "(enables [cyan]systemctl --user start aegis[/cyan])",
+        "(enables [cyan]systemctl --user start atlasbridge[/cyan])",
         default=True,
     )
     if not install:
         console.print("[dim]Skipped systemd service installation.[/dim]")
         return
 
-    aegis_bin = shutil.which("atlasbridge") or "atlasbridge"
-    unit = generate_unit_file(exec_path=aegis_bin, config_path=config_path)
+    atlasbridge_bin = shutil.which("atlasbridge") or "atlasbridge"
+    unit = generate_unit_file(exec_path=atlasbridge_bin, config_path=config_path)
     try:
         unit_path = install_service(unit)
         reload_daemon()
         enable_service()
         console.print(f"[green]Service installed:[/green] {unit_path}")
-        console.print("Start now: [cyan]systemctl --user start aegis[/cyan]")
+        console.print("Start now: [cyan]systemctl --user start atlasbridge[/cyan]")
     except Exception as exc:  # noqa: BLE001
         console.print(f"[yellow]Could not install service: {exc}[/yellow]")
         console.print(

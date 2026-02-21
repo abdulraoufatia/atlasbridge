@@ -1,7 +1,7 @@
 """
 Session domain models.
 
-A Session represents one invocation of a CLI tool under Aegis supervision.
+A Session represents one invocation of a CLI tool under AtlasBridge supervision.
 Sessions are identified by a UUID and are associated with exactly one
 PTY supervisor and zero or more PromptEvents.
 """
@@ -26,7 +26,7 @@ class SessionStatus(StrEnum):
 
 @dataclass
 class Session:
-    """Represents one CLI tool session managed by Aegis."""
+    """Represents one CLI tool session managed by AtlasBridge."""
 
     session_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     tool: str = ""  # Adapter name (e.g. "claude", "openai")

@@ -36,7 +36,7 @@ class BaseAdapter(ABC):
     #: Short identifier used in config files and CLI output (e.g. "claude")
     tool_name: str = ""
 
-    #: Human-readable description shown in `aegis adapter list`
+    #: Human-readable description shown in `atlasbridge adapter list`
     description: str = ""
 
     #: Minimum supported version of the wrapped tool (semver string or "")
@@ -126,7 +126,7 @@ class BaseAdapter(ABC):
         """
         Return health status for this adapter.
 
-        Called by `aegis doctor`. Default returns {"status": "ok"}.
+        Called by `atlasbridge doctor`. Default returns {"status": "ok"}.
         """
         return {"status": "ok", "adapter": self.tool_name}
 

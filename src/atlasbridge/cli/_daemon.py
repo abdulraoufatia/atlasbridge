@@ -1,4 +1,4 @@
-"""aegis start / stop — daemon lifecycle commands."""
+"""atlasbridge start / stop — daemon lifecycle commands."""
 
 from __future__ import annotations
 
@@ -9,12 +9,16 @@ from pathlib import Path
 
 from rich.console import Console
 
-_PID_FILE = Path.home() / ".aegis" / "aegis.pid"
+
+def _pid_file_path() -> Path:
+    from atlasbridge.core.constants import PID_FILENAME, _default_data_dir
+
+    return _default_data_dir() / PID_FILENAME
 
 
 def _read_pid() -> int | None:
     try:
-        return int(_PID_FILE.read_text().strip())
+        return int(_pid_file_path().read_text().strip())
     except (FileNotFoundError, ValueError):
         return None
 
@@ -28,7 +32,7 @@ def _pid_alive(pid: int) -> bool:
 
 
 def cmd_start(foreground: bool, console: Console) -> None:
-    """Start the Aegis daemon (foreground or background)."""
+    """Start the AtlasBridge daemon (foreground or background)."""
     from atlasbridge.core.config import load_config
     from atlasbridge.core.exceptions import ConfigError, ConfigNotFoundError
 
@@ -65,7 +69,8 @@ def cmd_start(foreground: bool, console: Console) -> None:
             console.print("\n[yellow]Daemon stopped.[/yellow]")
     else:
         # Fork into background
-        _PID_FILE.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        pid_file = _pid_file_path()
+        pid_file.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         child_pid = os.fork()
         if child_pid == 0:
             # Child process — become daemon
@@ -80,14 +85,14 @@ def cmd_start(foreground: bool, console: Console) -> None:
         else:
             # Parent — report the child PID
             console.print(f"[green]AtlasBridge daemon started[/green] (PID {child_pid})")
-            console.print(f"PID file: {_PID_FILE}")
+            console.print(f"PID file: {pid_file}")
             console.print(
                 "Use [cyan]atlasbridge status[/cyan] to check and [cyan]atlasbridge stop[/cyan] to stop."
             )
 
 
 def cmd_stop(console: Console) -> None:
-    """Stop the running Aegis daemon."""
+    """Stop the running AtlasBridge daemon."""
     pid = _read_pid()
     if pid is None:
         console.print("[yellow]AtlasBridge daemon is not running (no PID file).[/yellow]")
@@ -95,7 +100,7 @@ def cmd_stop(console: Console) -> None:
 
     if not _pid_alive(pid):
         console.print(f"[yellow]No process with PID {pid}. Cleaning up stale PID file.[/yellow]")
-        _PID_FILE.unlink(missing_ok=True)
+        _pid_file_path().unlink(missing_ok=True)
         return
 
     try:

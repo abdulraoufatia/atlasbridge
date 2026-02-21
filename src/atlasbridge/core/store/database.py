@@ -106,7 +106,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_timestamp
 
 
 class Database:
-    """SQLite persistence layer for Aegis."""
+    """SQLite persistence layer for AtlasBridge."""
 
     def __init__(self, db_path: Path) -> None:
         self._path = db_path

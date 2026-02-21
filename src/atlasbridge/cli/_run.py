@@ -1,4 +1,4 @@
-"""aegis run — launch a CLI tool under Aegis supervision."""
+"""atlasbridge run — launch a CLI tool under AtlasBridge supervision."""
 
 from __future__ import annotations
 

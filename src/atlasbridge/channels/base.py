@@ -37,7 +37,7 @@ class BaseChannel(ABC):
     #: Short identifier used in config and logs (e.g. "telegram")
     channel_name: str = ""
 
-    #: Human-readable name shown in `aegis channel list`
+    #: Human-readable name shown in `atlasbridge channel list`
     display_name: str = ""
 
     # ------------------------------------------------------------------
@@ -141,6 +141,6 @@ class BaseChannel(ABC):
         """
         Return health status for this channel.
 
-        Called by `aegis doctor`. Default returns {"status": "ok"}.
+        Called by `atlasbridge doctor`. Default returns {"status": "ok"}.
         """
         return {"status": "ok", "channel": self.channel_name}

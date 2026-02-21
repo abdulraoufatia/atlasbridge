@@ -18,7 +18,7 @@ Callback data format:
   and the callback_data uses a short reference key.
 
 Rate limiting:
-  Telegram allows ~30 messages/second per bot. Aegis sends at most
+  Telegram allows ~30 messages/second per bot. AtlasBridge sends at most
   1 prompt per session at a time, so rate limiting is not a concern
   for normal usage. The channel implements exponential backoff on 429.
 
@@ -339,7 +339,7 @@ class TelegramChannel(BaseChannel):
         label = type_labels.get(event.prompt_type, event.prompt_type)
         conf = confidence_labels.get(event.confidence, event.confidence)
         return (
-            f"<b>Aegis</b> — session <code>{event.session_id[:8]}</code> "
+            f"<b>AtlasBridge</b> — session <code>{event.session_id[:8]}</code> "
             f"is waiting for input\n\n"
             f"<pre>{event.excerpt}</pre>\n\n"
             f"Type: {label} | Confidence: {conf}"

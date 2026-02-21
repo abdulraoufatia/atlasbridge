@@ -12,7 +12,7 @@ Codex CLI prompt characteristics:
   - Model selection:      "Choose model: [1] gpt-4o  [2] gpt-4-turbo"
   - Free-text inputs:     "Enter a description:", "Provide context:"
 
-Registration key: "openai" (``aegis run openai``)
+Registration key: "openai" (``atlasbridge run openai``)
 """
 
 from __future__ import annotations

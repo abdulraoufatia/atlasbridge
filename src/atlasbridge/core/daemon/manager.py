@@ -1,7 +1,7 @@
 """
 Daemon manager.
 
-The DaemonManager orchestrates all top-level Aegis components for one
+The DaemonManager orchestrates all top-level AtlasBridge components for one
 daemon process lifetime:
   - Loads configuration
   - Connects to the database
@@ -10,10 +10,10 @@ daemon process lifetime:
   - Runs the reply consumer loop
   - Handles graceful shutdown on SIGTERM/SIGINT
 
-The daemon is a long-running asyncio process started by `aegis start`
+The daemon is a long-running asyncio process started by `atlasbridge start`
 and managed by launchd (macOS) or systemd (Linux).
 
-PID file: ~/.aegis/aegis.pid
+PID file: <data_dir>/atlasbridge.pid
 """
 
 from __future__ import annotations
@@ -28,12 +28,12 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_DATA_DIR = Path.home() / ".aegis"
+_DEFAULT_DATA_DIR = Path.home() / ".atlasbridge"
 
 
 class DaemonManager:
     """
-    Top-level orchestrator for the Aegis daemon.
+    Top-level orchestrator for the AtlasBridge daemon.
 
     Lifecycle::
 
@@ -56,7 +56,7 @@ class DaemonManager:
 
     async def start(self) -> None:
         """Start all subsystems and run until shutdown."""
-        logger.info("Aegis daemon starting")
+        logger.info("AtlasBridge daemon starting")
         self._write_pid_file()
 
         try:
@@ -70,13 +70,13 @@ class DaemonManager:
             self._running = True
             self._setup_signal_handlers()
 
-            logger.info("Aegis daemon ready")
+            logger.info("AtlasBridge daemon ready")
             await self._run_loop()
 
         finally:
             await self._cleanup()
             self._remove_pid_file()
-            logger.info("Aegis daemon stopped")
+            logger.info("AtlasBridge daemon stopped")
 
     async def stop(self) -> None:
         """Request graceful shutdown."""
@@ -89,7 +89,7 @@ class DaemonManager:
     async def _init_database(self) -> None:
         from atlasbridge.core.store.database import Database
 
-        db_path = self._data_dir / "aegis.db"
+        db_path = self._data_dir / "atlasbridge.db"
         self._db = Database(db_path)
         self._db.connect()
         logger.info("Database connected: %s", db_path)
@@ -343,12 +343,12 @@ class DaemonManager:
     # ------------------------------------------------------------------
 
     def _write_pid_file(self) -> None:
-        pid_file = self._data_dir / "aegis.pid"
+        pid_file = self._data_dir / "atlasbridge.pid"
         self._data_dir.mkdir(parents=True, exist_ok=True)
         pid_file.write_text(str(os.getpid()))
 
     def _remove_pid_file(self) -> None:
-        pid_file = self._data_dir / "aegis.pid"
+        pid_file = self._data_dir / "atlasbridge.pid"
         pid_file.unlink(missing_ok=True)
 
     # ------------------------------------------------------------------

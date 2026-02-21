@@ -1,4 +1,4 @@
-"""aegis channel add — add/reconfigure a notification channel."""
+"""atlasbridge channel add — add/reconfigure a notification channel."""
 
 from __future__ import annotations
 

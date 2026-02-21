@@ -1,4 +1,4 @@
-"""aegis status — daemon and session status."""
+"""atlasbridge status — daemon and session status."""
 
 from __future__ import annotations
 
@@ -9,12 +9,16 @@ from pathlib import Path
 from rich.console import Console
 from rich.table import Table
 
-_PID_FILE = Path.home() / ".aegis" / "aegis.pid"
+
+def _pid_file_path() -> Path:
+    from atlasbridge.core.constants import PID_FILENAME, _default_data_dir
+
+    return _default_data_dir() / PID_FILENAME
 
 
 def _read_pid() -> int | None:
     try:
-        return int(_PID_FILE.read_text().strip())
+        return int(_pid_file_path().read_text().strip())
     except (FileNotFoundError, ValueError):
         return None
 

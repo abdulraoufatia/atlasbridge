@@ -3,7 +3,7 @@ Slack channel implementation.
 
 Uses httpx for Slack Web API calls (chat.postMessage, chat.update, conversations.open).
 Uses Slack Socket Mode for receiving interactive component callbacks — requires the
-optional ``aegis-cli[slack]`` extra (slack-sdk + websockets).
+optional ``atlasbridge[slack]`` extra (slack-sdk + websockets).
 
 Block Kit message structure:
   section block — formatted prompt text (mrkdwn)
@@ -15,7 +15,7 @@ Callback value format (same as Telegram for consistency):
 Socket Mode:
   Requires a Slack App with Socket Mode enabled and an app-level token (xapp-*).
   If slack_sdk is not installed, interactive replies are unavailable but
-  Aegis can still SEND prompts to Slack.
+  AtlasBridge can still SEND prompts to Slack.
 
 Allowlist:
   Config key: channels.slack.allowed_users (list of Slack user IDs, e.g. "U1234567890")
@@ -164,7 +164,7 @@ class SlackChannel(BaseChannel):
         Listen for Slack interactive component callbacks via Socket Mode.
 
         Requires ``slack_sdk[socket-mode]`` and ``websockets``.
-        Installs with: pip install "aegis-cli[slack]"
+        Installs with: pip install "atlasbridge[slack]"
 
         If slack_sdk is not installed, this coroutine exits immediately
         with a warning — outgoing prompts still work, but interactive
@@ -175,7 +175,7 @@ class SlackChannel(BaseChannel):
         except ImportError:
             logger.warning(
                 "slack_sdk not installed — Slack interactive replies unavailable. "
-                "Install with: pip install 'aegis-cli[slack]'"
+                "Install with: pip install 'atlasbridge[slack]'"
             )
             return
 
@@ -300,7 +300,7 @@ class SlackChannel(BaseChannel):
         }
         label = type_labels.get(event.prompt_type, event.prompt_type)
         return (
-            f"Aegis — session {event.session_id[:8]} is waiting for input ({label}): "
+            f"AtlasBridge — session {event.session_id[:8]} is waiting for input ({label}): "
             f"{event.excerpt[:120]}"
         )
 
@@ -327,7 +327,7 @@ class SlackChannel(BaseChannel):
                 "text": {
                     "type": "mrkdwn",
                     "text": (
-                        f"*Aegis* — session `{event.session_id[:8]}` is waiting for input\n\n"
+                        f"*AtlasBridge* — session `{event.session_id[:8]}` is waiting for input\n\n"
                         f"```{event.excerpt}```\n\n"
                         f"Type: {label} | Confidence: {conf}"
                     ),
@@ -346,14 +346,14 @@ class SlackChannel(BaseChannel):
                             "type": "button",
                             "text": {"type": "plain_text", "text": "Yes"},
                             "value": f"{base}:y",
-                            "action_id": "aegis_yes",
+                            "action_id": "atlasbridge_yes",
                             "style": "primary",
                         },
                         {
                             "type": "button",
                             "text": {"type": "plain_text", "text": "No"},
                             "value": f"{base}:n",
-                            "action_id": "aegis_no",
+                            "action_id": "atlasbridge_no",
                             "style": "danger",
                         },
                     ],
@@ -368,13 +368,13 @@ class SlackChannel(BaseChannel):
                             "type": "button",
                             "text": {"type": "plain_text", "text": "Send Enter"},
                             "value": f"{base}:enter",
-                            "action_id": "aegis_enter",
+                            "action_id": "atlasbridge_enter",
                         },
                         {
                             "type": "button",
                             "text": {"type": "plain_text", "text": "Cancel"},
                             "value": f"{base}:cancel",
-                            "action_id": "aegis_cancel",
+                            "action_id": "atlasbridge_cancel",
                             "style": "danger",
                         },
                     ],
@@ -386,7 +386,7 @@ class SlackChannel(BaseChannel):
                     "type": "button",
                     "text": {"type": "plain_text", "text": str(i + 1)},
                     "value": f"{base}:{i + 1}",
-                    "action_id": f"aegis_choice_{i + 1}",
+                    "action_id": f"atlasbridge_choice_{i + 1}",
                 }
                 for i in range(len(event.choices))
             ]

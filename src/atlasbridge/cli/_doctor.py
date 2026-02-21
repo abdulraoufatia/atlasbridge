@@ -152,16 +152,16 @@ def _check_poller_lock() -> dict | None:
 
 
 def _check_systemd_service() -> dict | None:
-    """Linux-only: check if the aegis.service unit is installed."""
+    """Linux-only: check if the atlasbridge.service unit is installed."""
     if not sys.platform.startswith("linux"):
         return None
     from atlasbridge.os.systemd.service import systemd_user_dir
 
-    unit_path = systemd_user_dir() / "aegis.service"
+    unit_path = systemd_user_dir() / "atlasbridge.service"
     if unit_path.exists():
-        return {"name": "aegis.service", "status": "pass", "detail": str(unit_path)}
+        return {"name": "atlasbridge.service", "status": "pass", "detail": str(unit_path)}
     return {
-        "name": "aegis.service",
+        "name": "atlasbridge.service",
         "status": "warn",
         "detail": "not installed — run: atlasbridge setup --install-service",
     }

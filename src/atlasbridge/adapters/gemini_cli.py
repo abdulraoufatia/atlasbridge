@@ -12,7 +12,7 @@ Gemini CLI prompt characteristics:
   - Model selection:      "Choose a model:\n  [1] gemini-1.5-pro\n  [2] gemini-1.5-flash"
   - Free-text inputs:     "Enter your prompt:", "Describe the task:"
 
-Registration key: "gemini" (``aegis run gemini``)
+Registration key: "gemini" (``atlasbridge run gemini``)
 """
 
 from __future__ import annotations
