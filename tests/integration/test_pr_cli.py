@@ -70,9 +70,7 @@ class TestPRAutoRunOnce:
         assert result.exit_code == 0
         assert "No open PRs" in result.output
 
-    def test_run_once_missing_token_exits_nonzero(
-        self, runner: CliRunner, tmp_path: Path
-    ) -> None:
+    def test_run_once_missing_token_exits_nonzero(self, runner: CliRunner, tmp_path: Path) -> None:
         import tomli_w
 
         data = {
@@ -113,6 +111,7 @@ class TestPRAutoRunOnce:
         # If an error occurred, print it for debugging
         if result.exception:
             import traceback
+
             traceback.print_exception(
                 type(result.exception), result.exception, result.exception.__traceback__
             )
@@ -132,12 +131,15 @@ class TestPRAutoRunOnce:
 
 class TestPRAutoStatus:
     def test_status_when_stopped(self, runner: CliRunner, config_path: Path) -> None:
-        with patch(
-            "aegis.core.daemon_services.pr_automation_service.is_running",
-            return_value=False,
-        ), patch(
-            "aegis.core.daemon_services.pr_automation_service._STATUS_FILE",
-            Path("/nonexistent/status.json"),
+        with (
+            patch(
+                "aegis.core.daemon_services.pr_automation_service.is_running",
+                return_value=False,
+            ),
+            patch(
+                "aegis.core.daemon_services.pr_automation_service._STATUS_FILE",
+                Path("/nonexistent/status.json"),
+            ),
         ):
             result = runner.invoke(
                 cli,

@@ -162,9 +162,7 @@ class FixEngine:
     # Claude fix
     # ------------------------------------------------------------------
 
-    async def _attempt_fix(
-        self, test_output: str, attempt: int
-    ) -> list[dict[str, str]] | None:
+    async def _attempt_fix(self, test_output: str, attempt: int) -> list[dict[str, str]] | None:
         """
         Ask Claude to analyse failures and return a list of file changes.
         Returns a list of {"path": ..., "content": ...} dicts, or None.
@@ -203,9 +201,7 @@ class FixEngine:
     # Apply changes
     # ------------------------------------------------------------------
 
-    async def _apply_changes(
-        self, changes: list[dict[str, str]]
-    ) -> list[str]:
+    async def _apply_changes(self, changes: list[dict[str, str]]) -> list[str]:
         """Write changed files to disk. Returns list of modified paths."""
         changed: list[str] = []
         for change in changes:
@@ -271,12 +267,10 @@ def _collect_relevant_files(repo: Path, test_output: str) -> dict[str, str]:
     return files
 
 
-def _build_fix_prompt(
-    test_output: str, file_context: dict[str, str], attempt: int
-) -> str:
+def _build_fix_prompt(test_output: str, file_context: dict[str, str], attempt: int) -> str:
     ctx_parts = []
     for path, content in file_context.items():
-        ctx_parts.append(f"<file path=\"{path}\">\n{content}\n</file>")
+        ctx_parts.append(f'<file path="{path}">\n{content}\n</file>')
 
     file_ctx = "\n".join(ctx_parts) if ctx_parts else "(no source files identified)"
     truncated_output = test_output[-_MAX_OUTPUT_CHARS:]

@@ -128,7 +128,7 @@ def _read_last_hash(path: Path) -> str | None:
             f.seek(max(0, size - 4096))
             content = f.read().rstrip(b"\n")
             last_nl = content.rfind(b"\n")
-            line = content[last_nl + 1:] if last_nl != -1 else content
+            line = content[last_nl + 1 :] if last_nl != -1 else content
         if not line:
             return None
         obj = json.loads(line)

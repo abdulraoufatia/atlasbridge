@@ -74,9 +74,7 @@ class PRResult:
     commit_sha: str | None = None
     error: str | None = None
     protection_snapshot: dict[str, Any] = field(default_factory=dict)
-    timestamp: str = field(
-        default_factory=lambda: datetime.now(UTC).isoformat()
-    )
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 @dataclass
@@ -136,9 +134,7 @@ class PRAutomationEngine:
 
         return results
 
-    async def _process_pr(
-        self, gh: GitHubClient, pr: dict[str, Any]
-    ) -> PRResult:
+    async def _process_pr(self, gh: GitHubClient, pr: dict[str, Any]) -> PRResult:
         number = pr["number"]
         title = pr["title"]
         branch = pr["head"]["ref"]
@@ -179,20 +175,21 @@ class PRAutomationEngine:
         }
         log.debug(
             "PR #%d: required_checks=%s, required_reviews=%d",
-            number, required_checks, required_reviews,
+            number,
+            required_checks,
+            required_reviews,
         )
 
         # --- Required reviews check ---
         if required_reviews > 0:
             reviews = await gh.get_pr_reviews(number)
-            approved = sum(
-                1 for r in reviews
-                if r.get("state") == "APPROVED"
-            )
+            approved = sum(1 for r in reviews if r.get("state") == "APPROVED")
             if approved < required_reviews:
                 log.info(
                     "PR #%d: %d/%d required reviews — skipping",
-                    number, approved, required_reviews,
+                    number,
+                    approved,
+                    required_reviews,
                 )
                 return _skip(result, SkipReason.MISSING_REVIEWS)
 
@@ -225,9 +222,7 @@ class PRAutomationEngine:
             )
 
             if not ci_ok:
-                log.warning(
-                    "PR #%d: CI still failing after fix: %s", number, failing
-                )
+                log.warning("PR #%d: CI still failing after fix: %s", number, failing)
                 return _skip(result, SkipReason.REQUIRED_CHECK_FAILING)
 
             # Re-fetch PR for updated mergeability / SHA
@@ -272,8 +267,9 @@ class PRAutomationEngine:
         result.fix_attempts = fix_result.attempt
 
         if not fix_result.success:
-            log.warning("PR #%d: tests still failing after %d fix attempts",
-                        pr_number, fix_result.attempt)
+            log.warning(
+                "PR #%d: tests still failing after %d fix attempts", pr_number, fix_result.attempt
+            )
             return _skip(result, SkipReason.FIX_FAILED)
 
         if not fix_result.changed_files:
@@ -310,7 +306,9 @@ class PRAutomationEngine:
         if self._cfg.dry_run:
             log.info(
                 "[dry_run] Would merge PR #%d (%s) via %s",
-                result.pr_number, result.branch, self._cfg.merge_method,
+                result.pr_number,
+                result.branch,
+                self._cfg.merge_method,
             )
             return _skip(result, SkipReason.DRY_RUN)
 
@@ -379,8 +377,12 @@ async def _git_commit_and_push(
         return None
 
     commit_cmd = [
-        "git", "commit", "-m", message,
-        "--author", "Aegis Bot <aegis-bot@noreply.local>",
+        "git",
+        "commit",
+        "-m",
+        message,
+        "--author",
+        "Aegis Bot <aegis-bot@noreply.local>",
     ]
     if not await _run_cmd(commit_cmd, cwd=repo):
         return None
@@ -407,9 +409,7 @@ async def _run_cmd(cmd: list[str], cwd: Path) -> bool:
     try:
         result = await loop.run_in_executor(
             None,
-            lambda: subprocess.run(
-                cmd, cwd=str(cwd), capture_output=True, text=True, timeout=120
-            ),
+            lambda: subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, timeout=120),
         )
         if result.returncode != 0:
             log.debug("cmd %s failed: %s", cmd, result.stderr[:500])
@@ -425,9 +425,7 @@ async def _run_cmd_output(cmd: list[str], cwd: Path) -> str:
     try:
         result = await loop.run_in_executor(
             None,
-            lambda: subprocess.run(
-                cmd, cwd=str(cwd), capture_output=True, text=True, timeout=30
-            ),
+            lambda: subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, timeout=30),
         )
         return result.stdout
     except Exception:
@@ -504,7 +502,10 @@ async def _poll_ci_until_complete(
 
         log.debug(
             "CI in progress for %s — waiting %ds (elapsed=%d/%d)",
-            sha[:8], interval, elapsed, timeout,
+            sha[:8],
+            interval,
+            elapsed,
+            timeout,
         )
         await asyncio.sleep(interval)
         elapsed += interval
@@ -542,15 +543,22 @@ def _log_result(result: PRResult) -> None:
     if result.merged:
         log.info(
             "PR #%d (%s): MERGED via branch=%s commit=%s",
-            result.pr_number, result.pr_title, result.branch, result.commit_sha,
+            result.pr_number,
+            result.pr_title,
+            result.branch,
+            result.commit_sha,
         )
     elif result.skipped:
         log.info(
             "PR #%d (%s): SKIPPED reason=%s",
-            result.pr_number, result.pr_title, result.skip_reason,
+            result.pr_number,
+            result.pr_title,
+            result.skip_reason,
         )
     else:
         log.error(
             "PR #%d (%s): ERROR %s",
-            result.pr_number, result.pr_title, result.error,
+            result.pr_number,
+            result.pr_title,
+            result.error,
         )

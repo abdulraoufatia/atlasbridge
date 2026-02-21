@@ -135,9 +135,7 @@ class AutoPRConfig(BaseModel):
     require_all_checks: bool = True
     # If non-empty, only act on PRs for these repos (owner/repo format)
     allowlist_repos: list[str] = Field(default_factory=list)
-    concurrency: AutoPRConcurrencyConfig = Field(
-        default_factory=AutoPRConcurrencyConfig
-    )
+    concurrency: AutoPRConcurrencyConfig = Field(default_factory=AutoPRConcurrencyConfig)
     # dry_run=True: log everything but never push, never merge
     dry_run: bool = True
     # CI polling: max time to wait for checks to complete
@@ -163,9 +161,7 @@ class AutoPRConfig(BaseModel):
     @classmethod
     def validate_merge_method(cls, v: str) -> str:
         if v not in ("squash", "merge", "rebase"):
-            raise ValueError(
-                "auto_pr.merge_method must be 'squash', 'merge', or 'rebase'"
-            )
+            raise ValueError("auto_pr.merge_method must be 'squash', 'merge', or 'rebase'")
         return v
 
 

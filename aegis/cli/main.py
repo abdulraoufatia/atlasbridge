@@ -89,6 +89,7 @@ def setup(token: str | None, users: str | None, timeout: int, free_text: bool) -
     # Validate before writing
     try:
         from aegis.core.config import AegisConfig
+
         AegisConfig.model_validate(config_data)
     except Exception as exc:
         err_console.print(f"[red]Validation error:[/red] {exc}")
@@ -127,6 +128,7 @@ def run(ctx: click.Context, command: tuple[str, ...], session_id: str | None) ->
     """
     try:
         from aegis.core.config import load_config
+
         config = load_config()
     except ConfigNotFoundError as exc:
         err_console.print(f"[red]{exc}[/red]")
@@ -204,6 +206,7 @@ def status() -> None:
     """Show active Aegis sessions."""
     try:
         from aegis.core.config import load_config
+
         config = load_config()
     except AegisError as exc:
         err_console.print(f"[red]{exc}[/red]")
@@ -284,12 +287,14 @@ def _require_python() -> str:
 
 def _check_config() -> str:
     from aegis.core.config import load_config
+
     cfg = load_config()
     return str(cfg._config_path)
 
 
 def _check_telegram_token() -> str:
     from aegis.core.config import load_config
+
     cfg = load_config()
     tok = cfg.telegram.bot_token.get_secret_value()
     return f"{tok[:8]}…"
@@ -298,6 +303,7 @@ def _check_telegram_token() -> str:
 def _check_db() -> str:
     from aegis.core.config import load_config
     from aegis.store.database import Database
+
     cfg = load_config()
     db = Database(cfg.db_path)
     db.connect()
@@ -317,6 +323,7 @@ def approvals(session: str | None, show_all: bool) -> None:
     """List pending (or recent) prompts."""
     try:
         from aegis.core.config import load_config
+
         config = load_config()
     except AegisError as exc:
         err_console.print(f"[red]{exc}[/red]")
@@ -391,6 +398,7 @@ def logs(lines: int, follow: bool) -> None:
     """View Aegis log output."""
     try:
         from aegis.core.config import load_config
+
         config = load_config()
     except AegisError as exc:
         err_console.print(f"[red]{exc}[/red]")
@@ -405,6 +413,7 @@ def logs(lines: int, follow: bool) -> None:
         os.execvp("tail", ["tail", "-f", str(log_path)])
     else:
         import subprocess
+
         subprocess.run(["tail", f"-n{lines}", str(log_path)])
 
 
@@ -423,6 +432,7 @@ def audit_verify() -> None:
     """Verify the integrity of the audit log hash chain."""
     try:
         from aegis.core.config import load_config
+
         config = load_config()
     except AegisError as exc:
         err_console.print(f"[red]{exc}[/red]")
@@ -510,6 +520,7 @@ def uninstall_service() -> None:
 
 def _find_aegis_bin() -> str | None:
     import shutil
+
     return shutil.which("aegis")
 
 
@@ -535,6 +546,7 @@ def pr_auto_start(dry_run: bool | None) -> None:
 
     try:
         from aegis.core.config import load_config
+
         config = load_config()
     except AegisError as exc:
         err_console.print(f"[red]{exc}[/red]")
@@ -580,6 +592,7 @@ def pr_auto_status(as_json: bool) -> None:
 
     if as_json:
         import json as _json
+
         console.print(_json.dumps(data, indent=2))
         return
 
@@ -630,6 +643,7 @@ def pr_auto_run_once(dry_run: bool | None, as_json: bool) -> None:
     """Run one PR triage cycle immediately (foreground, no daemon)."""
     try:
         from aegis.core.config import load_config
+
         config = load_config()
     except AegisError as exc:
         err_console.print(f"[red]{exc}[/red]")
@@ -667,6 +681,7 @@ def pr_auto_run_once(dry_run: bool | None, as_json: bool) -> None:
 
     if as_json:
         import json as _json
+
         console.print(
             _json.dumps(
                 [

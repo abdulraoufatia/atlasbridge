@@ -272,9 +272,7 @@ class TelegramBot(BaseChannel):
         # Acknowledge and update message
         await self._answer_callback(cq_id, f"✅ Recorded: {normalized!r}")
         if chat_id and msg_id:
-            await self._edit_message(
-                chat_id, msg_id, format_response_accepted(prompt, normalized)
-            )
+            await self._edit_message(chat_id, msg_id, format_response_accepted(prompt, normalized))
 
         # Signal the supervisor
         await self._response_queue.put((prompt_id, normalized))

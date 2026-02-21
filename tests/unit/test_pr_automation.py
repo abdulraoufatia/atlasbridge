@@ -219,9 +219,7 @@ class TestBranchProtectionGating:
         ]
         gh.get_combined_status.return_value = {"statuses": []}
         gh.get_branch_protection.return_value = {
-            "required_pull_request_reviews": {
-                "required_approving_review_count": 2
-            },
+            "required_pull_request_reviews": {"required_approving_review_count": 2},
             "required_status_checks": {"contexts": [], "checks": []},
         }
         gh.get_required_checks.return_value = []

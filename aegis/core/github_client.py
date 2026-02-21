@@ -96,9 +96,7 @@ class GitHubClient:
 
     async def get_combined_status(self, ref: str) -> dict[str, Any]:
         """Return the combined commit status (legacy Status API)."""
-        return await self._get(
-            f"/repos/{self._repo}/commits/{ref}/status"
-        )
+        return await self._get(f"/repos/{self._repo}/commits/{ref}/status")
 
     async def get_branch_protection(self, branch: str) -> dict[str, Any] | None:
         """
@@ -106,9 +104,7 @@ class GitHubClient:
         Returns None if no protection rules are configured.
         """
         try:
-            return await self._get(
-                f"/repos/{self._repo}/branches/{branch}/protection"
-            )
+            return await self._get(f"/repos/{self._repo}/branches/{branch}/protection")
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 404:
                 return None
@@ -145,9 +141,7 @@ class GitHubClient:
             payload["commit_message"] = commit_message
         if sha:
             payload["sha"] = sha
-        return await self._put(
-            f"/repos/{self._repo}/pulls/{pr_number}/merge", json=payload
-        )
+        return await self._put(f"/repos/{self._repo}/pulls/{pr_number}/merge", json=payload)
 
     async def delete_branch(self, branch: str) -> None:
         """Delete a remote branch."""

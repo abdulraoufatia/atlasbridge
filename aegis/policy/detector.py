@@ -51,7 +51,10 @@ _YES_NO_PATTERNS: list[re.Pattern[str]] = [
     # Trailing "? [y/n]" or "? (y/n)"
     re.compile(r"\?\s*[\[\(]\s*[yYnN]\s*/\s*[yYnN]\s*[\]\)]"),
     # "Proceed? y/n" or "Continue? (y/n):"
-    re.compile(r"(?:proceed|continue|confirm|allow|accept|approve|delete|remove|overwrite|install|update|upgrade|reset|clear|flush|terminate|kill|stop|disable|enable)\b.*\?\s*[\[\(]?[Yy]\s*/\s*[Nn][\]\)]?", re.IGNORECASE),
+    re.compile(
+        r"(?:proceed|continue|confirm|allow|accept|approve|delete|remove|overwrite|install|update|upgrade|reset|clear|flush|terminate|kill|stop|disable|enable)\b.*\?\s*[\[\(]?[Yy]\s*/\s*[Nn][\]\)]?",
+        re.IGNORECASE,
+    ),
     # "Press y to continue, n to abort"
     re.compile(r"press\s+['\"]?[yY]['\"]?\s+to\s+\w+", re.IGNORECASE),
     # "Enter y or n" / "Type y/n"
@@ -60,7 +63,10 @@ _YES_NO_PATTERNS: list[re.Pattern[str]] = [
 
 # CONFIRM ENTER patterns — "Press Enter to continue", blank line with cursor
 _CONFIRM_ENTER_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(r"press\s+(?:enter|return|<enter>|<return>)\s+to\s+(?:continue|proceed|confirm|accept|start|begin)", re.IGNORECASE),
+    re.compile(
+        r"press\s+(?:enter|return|<enter>|<return>)\s+to\s+(?:continue|proceed|confirm|accept|start|begin)",
+        re.IGNORECASE,
+    ),
     re.compile(r"hit\s+(?:enter|return)\s+to\s+(?:continue|proceed)", re.IGNORECASE),
     re.compile(r"\[Press\s+Enter\]", re.IGNORECASE),
     re.compile(r"--\s*(?:More|Press\s+Enter\s+to\s+continue)\s*--", re.IGNORECASE),
@@ -71,9 +77,14 @@ _CONFIRM_ENTER_PATTERNS: list[re.Pattern[str]] = [
 # MULTIPLE CHOICE patterns — numbered lists with a "choose" prompt
 _MULTIPLE_CHOICE_PATTERNS: list[re.Pattern[str]] = [
     # "Enter your choice [1-4]:" or "Select an option (1-3):"
-    re.compile(r"(?:enter|select|choose|pick)\s+(?:your\s+)?(?:choice|option|selection)\s*[\(\[]\s*\d+\s*[-–]\s*\d+\s*[\)\]]", re.IGNORECASE),
+    re.compile(
+        r"(?:enter|select|choose|pick)\s+(?:your\s+)?(?:choice|option|selection)\s*[\(\[]\s*\d+\s*[-–]\s*\d+\s*[\)\]]",
+        re.IGNORECASE,
+    ),
     # "Enter choice:" alone is weak; require digit list context
-    re.compile(r"(?:enter|select|choose)\s+(?:an?\s+)?(?:choice|option):\s*$", re.IGNORECASE | re.MULTILINE),
+    re.compile(
+        r"(?:enter|select|choose)\s+(?:an?\s+)?(?:choice|option):\s*$", re.IGNORECASE | re.MULTILINE
+    ),
     # List of items: "1) ...\n2) ...\n"
     re.compile(r"(?:^|\n)\s*1[\)\.]\s+\S.+\n\s*2[\)\.]\s+\S", re.DOTALL),
     # Bracketed number prompt at EOL: "Choice [1/2/3]:"
@@ -89,9 +100,15 @@ _FREE_TEXT_PATTERNS: list[re.Pattern[str]] = [
     # "Type your message:" / "Provide a description:"
     re.compile(r"(?:type|provide|input|give|write)\b.{1,40}:\s*$", re.IGNORECASE | re.MULTILINE),
     # Password / secret prompts
-    re.compile(r"(?:password|passphrase|secret|token|key|api.?key|auth.?token)\s*:\s*$", re.IGNORECASE | re.MULTILINE),
+    re.compile(
+        r"(?:password|passphrase|secret|token|key|api.?key|auth.?token)\s*:\s*$",
+        re.IGNORECASE | re.MULTILINE,
+    ),
     # "Name:" / "Email:" bare field prompts
-    re.compile(r"^(?:name|email|username|user|host|url|path|file|directory|comment|message|description)\s*:\s*$", re.IGNORECASE | re.MULTILINE),
+    re.compile(
+        r"^(?:name|email|username|user|host|url|path|file|directory|comment|message|description)\s*:\s*$",
+        re.IGNORECASE | re.MULTILINE,
+    ),
     # Generic input prompt with terminal cursor indicator
     re.compile(r">\s*$"),
 ]

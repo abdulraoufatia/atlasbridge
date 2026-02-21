@@ -103,12 +103,8 @@ class PTYSupervisor:
         self._bot = bot
         self._session_id = session_id or str(uuid.uuid4())
 
-        self._detector = PromptDetector(
-            threshold=config.adapters.claude.detection_threshold
-        )
-        self._engine = PolicyEngine(
-            free_text_enabled=config.prompts.free_text_enabled
-        )
+        self._detector = PromptDetector(threshold=config.adapters.claude.detection_threshold)
+        self._engine = PolicyEngine(free_text_enabled=config.prompts.free_text_enabled)
 
         # asyncio.Queue: telegram bot puts (prompt_id, normalized_value) here
         self._response_queue: asyncio.Queue[tuple[str, str]] = asyncio.Queue()
@@ -195,9 +191,7 @@ class PTYSupervisor:
             # Restore terminal
             if old_term_settings is not None:
                 try:
-                    termios.tcsetattr(
-                        sys.stdin.fileno(), termios.TCSADRAIN, old_term_settings
-                    )
+                    termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_term_settings)
                 except Exception:
                     pass
 
@@ -232,9 +226,7 @@ class PTYSupervisor:
         ]
 
         # Wait for child to exit (detected in pty_reader) or any task to fail
-        done, pending = await asyncio.wait(
-            tasks, return_when=asyncio.FIRST_COMPLETED
-        )
+        done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
 
         for t in pending:
             t.cancel()
@@ -364,9 +356,7 @@ class PTYSupervisor:
 
             # Fire blocking heuristic
             result = self._detector.detect_blocking(stripped[-512:])
-            log.debug(
-                "Stall heuristic fired after %.1fs (conf=%.2f)", elapsed, result.confidence
-            )
+            log.debug("Stall heuristic fired after %.1fs (conf=%.2f)", elapsed, result.confidence)
             await self._handle_detection(result)
 
     # ------------------------------------------------------------------
@@ -451,9 +441,7 @@ class PTYSupervisor:
         import secrets
 
         timeout = self._config.prompts.timeout_seconds
-        expires_at = (
-            datetime.now(UTC) + timedelta(seconds=timeout)
-        ).isoformat()
+        expires_at = (datetime.now(UTC) + timedelta(seconds=timeout)).isoformat()
 
         from aegis.core.constants import SAFE_DEFAULTS
 

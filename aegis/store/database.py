@@ -138,17 +138,14 @@ class Database:
             self._conn.executescript(sql)
             with self.transaction():
                 self._conn.execute(
-                    "INSERT INTO schema_version(version, applied_at, description) "
-                    "VALUES (?, ?, ?)",
+                    "INSERT INTO schema_version(version, applied_at, description) VALUES (?, ?, ?)",
                     (i, datetime.now(UTC).isoformat(), f"Migration {i:03d}"),
                 )
 
     def _get_schema_version(self) -> int:
         assert self._conn is not None
         try:
-            row = self._conn.execute(
-                "SELECT MAX(version) FROM schema_version"
-            ).fetchone()
+            row = self._conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
             return row[0] or 0
         except sqlite3.OperationalError:
             return 0
@@ -173,15 +170,11 @@ class Database:
         sets = ", ".join(f"{k} = :{k}" for k in fields)
         params = {**fields, "id": session_id}
         with self.transaction():
-            self._conn.execute(
-                f"UPDATE sessions SET {sets} WHERE id = :id", params
-            )
+            self._conn.execute(f"UPDATE sessions SET {sets} WHERE id = :id", params)
 
     def get_session(self, session_id: str) -> Session | None:
         assert self._conn is not None
-        row = self._conn.execute(
-            "SELECT * FROM sessions WHERE id = ?", (session_id,)
-        ).fetchone()
+        row = self._conn.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)).fetchone()
         return Session.from_row(dict(row)) if row else None
 
     def list_active_sessions(self) -> list[Session]:
@@ -212,9 +205,7 @@ class Database:
         sets = ", ".join(f"{k} = :{k}" for k in fields)
         params = {**fields, "id": prompt_id}
         with self.transaction():
-            cur = self._conn.execute(
-                f"UPDATE prompts SET {sets} WHERE id = :id", params
-            )
+            cur = self._conn.execute(f"UPDATE prompts SET {sets} WHERE id = :id", params)
             return cur.rowcount
 
     def decide_prompt(
@@ -259,9 +250,7 @@ class Database:
 
     def get_prompt(self, prompt_id: str) -> PromptRecord | None:
         assert self._conn is not None
-        row = self._conn.execute(
-            "SELECT * FROM prompts WHERE id = ?", (prompt_id,)
-        ).fetchone()
+        row = self._conn.execute("SELECT * FROM prompts WHERE id = ?", (prompt_id,)).fetchone()
         return PromptRecord.from_row(dict(row)) if row else None
 
     def list_pending_prompts(self, session_id: str | None = None) -> list[PromptRecord]:
@@ -289,13 +278,10 @@ class Database:
         ).fetchall()
         return [PromptRecord.from_row(dict(r)) for r in rows]
 
-    def list_prompts_for_session(
-        self, session_id: str, limit: int = 50
-    ) -> list[PromptRecord]:
+    def list_prompts_for_session(self, session_id: str, limit: int = 50) -> list[PromptRecord]:
         assert self._conn is not None
         rows = self._conn.execute(
-            "SELECT * FROM prompts WHERE session_id = ? "
-            "ORDER BY created_at DESC LIMIT ?",
+            "SELECT * FROM prompts WHERE session_id = ? ORDER BY created_at DESC LIMIT ?",
             (session_id, limit),
         ).fetchall()
         return [PromptRecord.from_row(dict(r)) for r in rows]
@@ -317,9 +303,7 @@ class Database:
 
     def get_last_audit_event(self) -> AuditEvent | None:
         assert self._conn is not None
-        row = self._conn.execute(
-            "SELECT * FROM audit_events ORDER BY seq DESC LIMIT 1"
-        ).fetchone()
+        row = self._conn.execute("SELECT * FROM audit_events ORDER BY seq DESC LIMIT 1").fetchone()
         if row:
             d = dict(row)
             fields = AuditEvent.__dataclass_fields__

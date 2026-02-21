@@ -147,7 +147,8 @@ def _run_daemon(config: AutoPRConfig, poll_interval: int) -> None:
 async def _polling_loop(config: AutoPRConfig, interval: int) -> None:
     log.info(
         "PR automation polling loop started (interval=%ds, dry_run=%s)",
-        interval, config.dry_run,
+        interval,
+        config.dry_run,
     )
     while True:
         try:
