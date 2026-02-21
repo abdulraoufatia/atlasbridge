@@ -19,14 +19,15 @@ PID file: <data_dir>/atlasbridge.pid
 from __future__ import annotations
 
 import asyncio
-import logging
 import os
 import signal
 import uuid
 from pathlib import Path
 from typing import Any
 
-logger = logging.getLogger(__name__)
+import structlog
+
+logger = structlog.get_logger()
 
 _DEFAULT_DATA_DIR = Path.home() / ".atlasbridge"
 
@@ -56,7 +57,7 @@ class DaemonManager:
 
     async def start(self) -> None:
         """Start all subsystems and run until shutdown."""
-        logger.info("AtlasBridge daemon starting")
+        logger.info("daemon_starting", pid=os.getpid(), data_dir=str(self._data_dir))
         self._write_pid_file()
 
         try:
@@ -70,13 +71,13 @@ class DaemonManager:
             self._running = True
             self._setup_signal_handlers()
 
-            logger.info("AtlasBridge daemon ready")
+            logger.info("daemon_ready")
             await self._run_loop()
 
         finally:
             await self._cleanup()
             self._remove_pid_file()
-            logger.info("AtlasBridge daemon stopped")
+            logger.info("daemon_stopped")
 
     async def stop(self) -> None:
         """Request graceful shutdown."""
@@ -92,7 +93,7 @@ class DaemonManager:
         db_path = self._data_dir / "atlasbridge.db"
         self._db = Database(db_path)
         self._db.connect()
-        logger.info("Database connected: %s", db_path)
+        logger.info("database_connected", path=str(db_path))
 
     async def _reload_pending_prompts(self) -> None:
         """On restart, reload pending prompts from the database."""
@@ -100,10 +101,7 @@ class DaemonManager:
             return
         pending = self._db.list_pending_prompts()
         if pending:
-            logger.info(
-                "Daemon restarted with %d pending prompt(s) — will renotify",
-                len(pending),
-            )
+            logger.info("daemon_restarted_with_pending", count=len(pending))
         # TODO: renotify via channel after channel is initialised
 
     async def _init_channel(self) -> None:
@@ -134,7 +132,7 @@ class DaemonManager:
             )
 
         if not channels:
-            logger.warning("No channel configured — prompts will not be routed")
+            logger.warning("no_channel_configured")
             return
 
         if len(channels) == 1:
@@ -159,9 +157,9 @@ class DaemonManager:
         if policy_file:
             try:
                 self._policy = load_policy(policy_file)
-                logger.info("Policy loaded from %s", policy_file)
+                logger.info("policy_loaded", path=policy_file)
             except PolicyParseError as exc:
-                logger.error("Failed to load policy %s: %s — using safe default", policy_file, exc)
+                logger.error("policy_load_failed", path=policy_file, error=str(exc))
                 self._policy = default_policy()
         else:
             self._policy = default_policy()
@@ -203,7 +201,7 @@ class DaemonManager:
         tool = self._config.get("tool", "")
         command = self._config.get("command", [])
         if not tool or not command:
-            logger.info("No tool/command configured — running in channel-only mode")
+            logger.info("channel_only_mode")
             return
 
         from atlasbridge.adapters.base import AdapterRegistry
@@ -212,7 +210,7 @@ class DaemonManager:
         try:
             adapter_cls = AdapterRegistry.get(tool)
         except KeyError as exc:
-            logger.error("Cannot start adapter: %s", exc)
+            logger.error("adapter_not_found", tool=tool, error=str(exc))
             return
 
         adapter = adapter_cls()
@@ -220,12 +218,12 @@ class DaemonManager:
 
         session = Session(session_id=session_id, tool=tool, command=list(command))
         if self._session_manager is None:
-            logger.error("Session manager not initialised — cannot start session")
+            logger.error("session_manager_not_initialized")
             return
         self._session_manager.register(session)
         self._adapters[session_id] = adapter
 
-        logger.info("Starting %r session %s", tool, session_id[:8])
+        logger.info("session_starting", tool=tool, session_id=session_id[:8])
         await adapter.start_session(session_id=session_id, command=list(command))
 
         # Mark the session as running once the child PID is known
@@ -288,7 +286,7 @@ class DaemonManager:
         except* asyncio.CancelledError:
             pass
         finally:
-            logger.info("Session %s ended — requesting daemon shutdown", session_id[:8])
+            logger.info("session_ended", session_id=session_id[:8])
             self._session_manager.mark_ended(session_id)
             await adapter.terminate_session(session_id)
             await self.stop()
@@ -320,7 +318,7 @@ class DaemonManager:
             try:
                 await self._router.handle_reply(reply)
             except Exception as exc:  # noqa: BLE001
-                logger.error("Reply handling error: %s", exc)
+                logger.error("reply_handling_error", error=str(exc))
 
     async def _ttl_sweeper(self) -> None:
         """Periodically expire overdue prompts."""

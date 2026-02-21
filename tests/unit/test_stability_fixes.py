@@ -169,7 +169,7 @@ class TestStaleReplyHandling:
 
     @pytest.mark.asyncio
     async def test_unknown_prompt_reply_is_silently_dropped(self):
-        """Reply for unknown prompt_id is logged at debug level and dropped."""
+        """Reply for unknown prompt_id is dropped without side effects."""
         from atlasbridge.core.prompt.models import Reply
 
         router, sm, channel = self._make_router()
@@ -183,9 +183,9 @@ class TestStaleReplyHandling:
             timestamp="2024-01-01T00:00:00Z",
         )
 
-        with patch("atlasbridge.core.routing.router.logger") as mock_logger:
-            await router.handle_reply(reply)
-            mock_logger.debug.assert_called()
+        await router.handle_reply(reply)
+        # No crash, no channel interaction — silently dropped
+        channel.notify.assert_not_called()
 
     def test_free_text_reply_resolve(self):
         """Free-text reply with empty prompt_id resolves to active prompt."""
@@ -280,9 +280,9 @@ class TestStaleReplyHandling:
             timestamp="2024-01-01T00:00:00Z",
         )
 
-        with patch("atlasbridge.core.routing.router.logger") as mock_logger:
-            await router.handle_reply(reply)
-            mock_logger.debug.assert_called()
+        await router.handle_reply(reply)
+        # No crash, no channel interaction — silently dropped
+        channel.notify.assert_not_called()
 
 
 # =====================================================================

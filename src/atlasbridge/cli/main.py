@@ -15,6 +15,7 @@ Commands:
   atlasbridge debug bundle       — create a redacted support bundle
   atlasbridge channel add <type> — add/reconfigure a notification channel
   atlasbridge adapter list       — show available tool adapters
+  atlasbridge adapters           — list installed adapters (top-level shortcut)
   atlasbridge version            — show version and feature flags
   atlasbridge lab run <scenario> — Prompt Lab: run a QA scenario (dev/CI only)
   atlasbridge lab list           — Prompt Lab: list registered scenarios
@@ -43,9 +44,15 @@ err_console = Console(stderr=True)
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 @click.version_option(__version__, "--version", "-V", message="atlasbridge %(version)s")
+@click.option("--log-level", default="WARNING", hidden=True, help="Log level for structured logging.")
+@click.option("--log-json", is_flag=True, default=False, hidden=True, help="Emit JSON log lines.")
 @click.pass_context
-def cli(ctx: click.Context) -> None:
+def cli(ctx: click.Context, log_level: str, log_json: bool) -> None:
     """AtlasBridge — universal human-in-the-loop control plane for AI developer agents."""
+    from atlasbridge.core.logging import configure_logging
+
+    configure_logging(level=log_level, json_output=log_json)
+
     if ctx.invoked_subcommand is None:
         if sys.stdout.isatty():
             from atlasbridge.ui.app import run as tui_run
@@ -295,6 +302,52 @@ def adapter_list(as_json: bool) -> None:
                 + (f"  (min: {cls.min_tool_version})" if cls.min_tool_version else "")
             )
         console.print()
+
+
+# ---------------------------------------------------------------------------
+# adapters (top-level shortcut)
+# ---------------------------------------------------------------------------
+
+
+@cli.command("adapters")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Machine-readable JSON output")
+def adapters_cmd(as_json: bool) -> None:
+    """List installed tool adapters."""
+    import shutil
+
+    import atlasbridge.adapters  # noqa: F401 — registers all built-in adapters
+    from atlasbridge.adapters.base import AdapterRegistry
+
+    registry = AdapterRegistry.list_all()
+
+    if not registry:
+        err_console.print("[red]Error:[/red] No adapters found. Reinstall: pip install -U atlasbridge")
+        raise SystemExit(1)
+
+    if as_json:
+        import json
+
+        rows = []
+        for name, cls in sorted(registry.items()):
+            rows.append({
+                "name": name,
+                "kind": "llm",
+                "enabled": bool(shutil.which(cls.tool_name) if cls.tool_name else False),
+                "source": "builtin",
+                "tool_name": cls.tool_name,
+                "description": cls.description,
+                "min_version": cls.min_tool_version,
+            })
+        click.echo(json.dumps({"adapters": rows, "count": len(rows)}, indent=2))
+    else:
+        console.print("\n[bold]Installed Adapters[/bold]\n")
+        for name, cls in sorted(registry.items()):
+            on_path = bool(shutil.which(cls.tool_name)) if cls.tool_name else False
+            status = "[green]on PATH[/green]" if on_path else "[dim]not on PATH[/dim]"
+            desc = cls.description or "—"
+            ver = f"  (min: {cls.min_tool_version})" if cls.min_tool_version else ""
+            console.print(f"  [cyan]{name:<14}[/cyan] {desc}{ver}  {status}")
+        console.print(f"\n  {len(registry)} adapter(s) registered.\n")
 
 
 # ---------------------------------------------------------------------------

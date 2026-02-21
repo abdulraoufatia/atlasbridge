@@ -22,14 +22,15 @@ One active prompt per session:
 
 from __future__ import annotations
 
-import logging
 from typing import Any
+
+import structlog
 
 from atlasbridge.core.prompt.models import Confidence, PromptEvent, PromptStatus, Reply
 from atlasbridge.core.prompt.state import PromptStateMachine
 from atlasbridge.core.session.manager import SessionManager
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 
 class PromptRouter:
@@ -63,34 +64,40 @@ class PromptRouter:
 
     async def route_event(self, event: PromptEvent) -> None:
         """Route a PromptEvent to the channel, respecting confidence rules."""
+        log = logger.bind(
+            session_id=event.session_id[:8],
+            prompt_id=event.prompt_id,
+            prompt_type=event.prompt_type,
+            confidence=event.confidence,
+        )
+
         session = self._sessions.get_or_none(event.session_id)
         if session is None:
-            logger.warning("Dropped event for unknown session %s", event.session_id)
+            log.warning("event_dropped_unknown_session")
             return
 
         # Queue if another prompt is already active for this session
         if session.active_prompt_id:
             self._pending.setdefault(event.session_id, []).append(event)
-            logger.debug(
-                "Queued prompt %s (session %s already has active prompt %s)",
-                event.prompt_id,
-                event.session_id[:8],
-                session.active_prompt_id,
-            )
+            log.debug("event_queued", active_prompt=session.active_prompt_id)
             return
 
         # Confidence gate: LOW is routed to the channel so the user can decide.
         # The channel message labels it as "low (ambiguous)" so the user knows.
         if event.confidence == Confidence.LOW:
-            logger.info(
-                "LOW confidence prompt %s — routing as ambiguous (silence fallback)",
-                event.prompt_id,
-            )
+            log.info("routing_low_confidence", trigger="silence_fallback")
 
         await self._dispatch(event)
 
     async def _dispatch(self, event: PromptEvent) -> None:
         """Send event to channel and register state machine."""
+        log = logger.bind(
+            session_id=event.session_id[:8],
+            prompt_id=event.prompt_id,
+            prompt_type=event.prompt_type,
+            confidence=event.confidence,
+        )
+
         # Enrich event with session context before dispatch
         session = self._sessions.get_or_none(event.session_id)
         if session:
@@ -113,16 +120,10 @@ class PromptRouter:
             if session:
                 session.channel_message_ids[event.prompt_id] = message_id
 
-            logger.info(
-                "Prompt %s routed to channel (session %s, type=%s, confidence=%s)",
-                event.prompt_id,
-                event.session_id[:8],
-                event.prompt_type,
-                event.confidence,
-            )
+            log.info("prompt_routed", message_id=message_id)
         except Exception as exc:  # noqa: BLE001
             sm.transition(PromptStatus.FAILED, f"channel error: {exc}")
-            logger.error("Failed to route prompt %s: %s", event.prompt_id, exc)
+            log.error("prompt_route_failed", error=str(exc))
 
     # ------------------------------------------------------------------
     # Return path
@@ -134,23 +135,29 @@ class PromptRouter:
         if not reply.prompt_id:
             resolved = self._resolve_free_text_reply(reply)
             if resolved is None:
-                logger.debug("Free-text reply dropped — no active prompt for any session")
+                logger.debug("free_text_reply_dropped", reason="no_active_prompt")
                 return
             reply = resolved
 
+        log = logger.bind(
+            prompt_id=reply.prompt_id,
+            session_id=reply.session_id[:8] if reply.session_id else "",
+            channel_identity=reply.channel_identity,
+        )
+
         sm = self._machines.get(reply.prompt_id)
         if sm is None:
-            logger.debug("Reply for unknown/expired prompt %s — ignoring", reply.prompt_id)
+            log.debug("reply_ignored", reason="unknown_prompt")
             return
 
         # Already resolved — silently discard duplicate callbacks
         if sm.is_terminal:
-            logger.debug("Duplicate reply for already-resolved prompt %s", reply.prompt_id)
+            log.debug("reply_ignored", reason="already_resolved")
             return
 
         # TTL check
         if sm.expire_if_due():
-            logger.info("Reply for expired prompt %s rejected", reply.prompt_id)
+            log.info("reply_rejected", reason="expired")
             await self._channel.notify(
                 "This prompt has expired. The safe default was used.",
                 session_id=reply.session_id,
@@ -160,19 +167,16 @@ class PromptRouter:
 
         # Validate session binding
         if sm.event.session_id != reply.session_id and reply.session_id:
-            logger.warning(
-                "Reply session_id mismatch: prompt=%s reply=%s",
-                sm.event.session_id,
-                reply.session_id,
+            log.warning(
+                "reply_rejected",
+                reason="session_mismatch",
+                expected_session=sm.event.session_id[:8],
             )
             return
 
         # Identity allowlist (channel enforces; double-check here)
         if not self._channel.is_allowed(reply.channel_identity):
-            logger.warning(
-                "Reply from non-allowlisted identity %s rejected",
-                reply.channel_identity,
-            )
+            log.warning("reply_rejected", reason="identity_not_allowed")
             return
 
         try:
@@ -204,11 +208,12 @@ class PromptRouter:
                         session_id=sm.event.session_id,
                     )
 
+            log.info("reply_injected", value_length=len(reply.value))
             await self._resolve_next(sm.event.session_id)
 
         except Exception as exc:  # noqa: BLE001
             sm.transition(PromptStatus.FAILED, str(exc))
-            logger.error("Injection failed for prompt %s: %s", reply.prompt_id, exc)
+            log.error("reply_injection_failed", error=str(exc))
 
     def _resolve_free_text_reply(self, reply: Reply) -> Reply | None:
         """Resolve a free-text reply (empty prompt_id) to the active prompt."""
@@ -240,7 +245,11 @@ class PromptRouter:
         """Expire all overdue prompts. Called periodically by the scheduler."""
         for sm in list(self._machines.values()):
             if sm.expire_if_due():
-                logger.info("Prompt %s expired (TTL elapsed)", sm.event.prompt_id)
+                logger.info(
+                    "prompt_expired",
+                    prompt_id=sm.event.prompt_id,
+                    session_id=sm.event.session_id[:8],
+                )
                 session = self._sessions.get_or_none(sm.event.session_id)
                 if session:
                     msg_id = session.channel_message_ids.get(sm.event.prompt_id, "")
