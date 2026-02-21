@@ -32,10 +32,11 @@ from __future__ import annotations
 
 import asyncio
 import json
-import logging
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
+
+import structlog
 
 from atlasbridge.core.autopilot.actions import (
     ActionResult,
@@ -51,7 +52,7 @@ from atlasbridge.core.policy.model_v1 import PolicyV1
 
 AnyPolicy = Policy | PolicyV1
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 STATE_FILENAME = "autopilot_state.json"
 HISTORY_FILENAME = "autopilot_history.jsonl"
@@ -131,7 +132,7 @@ class AutopilotEngine:
                 encoding="utf-8",
             )
         except OSError as exc:
-            logger.error("AutopilotEngine: cannot save state: %s", exc)
+            logger.error("autopilot_state_save_failed", error=str(exc))
 
     # ------------------------------------------------------------------
     # Kill switch
@@ -147,16 +148,21 @@ class AutopilotEngine:
         """
         if new_state not in _VALID_TRANSITIONS.get(self._state, set()):
             logger.warning(
-                "AutopilotEngine: invalid transition %s → %s",
-                self._state.value,
-                new_state.value,
+                "autopilot_invalid_transition",
+                from_state=self._state.value,
+                to_state=new_state.value,
             )
             return False
         old = self._state
         self._state = new_state
         self._save_state()
         self._append_history(old, new_state, triggered_by)
-        logger.info("AutopilotEngine: %s → %s (by %s)", old.value, new_state.value, triggered_by)
+        logger.info(
+            "autopilot_transition",
+            from_state=old.value,
+            to_state=new_state.value,
+            triggered_by=triggered_by,
+        )
         return True
 
     def _append_history(
@@ -177,7 +183,7 @@ class AutopilotEngine:
             with self._history_path.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps(entry) + "\n")
         except OSError as exc:
-            logger.error("AutopilotEngine: cannot write history: %s", exc)
+            logger.error("autopilot_history_write_failed", error=str(exc))
 
     def pause(self, triggered_by: str = "unknown") -> bool:
         """Pause the engine — all prompts will be escalated to human."""
@@ -214,7 +220,7 @@ class AutopilotEngine:
         old_hash = self.policy.content_hash()
         self.policy = policy
         new_hash = policy.content_hash()
-        logger.info("AutopilotEngine: policy reloaded %s → %s", old_hash, new_hash)
+        logger.info("autopilot_policy_reloaded", old_hash=old_hash, new_hash=new_hash)
 
     # ------------------------------------------------------------------
     # Core dispatch
@@ -256,12 +262,12 @@ class AutopilotEngine:
 
             # --- Kill switch: STOPPED ---
             if self._state == AutopilotState.STOPPED:
-                logger.warning("AutopilotEngine: stopped — dropping prompt %s", prompt_id)
+                logger.warning("autopilot_prompt_dropped", prompt_id=prompt_id, reason="stopped")
                 return ActionResult(action_type="stopped", error="engine stopped")
 
             # --- Kill switch: PAUSED ---
             if self._state == AutopilotState.PAUSED:
-                logger.info("AutopilotEngine: paused — escalating prompt %s to human", prompt_id)
+                logger.info("autopilot_escalated", prompt_id=prompt_id, reason="paused")
                 await self._route_fn(prompt_event)
                 return ActionResult(action_type="require_human", routed_to_human=True)
 
@@ -296,11 +302,10 @@ class AutopilotEngine:
                     current = session_counts.get(decision.matched_rule_id, 0)
                     if current >= rule.max_auto_replies:
                         logger.info(
-                            "AutopilotEngine: rate limit reached for rule=%s session=%s "
-                            "(limit=%d) — escalating to human",
-                            decision.matched_rule_id,
-                            session_id,
-                            rule.max_auto_replies,
+                            "autopilot_rate_limited",
+                            rule_id=decision.matched_rule_id,
+                            session_id=session_id[:8],
+                            limit=rule.max_auto_replies,
                         )
                         await self._route_fn(prompt_event)
                         return ActionResult(action_type="require_human", routed_to_human=True)
@@ -312,9 +317,9 @@ class AutopilotEngine:
                 # Notification with the suggestion is sent by the channel adapter
                 # (which reads action_type / action_value from the decision)
                 logger.info(
-                    "AutopilotEngine: assist mode — forwarded prompt %s with suggestion %r",
-                    prompt_id,
-                    decision.action_value,
+                    "autopilot_assist_forwarded",
+                    prompt_id=prompt_id,
+                    suggestion=decision.action_value,
                 )
                 return ActionResult(action_type="require_human", routed_to_human=True)
 

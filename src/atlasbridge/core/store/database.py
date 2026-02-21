@@ -33,13 +33,14 @@ from __future__ import annotations
 
 import hashlib
 import json
-import logging
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-logger = logging.getLogger(__name__)
+import structlog
+
+logger = structlog.get_logger()
 
 
 class Database:
@@ -98,9 +99,30 @@ class Database:
         )
         self._db.commit()
 
+    # Columns that callers may update on the sessions table.  Any key not in
+    # this set is rejected to prevent accidental SQL column injection even
+    # though callers are all internal/trusted code.
+    _ALLOWED_SESSION_COLUMNS: frozenset[str] = frozenset(
+        {
+            "status",
+            "pid",
+            "ended_at",
+            "exit_code",
+            "label",
+            "metadata",
+            "cwd",
+        }
+    )
+
     def update_session(self, session_id: str, **kwargs: Any) -> None:
         if not kwargs:
             return
+        bad = set(kwargs) - self._ALLOWED_SESSION_COLUMNS
+        if bad:
+            raise ValueError(
+                f"update_session: disallowed column(s): {sorted(bad)}. "
+                f"Allowed: {sorted(self._ALLOWED_SESSION_COLUMNS)}"
+            )
         columns = ", ".join(f"{k} = ?" for k in kwargs)
         values = list(kwargs.values()) + [session_id]
         self._db.execute(

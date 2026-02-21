@@ -25,15 +25,16 @@ from __future__ import annotations
 
 import asyncio
 import json
-import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
 
+import structlog
+
 from atlasbridge.channels.base import BaseChannel
 from atlasbridge.core.prompt.models import Confidence, PromptEvent, PromptType, Reply
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 _SLACK_API_BASE = "https://slack.com/api/{method}"
 
@@ -81,13 +82,13 @@ class SlackChannel(BaseChannel):
         )
         self._running = True
         asyncio.create_task(self._socket_mode_loop(), name="slack_socket_mode")
-        logger.info("Slack channel started")
+        logger.info("slack_started")
 
     async def close(self) -> None:
         self._running = False
         if self._client:
             await self._client.aclose()
-        logger.info("Slack channel closed")
+        logger.info("slack_closed")
 
     async def send_prompt(self, event: PromptEvent) -> str:
         """Send a Block Kit prompt to all allowlisted users via DM."""
@@ -174,8 +175,8 @@ class SlackChannel(BaseChannel):
             from slack_sdk.socket_mode.websockets import SocketModeClient  # type: ignore[import]
         except ImportError:
             logger.warning(
-                "slack_sdk not installed — Slack interactive replies unavailable. "
-                "Install with: pip install 'atlasbridge[slack]'"
+                "slack_sdk_missing",
+                hint="Install with: pip install 'atlasbridge[slack]'",
             )
             return
 
@@ -215,7 +216,7 @@ class SlackChannel(BaseChannel):
                         )
                         return
             except Exception as exc:  # noqa: BLE001
-                logger.warning("Slack socket handler error: %s", exc)
+                logger.warning("slack_socket_handler_error", error=str(exc))
             finally:
                 await client.send_socket_mode_response(
                     SocketModeResponse(envelope_id=req.envelope_id)
@@ -224,18 +225,18 @@ class SlackChannel(BaseChannel):
         client.socket_mode_request_listeners.append(_handle)
         try:
             await client.connect()
-            logger.info("Slack Socket Mode connected")
+            logger.info("slack_socket_connected")
             while self._running:
                 await asyncio.sleep(1.0)
         except Exception as exc:  # noqa: BLE001
-            logger.error("Slack Socket Mode connection error: %s", exc)
+            logger.error("slack_socket_connection_error", error=str(exc))
         finally:
             await client.close()
 
     async def _handle_action(self, value: str, user_id: str) -> None:
         """Parse callback value and enqueue Reply."""
         if not self.is_allowed(f"slack:{user_id}"):
-            logger.warning("Rejected Slack action from non-allowlisted user %s", user_id)
+            logger.warning("slack_action_rejected", user_id=user_id, reason="not_allowed")
             return
         try:
             parts = value.split(":", 4)
@@ -280,9 +281,9 @@ class SlackChannel(BaseChannel):
             data = resp.json()
             if data.get("ok"):
                 return data
-            logger.warning("Slack API error (%s): %s", method, data.get("error"))
+            logger.warning("slack_api_error", method=method, error=data.get("error"))
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Slack API request failed (%s): %s", method, exc)
+            logger.warning("slack_api_request_failed", method=method, error=str(exc))
         return None
 
     # ------------------------------------------------------------------

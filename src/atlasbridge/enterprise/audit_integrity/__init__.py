@@ -12,12 +12,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-import logging
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
+import structlog
+
+logger = structlog.get_logger()
 
 
 @dataclass

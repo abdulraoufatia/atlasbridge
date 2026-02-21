@@ -10,11 +10,12 @@ Maturity: Experimental (Phase A scaffolding)
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-logger = logging.getLogger(__name__)
+import structlog
+
+logger = structlog.get_logger()
 
 
 @dataclass
@@ -58,9 +59,9 @@ class PolicyPinManager:
         )
         self._pins[session_id] = pin
         logger.info(
-            "Policy pinned for session %s (hash=%s)",
-            session_id[:8],
-            policy_hash[:12],
+            "policy_pinned",
+            session_id=session_id[:8],
+            policy_hash=policy_hash[:12],
         )
         return pin
 

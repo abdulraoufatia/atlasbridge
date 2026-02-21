@@ -15,11 +15,12 @@ from __future__ import annotations
 
 import fcntl
 import hashlib
-import logging
 import os
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
+import structlog
+
+logger = structlog.get_logger()
 
 
 def _token_hash(token: str) -> str:
@@ -97,7 +98,7 @@ class PollerLock:
         os.lseek(self._fd, 0, os.SEEK_SET)
         os.write(self._fd, str(os.getpid()).encode())
         self._acquired = True
-        logger.debug("Poller lock acquired: %s (PID %d)", self._lock_path, os.getpid())
+        logger.debug("poller_lock_acquired", path=str(self._lock_path), pid=os.getpid())
         return True
 
     def release(self) -> None:
@@ -112,7 +113,7 @@ class PollerLock:
         self._acquired = False
         # Clean up the lock file
         self._lock_path.unlink(missing_ok=True)
-        logger.debug("Poller lock released: %s", self._lock_path)
+        logger.debug("poller_lock_released", path=str(self._lock_path))
 
     def __del__(self) -> None:
         if self._fd is not None:

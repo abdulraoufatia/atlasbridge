@@ -37,17 +37,18 @@ Singleton polling:
 from __future__ import annotations
 
 import asyncio
-import logging
 import secrets
 from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import UTC
 from pathlib import Path
 from typing import Any
 
+import structlog
+
 from atlasbridge.channels.base import BaseChannel
 from atlasbridge.core.prompt.models import Confidence, PromptEvent, PromptType, Reply
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 _BASE_URL = "https://api.telegram.org/bot{token}/{method}"
 _POLL_TIMEOUT = 30  # Long-poll timeout (seconds)
@@ -108,15 +109,15 @@ class TelegramChannel(BaseChannel):
         if self._poller_lock.acquire():
             self._polling = True
             asyncio.create_task(self._poll_loop(), name="telegram_poll")
-            logger.info("Telegram channel started (polling)")
+            logger.info("telegram_started", mode="polling")
         else:
             holder = self._poller_lock.holder_pid
             logger.warning(
-                "Telegram poller already running (PID %s) — operating in send-only mode. "
-                "Stop the other instance with `atlasbridge stop` if this is unexpected.",
-                holder or "unknown",
+                "telegram_started",
+                mode="send_only",
+                holder_pid=holder or "unknown",
+                hint="Stop the other instance with `atlasbridge stop` if unexpected",
             )
-            logger.info("Telegram channel started (send-only, no polling)")
 
     async def close(self) -> None:
         self._running = False
@@ -126,7 +127,7 @@ class TelegramChannel(BaseChannel):
             self._poller_lock = None
         if self._client:
             await self._client.aclose()
-        logger.info("Telegram channel closed")
+        logger.info("telegram_closed")
 
     async def send_prompt(self, event: PromptEvent) -> str:
         """Send a prompt message with an inline keyboard."""
@@ -144,9 +145,9 @@ class TelegramChannel(BaseChannel):
                 responses.append(str(resp.get("message_id", "")))
             else:
                 logger.warning(
-                    "Failed to send prompt to user %s. "
-                    "Ensure the user has started a chat with the bot by sending /start.",
-                    uid,
+                    "telegram_send_failed",
+                    user_id=uid,
+                    hint="Ensure the user has sent /start to the bot",
                 )
 
         return responses[0] if responses else ""
@@ -219,16 +220,15 @@ class TelegramChannel(BaseChannel):
                 backoff = _RETRY_BASE_S
             except TelegramConflictError:
                 logger.error(
-                    "Telegram 409 Conflict — another poller is active for this bot token. "
-                    "Stopping polling. If this is unexpected, run `atlasbridge stop` "
-                    "and restart."
+                    "telegram_conflict",
+                    hint="Another poller is active. Run `atlasbridge stop` and restart.",
                 )
                 self._polling = False
                 if self._poller_lock is not None:
                     self._poller_lock.release()
                 return
             except Exception:  # noqa: BLE001
-                logger.warning("Telegram polling error; backoff=%.1fs", backoff)
+                logger.warning("telegram_poll_error", backoff_s=backoff)
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 2, _RETRY_MAX_S)
 
@@ -244,7 +244,7 @@ class TelegramChannel(BaseChannel):
         data = cb.get("data", "")
 
         if not self.is_allowed(f"telegram:{user_id}"):
-            logger.warning("Rejected callback from unknown user %s", user_id)
+            logger.warning("telegram_callback_rejected", user_id=user_id, reason="not_allowed")
             return
 
         # Parse: ans:{prompt_id}:{session_id}:{nonce}:{value}
@@ -325,17 +325,21 @@ class TelegramChannel(BaseChannel):
             # 400 "chat not found" — user hasn't messaged the bot yet
             if error_code == 400 and "chat not found" in description.lower():
                 logger.error(
-                    "Telegram: chat not found for chat_id=%s. "
-                    "The user must open Telegram and send /start to your bot first. "
-                    "See: https://core.telegram.org/bots#how-do-i-create-a-bot",
-                    payload.get("chat_id"),
+                    "telegram_chat_not_found",
+                    chat_id=payload.get("chat_id"),
+                    hint="The user must send /start to the bot first",
                 )
             else:
-                logger.warning("Telegram API error (%s %s): %s", method, error_code, description)
+                logger.warning(
+                    "telegram_api_error",
+                    method=method,
+                    error_code=error_code,
+                    description=description,
+                )
         except TelegramConflictError:
             raise
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Telegram API request failed (%s): %s", method, exc)
+            logger.warning("telegram_api_request_failed", method=method, error=str(exc))
         return None
 
     @staticmethod

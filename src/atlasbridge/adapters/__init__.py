@@ -9,9 +9,9 @@ Third-party adapters can register themselves the same way — just import
 atlasbridge.adapters.base and apply @AdapterRegistry.register("my-tool").
 """
 
-import logging as _logging
+import structlog as _structlog
 
-_logger = _logging.getLogger(__name__)
+_logger = _structlog.get_logger()
 
 # Side-effect imports: running each module executes the @AdapterRegistry.register()
 # decorator at module scope, which populates AdapterRegistry._registry.
@@ -26,7 +26,7 @@ for _mod_name in _BUILTIN_ADAPTERS:
     try:
         __import__(_mod_name)
     except Exception as _exc:  # noqa: BLE001
-        _logger.warning("Failed to load adapter %s: %s", _mod_name, _exc)
+        _logger.warning("adapter_load_failed", module=_mod_name, error=str(_exc))
 
 # Re-export the registry and base class for convenience.
 from atlasbridge.adapters.base import AdapterRegistry, BaseAdapter  # noqa: E402

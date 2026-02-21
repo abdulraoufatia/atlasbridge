@@ -17,13 +17,14 @@ Usage::
 from __future__ import annotations
 
 import json
-import logging
 from collections.abc import Iterator
 from pathlib import Path
 
+import structlog
+
 from atlasbridge.core.policy.model import PolicyDecision
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 TRACE_FILENAME = "autopilot_decisions.jsonl"
 
@@ -77,14 +78,16 @@ class DecisionTrace:
                 try:
                     old.rename(new)
                 except OSError as exc:
-                    logger.warning("DecisionTrace: cannot rotate %s → %s: %s", old, new, exc)
+                    logger.warning(
+                        "trace_rotate_failed", old=str(old), new=str(new), error=str(exc)
+                    )
 
         # Move active file to .jsonl.1
         archive = self._path.with_suffix(".jsonl.1")
         try:
             self._path.rename(archive)
         except OSError as exc:
-            logger.warning("DecisionTrace: cannot archive %s → %s: %s", self._path, archive, exc)
+            logger.warning("trace_archive_failed", path=str(self._path), error=str(exc))
 
     # ------------------------------------------------------------------
     # Public API
@@ -98,7 +101,7 @@ class DecisionTrace:
                 fh.write(decision.to_json() + "\n")
         except OSError as exc:
             # Trace write failure must never crash the autopilot engine
-            logger.error("DecisionTrace: failed to write to %s: %s", self._path, exc)
+            logger.error("trace_write_failed", path=str(self._path), error=str(exc))
 
     def tail(self, n: int = 50) -> list[dict[str, object]]:
         """Return the last ``n`` trace entries as dicts (oldest first)."""
@@ -109,7 +112,7 @@ class DecisionTrace:
             with self._path.open("r", encoding="utf-8") as fh:
                 lines = fh.readlines()
         except OSError as exc:
-            logger.error("DecisionTrace: cannot read %s: %s", self._path, exc)
+            logger.error("trace_read_failed", path=str(self._path), error=str(exc))
             return []
 
         entries: list[dict[str, object]] = []
@@ -138,4 +141,4 @@ class DecisionTrace:
                     except json.JSONDecodeError:
                         continue
         except OSError as exc:
-            logger.error("DecisionTrace: cannot iterate %s: %s", self._path, exc)
+            logger.error("trace_iterate_failed", path=str(self._path), error=str(exc))

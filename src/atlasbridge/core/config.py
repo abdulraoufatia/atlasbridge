@@ -63,12 +63,12 @@ def _maybe_migrate_legacy(new_dir: Path) -> None:
 
     marker.touch()
     if migrated:
-        import logging
+        import structlog
 
-        logging.getLogger(__name__).info(
-            "Migrated from ~/.aegis/ to %s (%s)",
-            new_dir,
-            ", ".join(migrated),
+        structlog.get_logger().info(
+            "config_migrated_from_aegis",
+            target_dir=str(new_dir),
+            files=", ".join(migrated),
         )
 
 

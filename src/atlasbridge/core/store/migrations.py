@@ -18,11 +18,12 @@ Version history:
 
 from __future__ import annotations
 
-import logging
 import sqlite3
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
+import structlog
+
+logger = structlog.get_logger()
 
 # Bump this when adding a new migration.
 LATEST_SCHEMA_VERSION = 1
@@ -163,7 +164,7 @@ def _add_column_if_missing(
     existing = {row[1] for row in cursor.fetchall()}
     if column not in existing:
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {column_def}")  # noqa: S608
-        logger.info("  added column %s.%s", table, column)
+        logger.info("migration_added_column", table=table, column=column)
 
 
 def get_user_version(conn: sqlite3.Connection) -> int:
@@ -202,9 +203,9 @@ def run_migrations(conn: sqlite3.Connection, db_path: Path) -> None:
         return  # already up to date
 
     logger.info(
-        "Migrating database schema from v%d to v%d …",
-        current,
-        LATEST_SCHEMA_VERSION,
+        "migration_starting",
+        from_version=current,
+        to_version=LATEST_SCHEMA_VERSION,
     )
 
     for from_version in range(current, LATEST_SCHEMA_VERSION):
@@ -216,7 +217,7 @@ def run_migrations(conn: sqlite3.Connection, db_path: Path) -> None:
             )
 
         target = from_version + 1
-        logger.info("  v%d → v%d …", from_version, target)
+        logger.info("migration_step", from_version=from_version, to_version=target)
 
         try:
             migration(conn)
@@ -232,4 +233,4 @@ def run_migrations(conn: sqlite3.Connection, db_path: Path) -> None:
             ) from exc
 
     final = get_user_version(conn)
-    logger.info("Database schema migration complete (now v%d).", final)
+    logger.info("migration_complete", version=final)

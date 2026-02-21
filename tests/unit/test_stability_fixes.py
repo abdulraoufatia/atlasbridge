@@ -94,9 +94,10 @@ class TestTelegramChatNotFound:
             result = await channel._api("sendMessage", {"chat_id": 99999, "text": "test"})
             assert result is None
             mock_logger.error.assert_called_once()
-            call_args = mock_logger.error.call_args[0]
-            assert "chat not found" in call_args[0]
-            assert "/start" in call_args[0]
+            call_args = mock_logger.error.call_args
+            assert call_args[0][0] == "telegram_chat_not_found"
+            assert call_args[1]["chat_id"] == 99999
+            assert "/start" in call_args[1]["hint"]
 
 
 # =====================================================================

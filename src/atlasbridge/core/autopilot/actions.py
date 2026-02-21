@@ -21,9 +21,10 @@ Usage::
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+
+import structlog
 
 from atlasbridge.core.policy.model import (
     AutoReplyAction,
@@ -33,7 +34,7 @@ from atlasbridge.core.policy.model import (
     RequireHumanAction,
 )
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 
 @dataclass
@@ -81,9 +82,9 @@ async def execute_action(
         try:
             await inject_fn(action.value)
             logger.info(
-                "Autopilot auto_reply: rule=%s value=%r",
-                decision.matched_rule_id,
-                action.value,
+                "autopilot_auto_reply",
+                rule_id=decision.matched_rule_id,
+                value=action.value,
             )
             return ActionResult(
                 action_type="auto_reply",
@@ -91,19 +92,16 @@ async def execute_action(
                 injected_value=action.value,
             )
         except Exception as exc:
-            logger.error("Autopilot auto_reply inject failed: %s", exc)
+            logger.error("autopilot_auto_reply_failed", error=str(exc))
             return ActionResult(action_type="auto_reply", error=str(exc))
 
     elif isinstance(action, RequireHumanAction):
         try:
             await route_fn(prompt_event)
-            logger.info(
-                "Autopilot require_human: rule=%s — forwarded to channel",
-                decision.matched_rule_id,
-            )
+            logger.info("autopilot_require_human", rule_id=decision.matched_rule_id)
             return ActionResult(action_type="require_human", routed_to_human=True)
         except Exception as exc:
-            logger.error("Autopilot require_human route failed: %s", exc)
+            logger.error("autopilot_require_human_failed", error=str(exc))
             return ActionResult(action_type="require_human", error=str(exc))
 
     elif isinstance(action, DenyAction):
@@ -111,31 +109,28 @@ async def execute_action(
         try:
             await notify_fn(f"[DENY] {msg}")
             logger.warning(
-                "Autopilot deny: rule=%s reason=%r",
-                decision.matched_rule_id,
-                action.reason,
+                "autopilot_deny",
+                rule_id=decision.matched_rule_id,
+                reason=action.reason,
             )
         except Exception as exc:
-            logger.error("Autopilot deny notification failed: %s", exc)
+            logger.error("autopilot_deny_notify_failed", error=str(exc))
         return ActionResult(action_type="deny", denied=True)
 
     elif isinstance(action, NotifyOnlyAction):
         msg = action.message or decision.explanation
         try:
             await notify_fn(msg)
-            logger.info(
-                "Autopilot notify_only: rule=%s",
-                decision.matched_rule_id,
-            )
+            logger.info("autopilot_notify_only", rule_id=decision.matched_rule_id)
         except Exception as exc:
-            logger.error("Autopilot notify_only failed: %s", exc)
+            logger.error("autopilot_notify_only_failed", error=str(exc))
             return ActionResult(action_type="notify_only", error=str(exc))
         return ActionResult(action_type="notify_only", notified=True)
 
     else:
-        logger.error("Autopilot: unknown action type %r — routing to human", action)
+        logger.error("autopilot_unknown_action", action=repr(action))
         try:
             await route_fn(prompt_event)
         except Exception as exc:
-            logger.error("Autopilot fallback route failed: %s", exc)
+            logger.error("autopilot_fallback_route_failed", error=str(exc))
         return ActionResult(action_type="unknown", routed_to_human=True)

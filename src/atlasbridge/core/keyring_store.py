@@ -8,9 +8,9 @@ written to ``config.toml`` in place of the real token.
 
 from __future__ import annotations
 
-import logging
+import structlog
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 SERVICE_NAME = "atlasbridge"
 KEYRING_PREFIX = "keyring:"
@@ -52,7 +52,7 @@ def retrieve_token(placeholder: str) -> str | None:
         service, key = rest.split(":", 1)
         return keyring.get_password(service, key)
     except Exception:  # noqa: BLE001
-        logger.warning("Failed to retrieve token from keyring: %s", placeholder)
+        logger.warning("keyring_retrieve_failed", placeholder=placeholder)
         return None
 
 

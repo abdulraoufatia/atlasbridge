@@ -20,12 +20,13 @@ Usage::
 
 from __future__ import annotations
 
-import logging
 import re
 import signal
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
+
+import structlog
 
 from atlasbridge.core.policy.model import (
     ConfidenceLevel,
@@ -41,7 +42,7 @@ from atlasbridge.core.policy.model import (
 if TYPE_CHECKING:
     from atlasbridge.core.policy.model_v1 import MatchCriteriaV1, PolicyRuleV1, PolicyV1
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 _REGEX_TIMEOUT_S = 0.1  # 100ms max per regex evaluation
 
@@ -163,10 +164,10 @@ def _match_contains(
             f"contains: regex {contains!r} {'matched' if matched else 'did not match'} excerpt",
         )
     except TimeoutError:
-        logger.warning("Regex %r timed out (>100ms) — rule skipped", contains)
+        logger.warning("regex_timeout", pattern=contains)
         return False, f"contains: regex {contains!r} timed out — rule skipped"
     except re.error as exc:
-        logger.warning("Regex %r error: %s — rule skipped", contains, exc)
+        logger.warning("regex_error", pattern=contains, error=str(exc))
         return False, f"contains: regex error {exc} — rule skipped"
 
 
@@ -385,7 +386,7 @@ def evaluate(
                     r.lstrip("✓ ").lstrip("✗ ") for r in result.reasons if r.startswith("✓")
                 )
             )
-            logger.debug("Policy match: rule=%s action=%s", rule.id, rule.action.type)
+            logger.debug("policy_match", rule_id=rule.id, action=rule.action.type)
             return PolicyDecision(
                 prompt_id=prompt_id,
                 session_id=session_id,
@@ -415,7 +416,7 @@ def evaluate(
             message="No policy rule matched — human input required"
         )
 
-    logger.debug("Policy no-match: fallback=%s", fallback)
+    logger.debug("policy_no_match", fallback=fallback)
     return PolicyDecision(
         prompt_id=prompt_id,
         session_id=session_id,

@@ -14,12 +14,13 @@ Invariants:
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Iterator
+
+import structlog
 
 from atlasbridge.core.session.models import Session, SessionStatus
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 
 class SessionNotFoundError(Exception):
@@ -46,7 +47,7 @@ class SessionManager:
         if session.session_id in self._sessions:
             raise ValueError(f"Session {session.session_id!r} already registered")
         self._sessions[session.session_id] = session
-        logger.info("Session registered: %s (%s)", session.short_id(), session.tool)
+        logger.info("session_registered", session_id=session.short_id(), tool=session.tool)
 
     def get(self, session_id: str) -> Session:
         """Return the session; raise SessionNotFoundError if not found."""
@@ -81,7 +82,7 @@ class SessionManager:
     def mark_running(self, session_id: str, pid: int) -> None:
         session = self.get(session_id)
         session.mark_running(pid)
-        logger.info("Session %s running (pid=%d)", session.short_id(), pid)
+        logger.info("session_running", session_id=session.short_id(), pid=pid)
 
     def mark_awaiting_reply(self, session_id: str, prompt_id: str) -> None:
         session = self.get(session_id)
@@ -101,10 +102,10 @@ class SessionManager:
         session.mark_ended(exit_code=exit_code, crashed=crashed)
         status_str = "crashed" if crashed else "completed"
         logger.info(
-            "Session %s %s (exit_code=%s)",
-            session.short_id(),
-            status_str,
-            exit_code,
+            "session_ended",
+            session_id=session.short_id(),
+            status=status_str,
+            exit_code=exit_code,
         )
 
     # ------------------------------------------------------------------

@@ -13,14 +13,15 @@ edit_prompt_message() can dispatch to the correct sub-channel:
 from __future__ import annotations
 
 import asyncio
-import logging
 from collections.abc import AsyncIterator
 from typing import Any
+
+import structlog
 
 from atlasbridge.channels.base import BaseChannel
 from atlasbridge.core.prompt.models import PromptEvent, Reply
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 
 class MultiChannel(BaseChannel):
@@ -53,9 +54,9 @@ class MultiChannel(BaseChannel):
         for ch in self._channels:
             try:
                 await ch.start()
-                logger.info("Channel started: %s", ch.channel_name)
+                logger.info("channel_started", channel=ch.channel_name)
             except Exception as exc:  # noqa: BLE001
-                logger.error("Failed to start channel %s: %s", ch.channel_name, exc)
+                logger.error("channel_start_failed", channel=ch.channel_name, error=str(exc))
 
     async def close(self) -> None:
         """Close all sub-channels."""
@@ -63,7 +64,7 @@ class MultiChannel(BaseChannel):
             try:
                 await ch.close()
             except Exception as exc:  # noqa: BLE001
-                logger.warning("Error closing channel %s: %s", ch.channel_name, exc)
+                logger.warning("channel_close_error", channel=ch.channel_name, error=str(exc))
 
     # ------------------------------------------------------------------
     # Forward path
@@ -82,7 +83,7 @@ class MultiChannel(BaseChannel):
         )
         for ch, result in zip(self._channels, results, strict=False):
             if isinstance(result, Exception):
-                logger.warning("send_prompt failed on %s: %s", ch.channel_name, result)
+                logger.warning("send_prompt_failed", channel=ch.channel_name, error=str(result))
             elif result:
                 return f"{ch.channel_name}:{result}"
         return ""
@@ -109,13 +110,13 @@ class MultiChannel(BaseChannel):
         try:
             ch_name, inner_id = message_id.split(":", 1)
         except ValueError:
-            logger.warning("MultiChannel.edit_prompt_message: bad message_id %r", message_id)
+            logger.warning("edit_prompt_bad_message_id", message_id=message_id)
             return
         for ch in self._channels:
             if ch.channel_name == ch_name:
                 await ch.edit_prompt_message(inner_id, new_text, session_id)
                 return
-        logger.warning("MultiChannel: no sub-channel named %r for edit", ch_name)
+        logger.warning("edit_prompt_unknown_channel", channel=ch_name)
 
     # ------------------------------------------------------------------
     # Return path
@@ -137,7 +138,7 @@ class MultiChannel(BaseChannel):
             except asyncio.CancelledError:
                 raise
             except Exception as exc:  # noqa: BLE001
-                logger.error("receive_replies error on %s: %s", ch.channel_name, exc)
+                logger.error("receive_replies_error", channel=ch.channel_name, error=str(exc))
 
         tasks = [
             asyncio.create_task(_drain(ch), name=f"recv_{ch.channel_name}") for ch in self._channels
