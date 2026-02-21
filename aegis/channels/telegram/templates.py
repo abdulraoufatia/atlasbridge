@@ -8,7 +8,6 @@ independently of the bot logic.
 from __future__ import annotations
 
 import textwrap
-from typing import Any
 
 from aegis.core.constants import PromptType
 from aegis.store.models import PromptRecord
@@ -95,7 +94,7 @@ def _format_multiple_choice(prompt: PromptRecord, tool: str) -> tuple[str, _Keyb
     for i, choice in enumerate(choices, start=1):
         label = textwrap.shorten(choice, width=30, placeholder="…")
         rows.append([_btn(f"{i}. {label}", f"ans:{prompt.id}:{prompt.nonce}:{i}")])
-    rows.append([_btn(f"⏩  Use default (1)", f"ans:{prompt.id}:{prompt.nonce}:default")])
+    rows.append([_btn("⏩  Use default (1)", f"ans:{prompt.id}:{prompt.nonce}:default")])
 
     return text, _keyboard(*rows)
 

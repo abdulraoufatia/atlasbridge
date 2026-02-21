@@ -44,7 +44,7 @@ class GitHubClient:
         }
         self._client: httpx.AsyncClient | None = None
 
-    async def __aenter__(self) -> "GitHubClient":
+    async def __aenter__(self) -> GitHubClient:
         self._client = httpx.AsyncClient(
             base_url=_API,
             headers=self._headers,

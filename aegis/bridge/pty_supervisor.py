@@ -45,10 +45,10 @@ import os
 import select
 import signal
 import sys
-import tty
 import termios
+import tty
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import ptyprocess  # type: ignore[import]
@@ -59,7 +59,6 @@ from aegis.core.config import AegisConfig
 from aegis.core.constants import (
     INJECT_BYTES,
     PromptStatus,
-    PromptType,
     SessionStatus,
     SupervisorState,
 )
@@ -205,7 +204,7 @@ class PTYSupervisor:
             self._db.update_session(
                 self._session_id,
                 status=SessionStatus.COMPLETED if exit_code == 0 else SessionStatus.CRASHED,
-                ended_at=datetime.now(timezone.utc).isoformat(),
+                ended_at=datetime.now(UTC).isoformat(),
                 exit_code=exit_code,
             )
             self._audit.write_event(
@@ -225,8 +224,6 @@ class PTYSupervisor:
 
     async def _event_loop(self) -> int:
         """Run PTY reader, stdin relay, stall watchdog, and response consumer."""
-        loop = asyncio.get_event_loop()
-
         tasks = [
             asyncio.create_task(self._pty_reader(), name="pty-reader"),
             asyncio.create_task(self._stdin_relay(), name="stdin-relay"),
@@ -455,7 +452,7 @@ class PTYSupervisor:
 
         timeout = self._config.prompts.timeout_seconds
         expires_at = (
-            datetime.now(timezone.utc) + timedelta(seconds=timeout)
+            datetime.now(UTC) + timedelta(seconds=timeout)
         ).isoformat()
 
         from aegis.core.constants import SAFE_DEFAULTS
@@ -511,7 +508,7 @@ class PTYSupervisor:
             self._db.update_prompt(
                 prompt_id,
                 status=status,
-                decided_at=datetime.now(timezone.utc).isoformat(),
+                decided_at=datetime.now(UTC).isoformat(),
             )
             self._audit.write_event(
                 event_id=str(uuid.uuid4()),

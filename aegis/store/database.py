@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import json
 import sqlite3
+from collections.abc import Generator
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Generator
+from typing import Any
 
 from aegis.store.models import AuditEvent, PromptRecord, Session
 
@@ -140,7 +140,7 @@ class Database:
                 self._conn.execute(
                     "INSERT INTO schema_version(version, applied_at, description) "
                     "VALUES (?, ?, ?)",
-                    (i, datetime.now(timezone.utc).isoformat(), f"Migration {i:03d}"),
+                    (i, datetime.now(UTC).isoformat(), f"Migration {i:03d}"),
                 )
 
     def _get_schema_version(self) -> int:
@@ -248,11 +248,11 @@ class Database:
                 {
                     "id": prompt_id,
                     "status": status,
-                    "decided_at": datetime.now(timezone.utc).isoformat(),
+                    "decided_at": datetime.now(UTC).isoformat(),
                     "decided_by": decided_by,
                     "response_normalized": response_normalized,
                     "nonce": nonce,
-                    "now": datetime.now(timezone.utc).isoformat(),
+                    "now": datetime.now(UTC).isoformat(),
                 },
             )
             return cur.rowcount
@@ -268,20 +268,20 @@ class Database:
         assert self._conn is not None
         if session_id:
             rows = self._conn.execute(
-                "SELECT * FROM prompts WHERE status IN ('pending','telegram_sent','awaiting_response') "
+                "SELECT * FROM prompts WHERE status IN ('pending','telegram_sent','awaiting_response') "  # noqa: E501
                 "AND session_id = ? ORDER BY created_at ASC",
                 (session_id,),
             ).fetchall()
         else:
             rows = self._conn.execute(
-                "SELECT * FROM prompts WHERE status IN ('pending','telegram_sent','awaiting_response') "
+                "SELECT * FROM prompts WHERE status IN ('pending','telegram_sent','awaiting_response') "  # noqa: E501
                 "ORDER BY created_at ASC"
             ).fetchall()
         return [PromptRecord.from_row(dict(r)) for r in rows]
 
     def list_expired_pending(self) -> list[PromptRecord]:
         assert self._conn is not None
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         rows = self._conn.execute(
             "SELECT * FROM prompts WHERE status IN ('pending','telegram_sent','awaiting_response') "
             "AND expires_at < ?",
@@ -311,7 +311,7 @@ class Database:
             self._conn.execute(
                 "INSERT INTO audit_events "
                 "(id, event_type, ts, session_id, prompt_id, data_json, prev_hash, hash) "
-                "VALUES (:id, :event_type, :ts, :session_id, :prompt_id, :data_json, :prev_hash, :hash)",
+                "VALUES (:id, :event_type, :ts, :session_id, :prompt_id, :data_json, :prev_hash, :hash)",  # noqa: E501
                 row,
             )
 
@@ -322,7 +322,8 @@ class Database:
         ).fetchone()
         if row:
             d = dict(row)
-            return AuditEvent(**{k: v for k, v in d.items() if k in AuditEvent.__dataclass_fields__})
+            fields = AuditEvent.__dataclass_fields__
+            return AuditEvent(**{k: v for k, v in d.items() if k in fields})
         return None
 
     def list_recent_audit_events(self, limit: int = 50) -> list[AuditEvent]:
@@ -333,5 +334,6 @@ class Database:
         result = []
         for r in rows:
             d = dict(r)
-            result.append(AuditEvent(**{k: v for k, v in d.items() if k in AuditEvent.__dataclass_fields__}))
+            fields = AuditEvent.__dataclass_fields__
+            result.append(AuditEvent(**{k: v for k, v in d.items() if k in fields}))
         return result

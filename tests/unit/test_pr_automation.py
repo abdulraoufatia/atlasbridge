@@ -2,14 +2,9 @@
 
 from __future__ import annotations
 
-import asyncio
-import json
-import secrets
-import uuid
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -23,29 +18,28 @@ from aegis.core.pr_automation import (
     _skip,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
 
 def _cfg(**overrides: Any) -> AutoPRConfig:
-    defaults = dict(
-        github_token="tok",
-        github_repo="owner/repo",
-        repo_path=Path("/tmp/repo"),
-        authors=["dependabot[bot]"],
-        labels=[],
-        merge_method="squash",
-        delete_branch_on_merge=True,
-        require_all_checks=True,
-        max_retries=2,
-        ci_timeout_seconds=60,
-        ci_poll_interval_seconds=5,
-        test_command="pytest tests/ -q",
-        dry_run=True,
-        anthropic_api_key="",
-    )
+    defaults: dict[str, Any] = {
+        "github_token": "tok",
+        "github_repo": "owner/repo",
+        "repo_path": Path("/tmp/repo"),
+        "authors": ["dependabot[bot]"],
+        "labels": [],
+        "merge_method": "squash",
+        "delete_branch_on_merge": True,
+        "require_all_checks": True,
+        "max_retries": 2,
+        "ci_timeout_seconds": 60,
+        "ci_poll_interval_seconds": 5,
+        "test_command": "pytest tests/ -q",
+        "dry_run": True,
+        "anthropic_api_key": "",
+    }
     defaults.update(overrides)
     return AutoPRConfig(**defaults)
 
@@ -65,7 +59,7 @@ def _pr(
         "title": title,
         "draft": draft,
         "user": {"login": author},
-        "labels": [{"name": l} for l in (labels or [])],
+        "labels": [{"name": lbl} for lbl in (labels or [])],
         "head": {"ref": branch, "sha": sha},
         "base": {"ref": base},
         "mergeable": True,

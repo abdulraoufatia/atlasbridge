@@ -26,7 +26,7 @@ import logging
 import os
 import signal
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -187,7 +187,7 @@ def _clear_pid() -> None:
 def _write_status(results: list[PRResult]) -> None:
     _STATUS_FILE.parent.mkdir(parents=True, exist_ok=True)
     data = {
-        "last_cycle": datetime.now(timezone.utc).isoformat(),
+        "last_cycle": datetime.now(UTC).isoformat(),
         "results": [
             {
                 "pr_number": r.pr_number,

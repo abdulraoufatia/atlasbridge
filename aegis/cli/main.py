@@ -28,7 +28,6 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from aegis.core.constants import PromptStatus
 from aegis.core.exceptions import AegisError, ConfigNotFoundError
 
 console = Console()
@@ -60,9 +59,9 @@ def cli(ctx: click.Context, debug: bool) -> None:
 
 @cli.command()
 @click.option("--token", envvar="AEGIS_TELEGRAM_BOT_TOKEN", help="Telegram bot token.")
-@click.option("--users", envvar="AEGIS_TELEGRAM_ALLOWED_USERS", help="Comma-separated Telegram user IDs.")
-@click.option("--timeout", type=int, default=600, show_default=True, help="Prompt timeout (seconds).")
-@click.option("--free-text", is_flag=True, default=False, help="Enable free-text prompt forwarding.")
+@click.option("--users", envvar="AEGIS_TELEGRAM_ALLOWED_USERS", help="Comma-separated user IDs.")
+@click.option("--timeout", type=int, default=600, show_default=True, help="Prompt timeout (s).")
+@click.option("--free-text", is_flag=True, default=False, help="Enable free-text forwarding.")
 def setup(token: str | None, users: str | None, timeout: int, free_text: bool) -> None:
     """Run the interactive setup wizard."""
     from aegis.core.config import save_config
@@ -329,7 +328,10 @@ def approvals(session: str | None, show_all: bool) -> None:
     db.connect()
     try:
         if show_all:
-            prompts = db.list_prompts_for_session(session or "", limit=50) if session else _list_recent(db)
+            if session:
+                prompts = db.list_prompts_for_session(session or "", limit=50)
+            else:
+                prompts = _list_recent(db)
         else:
             prompts = db.list_pending_prompts(session_id=_expand_session_id(db, session))
     finally:
@@ -359,7 +361,6 @@ def approvals(session: str | None, show_all: bool) -> None:
 
 
 def _list_recent(db: Any) -> list[Any]:
-    from aegis.store.database import Database
     # Return last 50 prompts across all sessions
     sessions = db.list_active_sessions()
     prompts = []
@@ -726,8 +727,9 @@ def pr_auto_run_once(dry_run: bool | None, as_json: bool) -> None:
 @click.option("--json", "as_json", is_flag=True, default=True, help="Output as JSON (default).")
 def pr_auto_report(as_json: bool) -> None:
     """Print a JSON report of the last PR automation cycle."""
-    from aegis.core.daemon_services.pr_automation_service import get_status
     import json as _json
+
+    from aegis.core.daemon_services.pr_automation_service import get_status
 
     data = get_status()
     console.print(_json.dumps(data, indent=2))

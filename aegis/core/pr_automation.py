@@ -29,10 +29,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import subprocess
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -76,7 +75,7 @@ class PRResult:
     error: str | None = None
     protection_snapshot: dict[str, Any] = field(default_factory=dict)
     timestamp: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+        default_factory=lambda: datetime.now(UTC).isoformat()
     )
 
 
@@ -171,7 +170,7 @@ class PRAutomationEngine:
             return _skip(result, SkipReason.CONFLICT)
 
         # --- Branch protection snapshot ---
-        protection = await gh.get_branch_protection(base_branch)
+        await gh.get_branch_protection(base_branch)
         required_checks = await gh.get_required_checks(base_branch)
         required_reviews = await gh.get_required_reviews(base_branch)
         result.protection_snapshot = {

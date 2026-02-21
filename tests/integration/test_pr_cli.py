@@ -7,7 +7,7 @@ Uses Click test runner with mocked GitHub API and daemon service.
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from click.testing import CliRunner
@@ -113,7 +113,9 @@ class TestPRAutoRunOnce:
         # If an error occurred, print it for debugging
         if result.exception:
             import traceback
-            traceback.print_exception(type(result.exception), result.exception, result.exception.__traceback__)
+            traceback.print_exception(
+                type(result.exception), result.exception, result.exception.__traceback__
+            )
 
         assert result.exit_code == 0, result.output
         import json

@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-import os
 import stat
-import tempfile
 from pathlib import Path
 
 import pytest
 
-from aegis.core.config import AegisConfig, load_config, save_config
+from aegis.core.config import load_config, save_config
 from aegis.core.exceptions import ConfigError, ConfigNotFoundError
-
 
 # ---------------------------------------------------------------------------
 # Helpers

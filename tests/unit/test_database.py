@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import secrets
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -27,7 +27,7 @@ def _session(sid: str | None = None) -> Session:
 
 
 def _prompt(session_id: str, expires_in: float = 600.0) -> PromptRecord:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return PromptRecord(
         id=str(uuid.uuid4()),
         session_id=session_id,
@@ -126,7 +126,9 @@ class TestPromptRepo:
         db.save_session(s)
         p = _prompt(s.id)
         db.save_prompt(p)
-        rows = db.decide_prompt(p.id, PromptStatus.RESPONSE_RECEIVED, "telegram:42", "y", "wrong-nonce")
+        rows = db.decide_prompt(
+            p.id, PromptStatus.RESPONSE_RECEIVED, "telegram:42", "y", "wrong-nonce"
+        )
         assert rows == 0
 
     def test_list_pending(self, db: Database) -> None:

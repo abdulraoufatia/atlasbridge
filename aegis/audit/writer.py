@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -69,7 +69,7 @@ class AuditWriter:
         ev = AuditEvent(
             id=event_id,
             event_type=event_type,
-            ts=datetime.now(timezone.utc).isoformat(),
+            ts=datetime.now(UTC).isoformat(),
             session_id=session_id,
             prompt_id=prompt_id,
             data_json=json.dumps(data or {}),

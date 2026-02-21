@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import secrets
 import uuid
-from datetime import datetime, timedelta, timezone
-
-import pytest
+from datetime import UTC, datetime, timedelta
 
 from aegis.channels.telegram.templates import (
     format_prompt,
@@ -24,7 +22,7 @@ def _prompt(input_type: str, choices: list[str] | None = None) -> PromptRecord:
         excerpt="Continue? (y/n)",
         confidence=0.9,
         nonce=secrets.token_hex(16),
-        expires_at=(datetime.now(timezone.utc) + timedelta(seconds=60)).isoformat(),
+        expires_at=(datetime.now(UTC) + timedelta(seconds=60)).isoformat(),
         safe_default="n",
     )
     if choices:

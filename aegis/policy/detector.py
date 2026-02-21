@@ -14,10 +14,8 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Sequence
 
 from aegis.core.constants import PromptType
-
 
 # ---------------------------------------------------------------------------
 # Detection result
@@ -212,7 +210,7 @@ def _match_patterns(
 
 def _extract_excerpt(text: str, max_chars: int = 200) -> str:
     """Return the last non-empty lines of text, up to max_chars."""
-    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     excerpt = " | ".join(lines[-3:])  # up to 3 trailing lines
     return excerpt[:max_chars]
 

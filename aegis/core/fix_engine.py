@@ -19,15 +19,12 @@ engine falls back to logging the failure for human review.
 from __future__ import annotations
 
 import asyncio
-import difflib
 import json
 import logging
 import os
 import subprocess
-import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 import httpx
 
