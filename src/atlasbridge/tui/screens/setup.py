@@ -241,7 +241,7 @@ class SetupScreen(Screen):  # type: ignore[type-arg]
                 pass
 
     def _refresh_screen(self) -> None:
-        self.refresh(layout=True)
+        self.recompose()
 
     def _show_error(self, msg: str) -> None:
         try:

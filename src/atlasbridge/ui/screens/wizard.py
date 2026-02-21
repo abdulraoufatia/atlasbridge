@@ -1,12 +1,12 @@
 """
 SetupWizardScreen — 4-step guided configuration flow.
 
-Widget tree::
+Widget tree (rebuilt on each step via ``recompose()``)::
 
     Header
     #wizard-root  (Static)
       #wizard-title   (Label)
-      #wizard-step    (Static — current step content, replaced on advance)
+      #wizard-step    (Static — current step content)
       #wizard-error   (Label  — validation error, empty when ok)
       .wizard-nav     (Static — Back / Next / Finish buttons)
     Footer
@@ -14,6 +14,7 @@ Widget tree::
 Keybindings:
   enter  — advance to next step (same as "Next →")
   escape — go back one step (or close wizard if on step 0)
+  h      — show channel token setup instructions
 """
 
 from __future__ import annotations
@@ -35,6 +36,30 @@ from textual.widgets import (
 
 from atlasbridge.ui.state import WIZARD_TOTAL, WizardState
 
+_TELEGRAM_HELP = (
+    "How to get a Telegram bot token:\n\n"
+    "  1. Open Telegram and search for @BotFather\n"
+    "  2. Send /newbot\n"
+    "  3. Choose a display name and a username (must end in 'bot')\n"
+    "  4. BotFather replies with your token\n"
+    "     Format: 123456789:ABCDefghIJKLMN...\n\n"
+    "  To find your user ID, message @userinfobot\n\n"
+    "  Your token is stored locally and never uploaded."
+)
+
+_SLACK_HELP = (
+    "How to get Slack tokens:\n\n"
+    "  1. Go to https://api.slack.com/apps\n"
+    "  2. Create New App → From scratch → choose workspace\n"
+    "  3. OAuth & Permissions → add scopes: chat:write, users:read\n"
+    "  4. Install App to Workspace\n"
+    "  5. Copy Bot User OAuth Token (xoxb-...)\n"
+    "  6. Basic Information → App-Level Tokens → Generate (xapp-...)\n"
+    "     Scope: connections:write\n\n"
+    "  To find your member ID: profile → ··· → Copy member ID\n\n"
+    "  Tokens are stored locally and never uploaded."
+)
+
 
 class SetupWizardScreen(Screen):  # type: ignore[type-arg]
     """Interactive 4-step setup wizard."""
@@ -44,6 +69,7 @@ class SetupWizardScreen(Screen):  # type: ignore[type-arg]
         Binding("escape", "cancel", "Back / Cancel", show=True),
         Binding("ctrl+n", "next_step", "Next", show=False),
         Binding("ctrl+p", "prev_step", "Back", show=False),
+        Binding("h", "show_help", "Help", show=True),
     ]
 
     def __init__(self) -> None:
@@ -51,7 +77,7 @@ class SetupWizardScreen(Screen):  # type: ignore[type-arg]
         self._wizard = WizardState()
 
     # ------------------------------------------------------------------
-    # Compose
+    # Compose — called on mount and on recompose()
     # ------------------------------------------------------------------
 
     def compose(self) -> ComposeResult:
@@ -70,6 +96,9 @@ class SetupWizardScreen(Screen):  # type: ignore[type-arg]
                 else:
                     yield Button("Finish", id="btn-finish", variant="success")
         yield Footer()
+
+    def on_mount(self) -> None:
+        self._focus_first_input()
 
     # ------------------------------------------------------------------
     # Step rendering
@@ -92,7 +121,7 @@ class SetupWizardScreen(Screen):  # type: ignore[type-arg]
         s.compose = lambda: [  # type: ignore[method-assign]
             Label("Step 1 of 4 — Choose a notification channel", classes="step-title"),
             Label(
-                "AtlasBridge will forward prompts to your phone via this channel.",
+                "AtlasBridge forwards prompts to your phone via this channel.",
                 classes="field-label",
             ),
             RadioSet(
@@ -108,7 +137,11 @@ class SetupWizardScreen(Screen):  # type: ignore[type-arg]
         if self._wizard.channel == "telegram":
             s.compose = lambda: [  # type: ignore[method-assign]
                 Label("Step 2 of 4 — Telegram credentials", classes="step-title"),
-                Label("Get your bot token from @BotFather on Telegram.", classes="field-label"),
+                Label(
+                    "Get your bot token from @BotFather on Telegram.\n"
+                    "Press [H] for step-by-step instructions.",
+                    classes="field-label",
+                ),
                 Label("Bot token:", classes="field-label"),
                 Input(
                     placeholder="12345678:ABCDefghIJKLMNopQRSTuvwxyz12345678901",
@@ -122,8 +155,7 @@ class SetupWizardScreen(Screen):  # type: ignore[type-arg]
                 Label("Step 2 of 4 — Slack credentials", classes="step-title"),
                 Label(
                     "Create a Slack App with Socket Mode enabled.\n"
-                    "Bot token (xoxb-*) from OAuth & Permissions.\n"
-                    "App-level token (xapp-*) from Basic Information → App-Level Tokens.",
+                    "Press [H] for step-by-step instructions.",
                     classes="field-label",
                 ),
                 Label("Bot token (xoxb-*):", classes="field-label"),
@@ -241,6 +273,14 @@ class SetupWizardScreen(Screen):  # type: ignore[type-arg]
         except Exception:  # noqa: BLE001
             pass
 
+    def _focus_first_input(self) -> None:
+        """Focus the first Input widget on the current step, if any."""
+        try:
+            first_input = self.query("Input").first()
+            first_input.focus()
+        except Exception:  # noqa: BLE001
+            pass
+
     # ------------------------------------------------------------------
     # Event handlers
     # ------------------------------------------------------------------
@@ -264,7 +304,6 @@ class SetupWizardScreen(Screen):  # type: ignore[type-arg]
 
             ConfigService.save(self._wizard.build_config_data())
             self._clear_error()
-            # Navigate to the completion screen
             from atlasbridge.ui.screens.complete import SetupCompleteScreen
 
             self.app.switch_screen(
@@ -281,7 +320,6 @@ class SetupWizardScreen(Screen):  # type: ignore[type-arg]
     # ------------------------------------------------------------------
 
     def action_next_step(self) -> None:
-        # On the last step, treat Enter as Finish
         if self._wizard.is_last_step:
             self._do_finish()
             return
@@ -292,15 +330,23 @@ class SetupWizardScreen(Screen):  # type: ignore[type-arg]
             return
         self._clear_error()
         self._wizard = self._wizard.next()
-        self.refresh(layout=True)
+        self.recompose()
 
     def action_prev_step(self) -> None:
+        self._collect_inputs()
         self._clear_error()
         self._wizard = self._wizard.prev()
-        self.refresh(layout=True)
+        self.recompose()
 
     def action_cancel(self) -> None:
         if self._wizard.is_first_step:
             self.app.pop_screen()
         else:
             self.action_prev_step()
+
+    def action_show_help(self) -> None:
+        channel = self._wizard.channel
+        help_text = _TELEGRAM_HELP if channel == "telegram" else _SLACK_HELP
+        self.notify(
+            help_text, title=f"{channel.capitalize()} setup", severity="information", timeout=15
+        )

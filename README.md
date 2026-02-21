@@ -166,6 +166,8 @@ atlasbridge setup --channel slack
 
 You'll need a Slack App with Socket Mode enabled, a bot token (`xoxb-*`), and an app-level token (`xapp-*`).
 
+> **Need help getting tokens?** See the [Channel Token Setup Guide](docs/channel-token-setup.md) for step-by-step instructions, or press **H** inside the TUI setup wizard.
+
 ### 2. Run your AI agent under supervision
 
 ```bash

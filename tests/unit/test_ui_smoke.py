@@ -173,6 +173,81 @@ def test_cli_ui_help_exits_zero() -> None:
     assert "TUI" in result.output or "terminal" in result.output.lower()
 
 
+# ---------------------------------------------------------------------------
+# Wizard screen — help constants, recompose-based navigation
+# ---------------------------------------------------------------------------
+
+
+def test_wizard_screen_has_help_constants() -> None:
+    """SetupWizardScreen exposes Telegram and Slack help text constants."""
+    from atlasbridge.ui.screens.wizard import _SLACK_HELP, _TELEGRAM_HELP
+
+    assert "BotFather" in _TELEGRAM_HELP
+    assert "@userinfobot" in _TELEGRAM_HELP
+    assert "xoxb" in _SLACK_HELP
+    assert "xapp" in _SLACK_HELP
+
+
+def test_wizard_screen_has_h_binding() -> None:
+    """SetupWizardScreen should bind 'h' for help."""
+    from atlasbridge.ui.screens.wizard import SetupWizardScreen
+
+    keys = [b.key for b in SetupWizardScreen.BINDINGS]
+    assert "h" in keys
+
+
+def test_wizard_screen_uses_recompose() -> None:
+    """action_next_step and action_prev_step must call recompose, not refresh."""
+    import inspect
+
+    from atlasbridge.ui.screens.wizard import SetupWizardScreen
+
+    next_src = inspect.getsource(SetupWizardScreen.action_next_step)
+    prev_src = inspect.getsource(SetupWizardScreen.action_prev_step)
+    assert "recompose" in next_src, "action_next_step should use recompose()"
+    assert "recompose" in prev_src, "action_prev_step should use recompose()"
+    assert "refresh(layout" not in next_src, "Must not use refresh(layout=True)"
+    assert "refresh(layout" not in prev_src, "Must not use refresh(layout=True)"
+
+
+def test_tui_setup_screen_uses_recompose() -> None:
+    """Legacy tui SetupScreen._refresh_screen must use recompose."""
+    import inspect
+
+    from atlasbridge.tui.screens.setup import SetupScreen
+
+    src = inspect.getsource(SetupScreen._refresh_screen)
+    assert "recompose" in src
+    assert "refresh(layout" not in src
+
+
+def test_wizard_state_step_transitions_preserve_data() -> None:
+    """Navigating forward and back preserves all entered data."""
+    from atlasbridge.tui.state import WizardState
+
+    w = WizardState(channel="slack", token="xoxb-test", app_token="xapp-test", users="U123")
+    w2 = w.next()
+    w3 = w2.prev()
+    assert w3.channel == "slack"
+    assert w3.token == "xoxb-test"
+    assert w3.app_token == "xapp-test"
+    assert w3.users == "U123"
+
+
+def test_channel_token_setup_docs_exist() -> None:
+    """docs/channel-token-setup.md must exist and contain key sections."""
+    from pathlib import Path
+
+    doc = Path(__file__).resolve().parents[2] / "docs" / "channel-token-setup.md"
+    assert doc.exists(), f"Expected {doc} to exist"
+    content = doc.read_text()
+    assert "Telegram Bot Token" in content
+    assert "Slack Bot Token" in content
+    assert "BotFather" in content
+    assert "xoxb-" in content
+    assert "xapp-" in content
+
+
 def test_cli_ui_non_tty_exits_nonzero(monkeypatch) -> None:
     """``atlasbridge ui`` without a TTY should exit 1."""
     import sys as _sys
