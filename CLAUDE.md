@@ -6,15 +6,11 @@ This file is read by Claude Code automatically. It provides project context for 
 
 ## What AtlasBridge is
 
-AtlasBridge is the **universal control plane for autonomous AI developer agents**.
+AtlasBridge is a **policy-driven autonomous runtime for AI CLI agents** with built-in human escalation and remote prompt relay.
 
-AtlasBridge sits between you and your AI coding agent. It detects every prompt your agent produces and decides what happens next — relay it to your phone, auto-reply per your policy, or deny it. You stay in control from anywhere.
+AtlasBridge is a deterministic, policy-governed runtime that allows AI CLI agents to operate autonomously within defined boundaries. Humans define the rules. AtlasBridge enforces them. When uncertainty, ambiguity, or high-impact actions arise, AtlasBridge escalates safely to a human via Telegram or Slack.
 
-**Two operating modes:**
-- **Relay mode** (v0.2.0+) — every prompt forwarded to Telegram/Slack; you reply from your phone
-- **Autopilot mode** (v0.6.0+) — a YAML policy defines which prompts to auto-handle, which to escalate, and which to deny; every decision is audited
-
-**Three autonomy levels:** Off (pure relay), Assist (policy suggests, you confirm), Full (policy auto-replies, escalates the rest).
+**Three autonomy levels:** Off (all prompts to human), Assist (policy handles allowed prompts, escalates others), Full (policy auto-executes, escalates no-match/low-confidence).
 
 ---
 
