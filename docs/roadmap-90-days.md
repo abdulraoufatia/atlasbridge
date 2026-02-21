@@ -1,6 +1,6 @@
 # AtlasBridge Roadmap
 
-**Version:** 0.8.2
+**Version:** 0.8.3
 **Status:** Active
 **Last updated:** 2026-02-21
 
@@ -45,6 +45,7 @@ The positioning is settled: **policy-driven autonomous runtime for AI CLI agents
 | v0.8.0 | Zero-touch setup — config migration, env bootstrap, keyring, config CLI | Released |
 | v0.8.1 | Policy DSL v1 — any_of/none_of, session_tag, max_confidence, extends, trace rotation | Released |
 | v0.8.2 | Redesigned Telegram + Slack prompt messages with structured layout | Released |
+| v0.8.3 | Enterprise architecture foundation — Phase A scaffold + Phase B/C specs | Released |
 
 ### v0.7.1 — Policy Engine Hardening (Released)
 
@@ -93,6 +94,24 @@ The positioning is settled: **policy-driven autonomous runtime for AI CLI agents
 - **Per-type response instructions** — each prompt type (Yes/No, Confirm Enter, Multiple Choice, Free Text) shows specific guidance on how to respond
 - **TTL visibility** — expiry countdown displayed in every prompt message
 - **Slack Block Kit upgrade** — dividers, header/question/instruction sections, context block for metadata
+
+### v0.8.3 — Enterprise Architecture Foundation (Released)
+
+**Theme:** Open-core enterprise scaffolding with phased cloud evolution.
+
+**Delivered:**
+
+- **Edition gating** — `COMMUNITY` / `PRO` / `ENTERPRISE` edition enum with feature flag registry; `detect_edition()` reads `ATLASBRIDGE_EDITION` env var
+- **RBAC** — local role-based access control with four roles (viewer / operator / admin / owner), permission-to-role mapping, and identity management
+- **Deterministic risk classifier** — fixed decision table (LOW / MEDIUM / HIGH / CRITICAL) based on action type, confidence, branch protection, and CI state; no ML or heuristics
+- **Hash-chained DecisionTraceEntryV2** — 20-field trace entries with SHA-256 chain (`previous_hash` → `current_hash`) for tamper-evident audit
+- **Policy pinning** — session-level policy hash capture to detect mid-session drift
+- **Policy governance lifecycle** — hash computation, snapshot diffing, and pin validation
+- **Cloud interfaces (Phase B spec)** — abstract ABCs for policy registry, escalation relay, audit streaming, auth, and control channel transport; all have `Disabled*` no-op stubs
+- **Cloud protocol spec (Phase C design)** — WSS + Ed25519 signed messages, advisory-only control channel, multi-tenant SaaS architecture docs
+- **CLI commands** — `atlasbridge edition`, `atlasbridge features`, `atlasbridge cloud status`
+- **66 new tests** — edition detection, risk classification, trace integrity, policy pinning, cloud disabled stubs
+- **6 design documents** — enterprise architecture, SaaS architecture, transition contracts, trust boundaries, implementation prompts, enterprise roadmap
 
 ---
 
@@ -222,6 +241,7 @@ Under high-volume output (100k+ lines/session), `PromptDetector.detect()` could 
 | v0.8.0 | Zero-touch setup | Released |
 | v0.8.1 | Policy DSL v1 | Released |
 | v0.8.2 | Redesigned prompt messages | Released |
+| v0.8.3 | Enterprise architecture foundation | Released |
 | v0.9.0 | Windows ConPTY (experimental) | Planned |
 | v1.0.0 | GA — stable, multi-platform, multi-agent | Planned |
 
