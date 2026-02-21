@@ -214,6 +214,12 @@ You can also send `/pause` or `/resume` from Telegram or Slack.
 
 ## Changelog
 
+### v0.6.1 — Policy Authoring Documentation
+
+- **New**: [`docs/policy-authoring.md`](docs/policy-authoring.md) — 10-section guide: quick start (5 min), core concepts, syntax reference, CLI usage, 8 authoring patterns, debugging, FAQ, and safety notes
+- **New**: `config/policies/` — 5 ready-to-use policy presets (`minimal`, `assist-mode`, `full-mode-safe`, `pr-remediation-dependabot`, `escalation-only`)
+- **Updated**: `docs/policy-dsl.md` — status updated to Implemented (v0.6.0+)
+
 ### v0.6.0 — Autonomous Agent Runtime (Policy-Driven)
 
 - **Policy DSL v0** — YAML-based, strictly typed, first-match-wins rule engine; `atlasbridge policy validate` and `atlasbridge policy test --explain`
@@ -296,7 +302,8 @@ You can also send `/pause` or `/resume` from Telegram or Slack.
 | v0.5.0 | Released | Interactive terminal UI — setup wizard, sessions, logs, doctor |
 | v0.5.1 | Released | Branding fix (Aegis→AtlasBridge in CLI output) + lab import fix |
 | v0.5.2 | Released | Production UI skeleton — 6 screens, StatusCards, polling, TCSS |
-| **v0.6.0** | **Released** | Autonomous Agent Runtime — Policy DSL v0, autopilot engine, kill switch |
+| v0.6.0 | Released | Autonomous Agent Runtime — Policy DSL v0, autopilot engine, kill switch |
+| **v0.6.1** | **Released** | Policy authoring guide, 5 policy presets, docs/policy-authoring.md |
 | v0.7.0 | Planned | Windows (ConPTY, experimental) |
 
 ---
