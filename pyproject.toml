@@ -82,9 +82,9 @@ Security = "https://github.com/abdulraoufatia/aegis-cli/blob/main/SECURITY.md"
 # ---------------------------------------------------------------------------
 
 [tool.setuptools.packages.find]
-# Primary source layout: src/aegis (v0.2.0+)
-# Legacy root layout: aegis/ (pre-v0.2.0, kept for existing tests during transition)
-where = ["src", "."]
+# Root package (aegis/) is the installed distribution for now.
+# src/aegis/ stubs will become the primary package in v0.2.0.
+where = ["."]
 include = ["aegis*"]
 
 [tool.ruff]
