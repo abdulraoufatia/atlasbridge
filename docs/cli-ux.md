@@ -1,7 +1,7 @@
 # AtlasBridge UX Specification
 
-**Version:** 0.2.0
-**Status:** Design
+**Version:** 0.5.0
+**Status:** Active
 **Last updated:** 2026-02-21
 
 ---
@@ -41,7 +41,88 @@ AtlasBridge does not have hidden global state beyond the files in `~/.atlasbridg
 
 ---
 
-## 2. Command Reference
+## 2. Interactive TUI (v0.5.0+)
+
+Running `atlasbridge` with no arguments in an interactive terminal launches the built-in TUI:
+
+```bash
+atlasbridge        # auto-detects TTY, launches TUI
+atlasbridge ui     # explicit TUI launch
+```
+
+### Screens
+
+| Screen | Key | Description |
+|--------|-----|-------------|
+| Welcome / Overview | (default) | Status summary; quick actions for setup, doctor, sessions, logs |
+| Setup Wizard | `S` | 4-step guided configuration: channel → credentials → user IDs → confirm |
+| Doctor | `D` | Environment and config health checks with ✓/⚠/✗ status |
+| Sessions | `L` | DataTable of active and recent sessions |
+| Logs | `G` | Tail of the hash-chained audit log (last 100 events) |
+
+### Navigation
+
+- `Escape` — go back / cancel
+- `Q` — quit from any screen
+- `R` — refresh current screen
+- Arrow keys / Tab — navigate within screens
+- Button labels show available keyboard shortcuts
+
+### Welcome screen: unconfigured state
+
+```
+AtlasBridge
+Human-in-the-loop control plane for AI developer agents
+
+You're not set up yet. Let's fix that.
+
+AtlasBridge keeps your AI CLI sessions moving when they pause for input.
+When your agent asks a question, AtlasBridge forwards it to your phone
+(Telegram or Slack). You reply there — AtlasBridge resumes the CLI.
+
+Setup takes ~2 minutes:
+  1) Choose a channel (Telegram or Slack)
+  2) Add your credentials (kept local)
+  3) Allowlist your user ID(s)
+  4) Run a quick health check
+
+  [S] Setup AtlasBridge  (recommended)
+  [D] Run Doctor         (check environment)
+  [Q] Quit
+```
+
+### Welcome screen: configured state
+
+```
+AtlasBridge
+Human-in-the-loop control plane for AI developer agents
+
+AtlasBridge is ready.
+
+  Config:           Loaded
+  Daemon:           Running
+  Channel:          telegram
+  Sessions:         2
+  Pending prompts:  0
+
+  [R] Run a tool      [S] Sessions
+  [L] Logs (tail)     [D] Doctor
+  [T] Start/Stop daemon
+  [Q] Quit
+```
+
+### Setup wizard — steps
+
+1. **Channel** — choose Telegram (recommended) or Slack
+2. **Credentials** — enter bot token (masked while typing); Slack adds app-level token field
+3. **User IDs** — allowlist your numeric Telegram user IDs or Slack member IDs
+4. **Confirm** — review summary, press Finish to write `~/.atlasbridge/config.toml`
+
+Tokens are never shown in cleartext. The confirm screen shows `********<last 4>`.
+
+---
+
+## 3. Command Reference
 
 ### Global Flags
 

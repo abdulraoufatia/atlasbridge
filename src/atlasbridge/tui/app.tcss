@@ -1,0 +1,184 @@
+/* AtlasBridge TUI — global stylesheet */
+
+Screen {
+    background: $surface;
+}
+
+/* ── Header / Footer ─────────────────────────────────────────── */
+
+Header {
+    dock: top;
+    height: 1;
+    background: $accent;
+    color: $text;
+}
+
+Footer {
+    dock: bottom;
+    height: 1;
+    background: $primary-darken-2;
+    color: $text-muted;
+}
+
+/* ── Welcome screen ──────────────────────────────────────────── */
+
+#welcome-container {
+    align: center middle;
+    padding: 1 4;
+}
+
+#brand-header {
+    text-align: center;
+    color: $accent;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+#brand-tagline {
+    text-align: center;
+    color: $text-muted;
+    margin-bottom: 2;
+}
+
+#status-box {
+    border: round $primary;
+    padding: 1 2;
+    margin-bottom: 2;
+    min-width: 60;
+}
+
+#status-title {
+    text-style: bold;
+    color: $accent;
+    margin-bottom: 1;
+}
+
+#actions-box {
+    padding: 0 2;
+    margin-bottom: 2;
+}
+
+.action-key {
+    color: $accent;
+    text-style: bold;
+}
+
+#footer-tip {
+    text-align: center;
+    color: $text-muted;
+    text-style: italic;
+}
+
+/* ── Setup wizard ────────────────────────────────────────────── */
+
+#setup-container {
+    padding: 1 4;
+}
+
+#wizard-title {
+    text-style: bold;
+    color: $accent;
+    margin-bottom: 1;
+}
+
+#progress-label {
+    color: $text-muted;
+    margin-bottom: 1;
+}
+
+ProgressBar {
+    margin-bottom: 2;
+}
+
+.step-container {
+    border: round $primary;
+    padding: 1 2;
+    margin-bottom: 2;
+}
+
+.step-title {
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+.field-label {
+    color: $text-muted;
+    margin-top: 1;
+    margin-bottom: 0;
+}
+
+Input {
+    margin-bottom: 1;
+}
+
+RadioSet {
+    margin-bottom: 1;
+}
+
+.error-label {
+    color: $error;
+    margin-top: 1;
+}
+
+.success-label {
+    color: $success;
+    margin-top: 1;
+}
+
+.wizard-nav {
+    layout: horizontal;
+    height: 3;
+    margin-top: 1;
+    align: right middle;
+}
+
+Button {
+    margin-left: 1;
+}
+
+Button.primary {
+    background: $accent;
+}
+
+/* ── Doctor screen ───────────────────────────────────────────── */
+
+#doctor-container {
+    padding: 1 4;
+}
+
+.check-pass {
+    color: $success;
+}
+
+.check-warn {
+    color: $warning;
+}
+
+.check-fail {
+    color: $error;
+}
+
+.check-skip {
+    color: $text-muted;
+}
+
+/* ── Sessions screen ─────────────────────────────────────────── */
+
+#sessions-container {
+    padding: 1 4;
+}
+
+DataTable {
+    height: 1fr;
+}
+
+/* ── Logs screen ─────────────────────────────────────────────── */
+
+#logs-container {
+    padding: 1 4;
+}
+
+RichLog {
+    height: 1fr;
+    border: round $primary;
+}

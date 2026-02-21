@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "atlasbridge"
-version = "0.4.2"
+version = "0.5.0"
 description = "Universal human-in-the-loop control plane for AI developer agents — forward prompts to your phone, reply from anywhere"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -40,6 +40,8 @@ dependencies = [
     "structlog>=24.1",
     # Rich terminal output
     "rich>=13.7",
+    # Interactive TUI
+    "textual>=0.50",
     # PTY handling for tool wrapping
     "ptyprocess>=0.7",
     # Process management
@@ -126,6 +128,7 @@ ignore = [
 "src/atlasbridge/os/**/*.py" = ["ANN"]
 "src/atlasbridge/adapters/*.py" = ["ANN", "E501"]
 "src/atlasbridge/channels/**/*.py" = ["ANN"]
+"src/atlasbridge/tui/**/*.py" = ["ANN", "E501"]
 
 [tool.mypy]
 python_version = "3.11"
@@ -139,7 +142,7 @@ disallow_any_generics = false
 no_implicit_optional = true
 
 [[tool.mypy.overrides]]
-module = ["ptyprocess.*", "detect_secrets.*"]
+module = ["ptyprocess.*", "detect_secrets.*", "textual.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -153,6 +156,7 @@ module = [
     "atlasbridge.core.audit.*",
     "atlasbridge.channels.*",
     "atlasbridge.cli.*",
+    "atlasbridge.tui.*",
 ]
 ignore_errors = true
 
@@ -178,6 +182,7 @@ omit = [
     "*/atlasbridge/core/daemon/*",
     "*/atlasbridge/channels/*",
     "*/atlasbridge/cli/*",
+    "*/atlasbridge/tui/*",
 ]
 
 [tool.coverage.report]

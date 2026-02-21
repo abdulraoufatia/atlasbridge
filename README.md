@@ -42,6 +42,39 @@ Requires Python 3.11+. Works on macOS and Linux.
 
 ## Quick start
 
+### Option A — Interactive TUI (v0.5.0+)
+
+Run `atlasbridge` with no arguments in your terminal to launch the interactive control panel:
+
+```bash
+atlasbridge
+```
+
+The TUI guides you through setup, shows live status, and provides quick access to sessions, logs, and doctor checks — all in your terminal.
+
+```
+┌─ AtlasBridge ──────────────────────────────────────────────────────┐
+│  AtlasBridge                                                        │
+│  Human-in-the-loop control plane for AI developer agents           │
+│                                                                     │
+│  AtlasBridge is ready.                                              │
+│    Config:           Loaded                                         │
+│    Daemon:           Running                                        │
+│    Channel:          telegram                                       │
+│    Sessions:         2                                              │
+│    Pending prompts:  0                                              │
+│                                                                     │
+│  [R] Run a tool      [S] Sessions                                   │
+│  [L] Logs (tail)     [D] Doctor                                     │
+│  [T] Start/Stop daemon                                              │
+│  [Q] Quit                                                           │
+│                                                                     │
+│  [S] Setup  [D] Doctor  [Q] Quit                                    │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Option B — CLI commands
+
 ### 1. Set up your channel
 
 **Telegram** (recommended for getting started):

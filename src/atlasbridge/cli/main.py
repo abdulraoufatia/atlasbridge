@@ -2,6 +2,8 @@
 AtlasBridge CLI entry point.
 
 Commands:
+  atlasbridge                    — launch interactive TUI (if stdout is a TTY)
+  atlasbridge ui                 — launch interactive TUI (explicit)
   atlasbridge setup              — interactive first-time configuration
   atlasbridge start              — start the background daemon
   atlasbridge stop               — stop the background daemon
@@ -20,6 +22,8 @@ Commands:
 
 from __future__ import annotations
 
+import sys
+
 import click
 from rich.console import Console
 
@@ -34,10 +38,39 @@ err_console = Console(stderr=True)
 # ---------------------------------------------------------------------------
 
 
-@click.group(context_settings={"help_option_names": ["-h", "--help"]})
+@click.group(
+    invoke_without_command=True,
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
 @click.version_option(__version__, "--version", "-V", message="atlasbridge %(version)s")
-def cli() -> None:
+@click.pass_context
+def cli(ctx: click.Context) -> None:
     """AtlasBridge — universal human-in-the-loop control plane for AI developer agents."""
+    if ctx.invoked_subcommand is None:
+        if sys.stdout.isatty():
+            from atlasbridge.tui.app import run as tui_run
+
+            tui_run()
+        else:
+            click.echo(ctx.get_help())
+
+
+# ---------------------------------------------------------------------------
+# ui (interactive TUI — explicit launch)
+# ---------------------------------------------------------------------------
+
+
+@cli.command()
+def ui() -> None:
+    """Launch the interactive terminal UI (requires a TTY)."""
+    if not sys.stdout.isatty():
+        err_console.print(
+            "[red]Error:[/red] 'atlasbridge ui' requires an interactive terminal (TTY)."
+        )
+        raise SystemExit(1)
+    from atlasbridge.tui.app import run as tui_run
+
+    tui_run()
 
 
 # ---------------------------------------------------------------------------

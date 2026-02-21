@@ -72,6 +72,9 @@ jobs:
       - name: atlasbridge debug --help
         run: atlasbridge debug --help
 
+      - name: atlasbridge ui --help
+        run: atlasbridge ui --help
+
   lint:
     name: Lint & Type Check
     runs-on: ubuntu-latest

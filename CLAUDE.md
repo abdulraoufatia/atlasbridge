@@ -56,6 +56,7 @@ src/atlasbridge/         ← installed package (where = ["src"])
   os/systemd/            — service.py (Linux systemd user service)
   adapters/              — base.py, claude_code.py, openai_cli.py, gemini_cli.py
   channels/              — base.py, multi.py, telegram/channel.py, slack/channel.py
+  tui/                   — app.py, state.py, services.py, app.tcss, screens/
   cli/                   — main.py + _setup/_daemon/_run/_status/etc.
 tests/
   unit/                  — pure unit tests (no I/O)
@@ -73,7 +74,10 @@ docs/                    — all design documents
 
 | Path | Purpose |
 |------|---------|
-| `src/atlasbridge/cli/main.py` | All CLI commands (Click group) |
+| `src/atlasbridge/cli/main.py` | All CLI commands (Click group) + TUI launch |
+| `src/atlasbridge/tui/app.py` | AtlasBridgeApp (Textual App + `run()` entry) |
+| `src/atlasbridge/tui/state.py` | AppState, WizardState — pure Python, testable without Textual |
+| `src/atlasbridge/tui/services.py` | ConfigService, DoctorService, DaemonService, SessionService, LogsService |
 | `src/atlasbridge/core/prompt/detector.py` | Tri-signal prompt detector |
 | `src/atlasbridge/core/prompt/models.py` | PromptEvent, Reply, PromptType, Confidence |
 | `src/atlasbridge/core/prompt/state.py` | PromptStateMachine, VALID_TRANSITIONS |
@@ -143,6 +147,10 @@ pytest tests/ -q
 # Run a specific test file
 pytest tests/unit/test_prompt_detector.py -v
 
+# Launch TUI
+atlasbridge         # (must be a TTY)
+atlasbridge ui
+
 # Run Prompt Lab scenarios (via CLI)
 atlasbridge lab list
 atlasbridge lab run partial-line-prompt
@@ -162,7 +170,7 @@ ruff check . && ruff format --check . && mypy src/atlasbridge/ && pytest tests/ 
 
 ## CI pipeline
 
-1. **CLI Smoke Tests** — verifies all 14 subcommands exist (gates everything)
+1. **CLI Smoke Tests** — verifies all 15 subcommands exist (gates everything)
 2. **Security Scan** — bandit on `src/`
 3. **Lint + Type Check** — ruff check, ruff format --check, mypy src/atlasbridge/
 4. **Tests** — pytest on Python 3.11 + 3.12, macOS + ubuntu
@@ -200,5 +208,6 @@ Override with `ATLASBRIDGE_CONFIG` env var. Legacy `AEGIS_CONFIG` is also honour
 | v0.2.0 | macOS  | Released | Working Telegram relay for Claude Code |
 | v0.3.0 | Linux  | Released | Linux PTY, systemd integration |
 | v0.4.0 | Slack  | Released | Slack channel, multi-channel routing, renamed to AtlasBridge |
-| v0.5.0 | Windows | Planned | ConPTY experimental |
+| v0.5.0 | TUI    | Released | Interactive Textual TUI — setup wizard, sessions, logs, doctor |
+| v0.6.0 | Windows | Planned | ConPTY experimental |
 | v1.0.0 | GA | Planned | Stable adapter + channel API |
