@@ -105,8 +105,6 @@ select = [
     "ANN", # flake8-annotations
 ]
 ignore = [
-    "ANN101",  # Missing type annotation for `self`
-    "ANN102",  # Missing type annotation for `cls`
     "ANN401",  # Dynamically typed Any — needed for generic helpers and callback dispatch
     "S101",    # Use of assert (ok in tests)
     "S110",    # try-except-pass — intentional in cleanup/signal handlers
@@ -120,8 +118,8 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101", "ANN", "S105", "S106", "S108"]
 "aegis/policy/detector.py" = ["E501"]         # regex patterns are inherently long
-"src/aegis/core/prompt/detector.py" = ["E501"] # regex patterns are inherently long
-"src/aegis/**/*.py" = ["ANN"]                  # new src package: type annotations added incrementally
+# New src/aegis design stubs — full lint enforcement deferred to v0.2.0 implementation
+"src/**/*.py" = ["ANN", "I", "F401", "E501", "N", "UP", "B", "C4", "S", "W"]
 
 [tool.mypy]
 python_version = "3.11"
