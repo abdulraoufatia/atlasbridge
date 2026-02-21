@@ -1,6 +1,6 @@
 # AtlasBridge
 
-> **The universal control plane for autonomous AI developer agents.**
+> **Policy-driven autonomous runtime for AI CLI agents.**
 
 [![CI](https://github.com/abdulraoufatia/atlasbridge/actions/workflows/ci.yml/badge.svg)](https://github.com/abdulraoufatia/atlasbridge/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/atlasbridge.svg)](https://pypi.org/project/atlasbridge/)
@@ -9,30 +9,93 @@
 
 ---
 
-AtlasBridge sits between you and your AI coding agent. It detects every prompt your agent produces — approvals, confirmations, choices, clarifications — and decides what happens next.
+AtlasBridge is a deterministic, policy-governed runtime that allows AI CLI agents to operate autonomously within defined boundaries. Humans define the rules. AtlasBridge enforces them.
 
-**In relay mode**, prompts go straight to your phone via Telegram or Slack. You reply from anywhere. AtlasBridge injects your answer and the agent continues. No walking back to your desk, no missed prompts.
+Instead of manually approving every prompt, AtlasBridge evaluates each decision against a strict Policy DSL and executes only what is explicitly permitted. When uncertainty, ambiguity, or high-impact actions arise, AtlasBridge escalates safely to a human.
 
-**In autopilot mode** (v0.6.0+), AtlasBridge uses a policy you define in YAML to handle prompts automatically — auto-approving safe operations, escalating risky ones to your phone, and denying anything you've blocked. Every decision is logged. You can pause autopilot instantly with a single command or a message from your phone.
+Autonomy first. Human override when required.
 
-Three autonomy modes let you dial in the level of control:
+---
 
-| Mode | Behaviour |
-|------|-----------|
-| **Off** | Every prompt forwarded to you (classic relay) |
-| **Assist** | Policy suggests a reply; you confirm or override |
-| **Full** | Policy auto-replies where rules match; escalates the rest to you |
+## What AtlasBridge Is
 
-```
-┌──────────────┐        ┌───────────────┐        ┌─────────────────┐
-│  AI Agent    │──────► │  AtlasBridge  │──────► │   Your Phone    │
-│ (Claude CLI) │        │               │        │ (Telegram/Slack)│
-│              │◄────── │  Policy Engine │◄────── │                 │
-└──────────────┘        │  + Autopilot  │        └─────────────────┘
-   paused waiting       └───────────────┘          you reply — or
-   for input              auto-replies when          policy handles it
-                          policy matches             for you
-```
+AtlasBridge is an autonomous execution layer that sits between you and your AI developer agents.
+
+It provides:
+
+- Policy-driven prompt responses
+- Deterministic rule evaluation
+- Autonomous workflow execution (plan → execute → fix → PR → merge)
+- CI-enforced merge gating
+- Built-in human escalation
+- Structured audit logs and decision traces
+
+AtlasBridge is not a wrapper around a CLI tool.
+It is a runtime that governs how AI agents execute.
+
+---
+
+## How It Works
+
+1. An AI CLI agent emits a prompt or reaches a decision boundary.
+2. AtlasBridge classifies the prompt (type + confidence).
+3. The Policy DSL is evaluated deterministically.
+4. If a rule matches:
+   - The action is executed automatically.
+5. If no rule matches or confidence is low:
+   - The prompt is escalated to a human.
+6. Execution resumes.
+
+Every decision is logged, traceable, and idempotent.
+
+---
+
+## Autonomy Modes
+
+AtlasBridge supports three operating modes:
+
+### Off
+
+All prompts are routed to a human.
+No automatic decisions.
+
+### Assist
+
+AtlasBridge automatically handles explicitly allowed prompts.
+All others are escalated.
+
+### Full
+
+AtlasBridge automatically executes permitted prompts and workflows.
+No-match, low-confidence, or high-impact actions are escalated safely.
+
+Full autonomy never means uncontrolled execution.
+Policy always defines the boundary.
+
+---
+
+## Human Escalation (Built-In)
+
+Whenever your agent pauses and requires human input — approval, confirmation, a choice, or clarification — AtlasBridge forwards that prompt to your phone.
+
+You respond from Telegram or Slack. AtlasBridge relays your decision back to the CLI. Execution resumes.
+
+Human intervention is always available when policy requires it.
+
+---
+
+## Safety by Design
+
+AtlasBridge is built around strict invariants:
+
+- No freestyle decisions
+- No bypassing CI checks
+- No merging unless all required checks pass
+- No force-pushing protected branches
+- Default-safe escalation on uncertainty
+- Append-only audit log for every decision
+
+Autonomy is powerful — but bounded, deterministic, and reviewable.
 
 ---
 
