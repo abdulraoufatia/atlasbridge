@@ -102,6 +102,27 @@ def _check_systemd() -> dict | None:
     }
 
 
+def _check_ui_assets() -> dict:
+    """Verify that TUI CSS assets are loadable via importlib.resources."""
+    try:
+        from importlib.resources import files
+
+        css = files("atlasbridge.ui.css").joinpath("atlasbridge.tcss").read_text("utf-8")
+        if len(css) < 10:
+            return {
+                "name": "UI assets",
+                "status": "fail",
+                "detail": "atlasbridge.tcss is empty — reinstall: pip install -U atlasbridge",
+            }
+        return {"name": "UI assets", "status": "pass", "detail": "atlasbridge.tcss loaded OK"}
+    except Exception:  # noqa: BLE001
+        return {
+            "name": "UI assets",
+            "status": "fail",
+            "detail": "cannot load atlasbridge.tcss — reinstall: pip install -U atlasbridge",
+        }
+
+
 def _check_systemd_service() -> dict | None:
     """Linux-only: check if the aegis.service unit is installed."""
     if not sys.platform.startswith("linux"):
@@ -125,6 +146,7 @@ def cmd_doctor(fix: bool, as_json: bool, console: Console) -> None:
         _check_ptyprocess(),
         _check_config(),
         _check_bot_token(),
+        _check_ui_assets(),
         _check_systemd(),
         _check_systemd_service(),
     ]

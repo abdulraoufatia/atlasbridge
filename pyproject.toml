@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "atlasbridge"
-version = "0.5.2"
+version = "0.5.3"
 description = "Universal human-in-the-loop control plane for AI developer agents — forward prompts to your phone, reply from anywhere"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -90,6 +90,9 @@ Security = "https://github.com/abdulraoufatia/atlasbridge/blob/main/SECURITY.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+atlasbridge = ["**/*.tcss"]
 
 [tool.ruff]
 target-version = "py311"

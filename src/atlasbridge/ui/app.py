@@ -6,19 +6,21 @@ Launched by ``atlasbridge`` (no args, TTY) or ``atlasbridge ui``.
 
 from __future__ import annotations
 
-from pathlib import Path
+from importlib.resources import files
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 
 from atlasbridge import __version__
 
+_CSS_TEXT: str = files("atlasbridge.ui.css").joinpath("atlasbridge.tcss").read_text("utf-8")
+
 
 class AtlasBridgeApp(App):  # type: ignore[type-arg]
     """AtlasBridge interactive terminal UI."""
 
     TITLE = f"AtlasBridge {__version__}"
-    CSS_PATH = str(Path(__file__).parent / "css" / "atlasbridge.tcss")
+    CSS = _CSS_TEXT
 
     BINDINGS = [
         Binding("ctrl+c", "app.quit", "Quit", show=False, priority=True),

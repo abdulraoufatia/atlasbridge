@@ -51,6 +51,45 @@ def test_ui_app_importable() -> None:
     assert callable(run)
 
 
+# ---------------------------------------------------------------------------
+# CSS resource loading regression tests (prevents StylesheetError on install)
+# ---------------------------------------------------------------------------
+
+
+def test_ui_css_resource_loads_non_empty() -> None:
+    """CSS must be loadable via importlib.resources (works in wheel installs)."""
+    from importlib.resources import files
+
+    css = files("atlasbridge.ui.css").joinpath("atlasbridge.tcss").read_text("utf-8")
+    assert len(css) > 100, "CSS content is too short — file may be empty or corrupted"
+    assert "Screen" in css, "CSS should contain Screen selector"
+
+
+def test_tui_css_resource_loads_non_empty() -> None:
+    """Legacy TUI CSS must also be loadable via importlib.resources."""
+    from importlib.resources import files
+
+    css = files("atlasbridge.tui").joinpath("app.tcss").read_text("utf-8")
+    assert len(css) > 0, "TUI CSS file should not be empty"
+
+
+def test_ui_app_has_css_class_variable() -> None:
+    """AtlasBridgeApp.CSS must be a non-empty string (not a file path)."""
+    from atlasbridge.ui.app import AtlasBridgeApp
+
+    assert isinstance(AtlasBridgeApp.CSS, str)
+    assert len(AtlasBridgeApp.CSS) > 100
+    assert "Screen" in AtlasBridgeApp.CSS
+
+
+def test_tui_app_has_css_class_variable() -> None:
+    """Legacy TUI AtlasBridgeApp.CSS must be a non-empty string."""
+    from atlasbridge.tui.app import AtlasBridgeApp
+
+    assert isinstance(AtlasBridgeApp.CSS, str)
+    assert len(AtlasBridgeApp.CSS) > 0
+
+
 def test_ui_components_importable() -> None:
     from atlasbridge.ui.components.status_cards import StatusCards
 

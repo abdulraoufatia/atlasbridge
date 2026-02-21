@@ -145,6 +145,16 @@ AtlasBridge is a relay, not a firewall. It does not interpret commands, score ri
 
 ## Changelog
 
+### v0.5.3 — CSS packaging hotfix
+
+- **fix(ui):** `atlasbridge ui` no longer crashes with `StylesheetError` when installed from a wheel
+- Root cause: `.tcss` files were not included in the package distribution, and CSS was loaded via filesystem path instead of `importlib.resources`
+- Both `ui/app.py` and `tui/app.py` now load CSS via `importlib.resources` (works in editable and wheel installs)
+- Added `[tool.setuptools.package-data]` for `*.tcss` inclusion
+- Added `__init__.py` to `ui/css/` so `importlib.resources` can locate assets
+- `atlasbridge doctor` now checks that UI assets are loadable
+- 4 new regression tests for CSS resource loading
+
 ### v0.5.2 — Production UI skeleton
 
 - New `atlasbridge.ui` package: 6 screens with exact widget IDs, `StatusCards` component, `polling.py` (`poll_state()`), and full TCSS
