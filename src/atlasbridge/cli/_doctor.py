@@ -1,10 +1,11 @@
-"""aegis doctor — environment and configuration health check."""
+"""atlasbridge doctor — environment and configuration health check."""
 
 from __future__ import annotations
 
 import json
 import shutil
 import sys
+from pathlib import Path
 
 from rich.console import Console
 
@@ -42,18 +43,25 @@ def _check_ptyprocess() -> dict:
         }
 
 
+def _config_path() -> Path:
+    """Return the canonical config file path (respects ATLASBRIDGE_CONFIG env var)."""
+    from atlasbridge.core.config import _config_file_path
+
+    return _config_file_path()
+
+
 def _check_config() -> dict:
     try:
-        from atlasbridge.core.config import atlasbridge_dir, load_config
+        from atlasbridge.core.config import load_config
 
-        cfg_path = atlasbridge_dir() / "config.toml"
+        cfg_path = _config_path()
         if not cfg_path.exists():
             return {
                 "name": "Config file",
                 "status": "warn",
                 "detail": f"not found at {cfg_path} — run: atlasbridge setup",
             }
-        load_config(str(cfg_path))
+        load_config(cfg_path)
         return {"name": "Config file", "status": "pass", "detail": str(cfg_path)}
     except Exception as exc:  # noqa: BLE001
         return {"name": "Config file", "status": "fail", "detail": str(exc)}
@@ -61,19 +69,20 @@ def _check_config() -> dict:
 
 def _check_bot_token() -> dict:
     try:
-        from atlasbridge.core.config import atlasbridge_dir, load_config
+        from atlasbridge.core.config import load_config
 
-        cfg_path = atlasbridge_dir() / "config.toml"
+        cfg_path = _config_path()
         if not cfg_path.exists():
             return {"name": "Bot token", "status": "skip", "detail": "no config file"}
-        cfg = load_config(str(cfg_path))
-        token = cfg.telegram.bot_token if cfg.telegram else ""
-        if not token:
+        cfg = load_config(cfg_path)
+        token_obj = cfg.telegram.bot_token if cfg.telegram else None
+        if token_obj is None:
             return {
                 "name": "Bot token",
                 "status": "warn",
                 "detail": "not configured — run: atlasbridge setup",
             }
+        token = token_obj.get_secret_value()
         masked = token[:8] + "..." + token[-4:]
         return {"name": "Bot token", "status": "pass", "detail": masked}
     except Exception as exc:  # noqa: BLE001
@@ -139,7 +148,32 @@ def _check_systemd_service() -> dict | None:
     }
 
 
+def _fix_config(console: Console) -> None:
+    """Create a minimal config skeleton if no config file exists."""
+    cfg_path = _config_path()
+    if cfg_path.exists():
+        return
+    try:
+        cfg_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        cfg_path.write_text(
+            "# AtlasBridge configuration — edit then run: atlasbridge setup\n"
+            "# See: https://github.com/abdulraoufatia/atlasbridge\n\n"
+            "[telegram]\n"
+            '# bot_token = "<YOUR_BOT_TOKEN>"\n'
+            "# allowed_users = [<YOUR_TELEGRAM_USER_ID>]\n",
+            encoding="utf-8",
+        )
+        cfg_path.chmod(0o600)
+        console.print(f"  [green]FIX[/green]  Created config skeleton at {cfg_path}")
+        console.print("          Edit the file then run: atlasbridge setup")
+    except OSError as exc:
+        console.print(f"  [red]ERR[/red]  Cannot create config at {cfg_path}: {exc}")
+
+
 def cmd_doctor(fix: bool, as_json: bool, console: Console) -> None:
+    if fix:
+        _fix_config(console)
+
     checks_raw: list[dict | None] = [
         _check_python_version(),
         _check_platform(),

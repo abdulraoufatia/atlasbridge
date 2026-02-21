@@ -143,8 +143,8 @@ def test_poll_state_returns_app_state_when_no_config(tmp_path, monkeypatch) -> N
     from atlasbridge.ui.polling import poll_state
     from atlasbridge.ui.state import AppState, ConfigStatus
 
-    # Point atlasbridge_dir at an empty tmp dir so no config file exists.
-    monkeypatch.setenv("ATLASBRIDGE_DATA_DIR", str(tmp_path))
+    # Point config lookup at a non-existent path via ATLASBRIDGE_CONFIG so no config file exists.
+    monkeypatch.setenv("ATLASBRIDGE_CONFIG", str(tmp_path / "config.toml"))
     result = poll_state()
     assert isinstance(result, AppState)
     assert result.config_status in (ConfigStatus.NOT_FOUND, ConfigStatus.ERROR)

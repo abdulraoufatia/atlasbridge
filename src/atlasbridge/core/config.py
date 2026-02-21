@@ -248,17 +248,19 @@ def _config_file_path() -> Path:
     return atlasbridge_dir() / CONFIG_FILENAME
 
 
-def load_config(path: Path | None = None) -> AtlasBridgeConfig:
+def load_config(path: Path | str | None = None) -> AtlasBridgeConfig:
     """
     Load AtlasBridgeConfig from TOML file, overlaid with environment variables.
 
     Priority (highest to lowest):
       1. Environment variables (ATLASBRIDGE_* or legacy AEGIS_*)
       2. Config file (platform data dir / config.toml)
+
+    *path* may be a :class:`~pathlib.Path` or a plain ``str`` — both are accepted.
     """
     import tomllib
 
-    cfg_path = path or _config_file_path()
+    cfg_path = Path(path) if path is not None else _config_file_path()
 
     if not cfg_path.exists():
         raise ConfigNotFoundError(

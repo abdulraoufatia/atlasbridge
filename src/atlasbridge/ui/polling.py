@@ -28,11 +28,11 @@ def poll_state() -> AppState:
     # Config
     # ----------------------------------------------------------------
     try:
-        from atlasbridge.core.config import atlasbridge_dir, load_config
+        from atlasbridge.core.config import _config_file_path, load_config
 
-        cfg_path = atlasbridge_dir() / "config.toml"
+        cfg_path = _config_file_path()
         if cfg_path.exists():
-            cfg = load_config(str(cfg_path))
+            cfg = load_config(cfg_path)
             config_status = ConfigStatus.LOADED
             if cfg.telegram:
                 channels.append(ChannelStatus(name="telegram", configured=True))
