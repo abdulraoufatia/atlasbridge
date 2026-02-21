@@ -136,7 +136,7 @@ def cmd_doctor(fix: bool, as_json: bool, console: Console) -> None:
         print(json.dumps({"checks": checks, "all_pass": all_pass}, indent=2))
         return
 
-    console.print("[bold]Aegis Doctor[/bold]\n")
+    console.print("[bold]AtlasBridge Doctor[/bold]\n")
     for c in checks:
         if c["status"] == "pass":
             icon = "[green]PASS[/green]"

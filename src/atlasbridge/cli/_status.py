@@ -80,14 +80,16 @@ def cmd_status(as_json: bool, console: Console) -> None:
         print(json.dumps(data, indent=2))
         return
 
-    console.print("[bold]Aegis Status[/bold]\n")
+    console.print("[bold]AtlasBridge Status[/bold]\n")
 
     # Daemon row
     if daemon_running:
         console.print(f"  Daemon:   [green]{daemon_status}[/green]")
     else:
         console.print(f"  Daemon:   [yellow]{daemon_status}[/yellow]")
-        console.print("  Run [cyan]aegis start[/cyan] or [cyan]aegis run <tool>[/cyan] to start.")
+        console.print(
+            "  Run [cyan]atlasbridge start[/cyan] or [cyan]atlasbridge run <tool>[/cyan] to start."
+        )
 
     console.print(f"  Sessions: {len(active_sessions)} active")
     console.print(f"  Prompts:  {pending_prompts} pending\n")

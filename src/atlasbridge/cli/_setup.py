@@ -47,7 +47,7 @@ def run_setup(
     from atlasbridge.core.config import atlasbridge_dir, save_config
     from atlasbridge.core.exceptions import ConfigError
 
-    console.print("[bold]Aegis Setup[/bold]")
+    console.print("[bold]AtlasBridge Setup[/bold]")
     console.print(f"\nConfiguring channel: [cyan]{channel}[/cyan]\n")
 
     if channel == "telegram":
@@ -82,7 +82,7 @@ def run_setup(
         _maybe_install_systemd(console, str(cfg_path))
 
     console.print("\n[green]Setup complete.[/green]")
-    console.print("Run [cyan]aegis run claude[/cyan] to start supervising Claude Code.")
+    console.print("Run [cyan]atlasbridge run claude[/cyan] to start supervising Claude Code.")
 
 
 # ---------------------------------------------------------------------------

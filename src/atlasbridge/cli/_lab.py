@@ -17,19 +17,33 @@ def _ensure_tests_importable() -> None:
         sys.path.insert(0, str(project_root))
 
 
-def cmd_lab_list(as_json: bool, console: Console) -> None:
+def _import_scenario_registry() -> object:
+    """Import ScenarioRegistry, raising a user-friendly error if tests/ is not available."""
     _ensure_tests_importable()
-    from tests.prompt_lab.simulator import ScenarioRegistry
+    try:
+        from tests.prompt_lab.simulator import ScenarioRegistry  # type: ignore[import]
 
-    ScenarioRegistry.discover()
-    scenarios = ScenarioRegistry.list_all()
+        return ScenarioRegistry
+    except ModuleNotFoundError as exc:
+        raise SystemExit(
+            "atlasbridge lab requires the source repository.\n"
+            "Install in editable mode: pip install -e '.[dev]'\n"
+            "Then run from the repo root."
+        ) from exc
+
+
+def cmd_lab_list(as_json: bool, console: Console) -> None:
+    registry = _import_scenario_registry()
+
+    registry.discover()  # type: ignore[attr-defined]
+    scenarios = registry.list_all()  # type: ignore[attr-defined]
 
     if as_json:
-        rows = [{"id": cls.scenario_id, "name": name} for name, cls in scenarios.items()]
+        rows = [{"id": cls.scenario_id, "name": name} for name, cls in scenarios.items()]  # type: ignore[attr-defined]
         print(json.dumps(rows, indent=2))
         return
 
-    console.print("[bold]Aegis Prompt Lab — Registered Scenarios[/bold]\n")
+    console.print("[bold]AtlasBridge Prompt Lab — Registered Scenarios[/bold]\n")
     if not scenarios:
         console.print("  [dim]No scenarios registered.[/dim]")
         console.print("\n  Add scenario modules to tests/prompt_lab/scenarios/")
@@ -37,7 +51,7 @@ def cmd_lab_list(as_json: bool, console: Console) -> None:
 
     console.print(f"  {'QA ID':<10} {'Name':<35} Status")
     console.print(f"  {'─' * 10} {'─' * 35} {'─' * 10}")
-    for name, cls in sorted(scenarios.items(), key=lambda x: x[1].scenario_id):
+    for name, cls in sorted(scenarios.items(), key=lambda x: x[1].scenario_id):  # type: ignore[attr-defined]
         console.print(f"  {cls.scenario_id:<10} {name:<35} [green]registered[/green]")
     console.print(f"\n{len(scenarios)} scenarios registered.")
 
@@ -50,20 +64,21 @@ def cmd_lab_run(
     as_json: bool,
     console: Console,
 ) -> None:
-    _ensure_tests_importable()
+    registry = _import_scenario_registry()
     import asyncio
 
-    from tests.prompt_lab.simulator import ScenarioRegistry, Simulator
+    _ensure_tests_importable()
+    from tests.prompt_lab.simulator import Simulator  # type: ignore[import]
 
-    ScenarioRegistry.discover()
+    registry.discover()  # type: ignore[attr-defined]
 
     if run_all:
-        targets = ScenarioRegistry.list_all()
+        targets = registry.list_all()  # type: ignore[attr-defined]
     elif pattern:
-        targets = ScenarioRegistry.filter(pattern)
+        targets = registry.filter(pattern)  # type: ignore[attr-defined]
     elif scenario:
         try:
-            targets = {scenario: ScenarioRegistry.get(scenario)}
+            targets = {scenario: registry.get(scenario)}  # type: ignore[attr-defined]
         except KeyError as exc:
             console.print(f"[red]Error:[/red] {exc}")
             return

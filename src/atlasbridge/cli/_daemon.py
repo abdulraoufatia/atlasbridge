@@ -35,8 +35,10 @@ def cmd_start(foreground: bool, console: Console) -> None:
     # Check if already running
     existing_pid = _read_pid()
     if existing_pid and _pid_alive(existing_pid):
-        console.print(f"[yellow]Aegis daemon is already running (PID {existing_pid}).[/yellow]")
-        console.print("Use [cyan]aegis stop[/cyan] to stop it first.")
+        console.print(
+            f"[yellow]AtlasBridge daemon is already running (PID {existing_pid}).[/yellow]"
+        )
+        console.print("Use [cyan]atlasbridge stop[/cyan] to stop it first.")
         sys.exit(1)
 
     try:
@@ -50,7 +52,7 @@ def cmd_start(foreground: bool, console: Console) -> None:
         sys.exit(1)
 
     if foreground:
-        console.print("[bold]Starting Aegis daemon[/bold] (foreground)...")
+        console.print("[bold]Starting AtlasBridge daemon[/bold] (foreground)...")
         console.print("Press Ctrl+C to stop.\n")
         import asyncio
 
@@ -77,10 +79,10 @@ def cmd_start(foreground: bool, console: Console) -> None:
             sys.exit(0)
         else:
             # Parent — report the child PID
-            console.print(f"[green]Aegis daemon started[/green] (PID {child_pid})")
+            console.print(f"[green]AtlasBridge daemon started[/green] (PID {child_pid})")
             console.print(f"PID file: {_PID_FILE}")
             console.print(
-                "Use [cyan]aegis status[/cyan] to check and [cyan]aegis stop[/cyan] to stop."
+                "Use [cyan]atlasbridge status[/cyan] to check and [cyan]atlasbridge stop[/cyan] to stop."
             )
 
 
@@ -88,7 +90,7 @@ def cmd_stop(console: Console) -> None:
     """Stop the running Aegis daemon."""
     pid = _read_pid()
     if pid is None:
-        console.print("[yellow]Aegis daemon is not running (no PID file).[/yellow]")
+        console.print("[yellow]AtlasBridge daemon is not running (no PID file).[/yellow]")
         return
 
     if not _pid_alive(pid):
@@ -98,8 +100,8 @@ def cmd_stop(console: Console) -> None:
 
     try:
         os.kill(pid, signal.SIGTERM)
-        console.print(f"[green]Sent SIGTERM to Aegis daemon (PID {pid}).[/green]")
-        console.print("Use [cyan]aegis status[/cyan] to confirm it stopped.")
+        console.print(f"[green]Sent SIGTERM to AtlasBridge daemon (PID {pid}).[/green]")
+        console.print("Use [cyan]atlasbridge status[/cyan] to confirm it stopped.")
     except PermissionError:
         console.print(f"[red]Cannot send SIGTERM to PID {pid}: permission denied.[/red]")
         sys.exit(1)

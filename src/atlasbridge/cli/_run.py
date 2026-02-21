@@ -31,7 +31,7 @@ def cmd_run(tool: str, command: list[str], label: str, cwd: str, console: Consol
         channel_parts.append(f"Slack ({len(config.slack.allowed_users)} user(s))")
     channel_str = " + ".join(channel_parts) or "no channel configured"
 
-    console.print(f"[bold]Aegis[/bold] supervising: [cyan]{' '.join(command)}[/cyan]")
+    console.print(f"[bold]AtlasBridge[/bold] supervising: [cyan]{' '.join(command)}[/cyan]")
     console.print(f"Session will forward prompts via {channel_str}")
     console.print("Press Ctrl+C to stop.\n")
 

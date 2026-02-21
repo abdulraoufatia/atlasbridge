@@ -14,4 +14,4 @@ def cmd_sessions(as_json: bool, console: Console) -> None:
     else:
         console.print("[bold]Active Sessions[/bold]\n")
         console.print("  [dim]No active sessions.[/dim]")
-        console.print("\nRun [cyan]aegis run <tool>[/cyan] to start a session.")
+        console.print("\nRun [cyan]atlasbridge run <tool>[/cyan] to start a session.")
