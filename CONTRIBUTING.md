@@ -57,7 +57,7 @@ pytest
 ruff check .
 
 # Run type checker
-mypy aegis/
+mypy src/atlasbridge/
 ```
 
 ---
@@ -145,7 +145,7 @@ feat(cli): add `atlasbridge doctor --fix` auto-remediation
 pytest
 
 # Run with coverage
-pytest --cov=aegis --cov-report=html
+pytest --cov=atlasbridge --cov-report=html
 
 # Run specific test file
 pytest tests/test_policy.py

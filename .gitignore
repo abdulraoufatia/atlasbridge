@@ -39,11 +39,14 @@ venv.bak/
 secrets.toml
 config.local.toml
 
-# Aegis runtime
-aegis.db
-aegis.db-shm
-aegis.db-wal
+# AtlasBridge runtime
+atlasbridge.db
+atlasbridge.db-shm
+atlasbridge.db-wal
 *.lock
+.atlasbridge/
+# Legacy (pre-rename)
+aegis.db
 .aegis/
 
 # IDE
