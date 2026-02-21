@@ -1,0 +1,22 @@
+policy_version: "1"
+name: base-policy
+autonomy_mode: full
+
+rules:
+  - id: base-yes-no
+    description: "Base policy: auto-reply y to yes_no."
+    match:
+      prompt_type: [yes_no]
+    action:
+      type: auto_reply
+      value: "y"
+
+  - id: base-catch-all
+    description: "Base policy: catch-all require_human."
+    match: {}
+    action:
+      type: require_human
+
+defaults:
+  no_match: require_human
+  low_confidence: require_human

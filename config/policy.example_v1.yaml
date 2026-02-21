@@ -1,0 +1,104 @@
+# AtlasBridge Policy DSL v1 — annotated example
+#
+# Policy DSL v1 extends v0 with:
+#   - Compound OR logic (any_of)
+#   - NOT exclusion logic (none_of)
+#   - Session scoping (session_tag)
+#   - Confidence upper bound (max_confidence)
+#   - Policy inheritance (extends)
+#
+# v0 files continue to work unchanged.
+# Migrate with: atlasbridge policy migrate policy.example.yaml
+#
+# Validate:   atlasbridge policy validate config/policy.example_v1.yaml
+# Test:       atlasbridge policy test config/policy.example_v1.yaml \
+#               --prompt "Continue? [y/n]" --type yes_no --confidence high \
+#               --session-tag ci --explain
+
+policy_version: "1"
+name: "example-v1"
+autonomy_mode: full
+
+# ---------------------------------------------------------------------------
+# Rules (evaluated top-to-bottom — first match wins)
+# ---------------------------------------------------------------------------
+
+rules:
+  # ---- Deny destructive operations (highest priority) ----
+  - id: deny-destructive
+    description: |
+      Deny any prompt that mentions destructive operations.
+      Uses none_of is NOT needed here — we use a direct contains match.
+    match:
+      contains: "(rm|delete|drop|destroy|truncate)\\s"
+      contains_is_regex: true
+    action:
+      type: deny
+      reason: "Destructive operation detected — auto-reply denied."
+
+  # ---- CI session: auto-reply to yes/no prompts ----
+  - id: ci-yes-no-auto
+    description: |
+      In CI sessions (session_tag: ci), auto-reply 'y' to high-confidence
+      yes/no prompts. session_tag is set by `atlasbridge run --session-label ci`.
+    match:
+      prompt_type: [yes_no]
+      min_confidence: high
+      session_tag: "ci"
+    action:
+      type: auto_reply
+      value: "y"
+
+  # ---- any_of: match multiple prompt types ----
+  - id: auto-confirm-interactive
+    description: |
+      Auto-confirm both yes_no and confirm_enter prompts for interactive sessions.
+      Uses any_of for OR logic across prompt types.
+    match:
+      any_of:
+        - prompt_type: [yes_no]
+          min_confidence: medium
+        - prompt_type: [confirm_enter]
+    action:
+      type: auto_reply
+      value: "y"
+
+  # ---- none_of: exclude dangerous patterns from auto-reply ----
+  - id: safe-free-text-auto
+    description: |
+      Auto-reply to free_text prompts UNLESS the prompt contains "sudo" or "root".
+      Uses none_of to exclude dangerous patterns.
+    match:
+      prompt_type: [free_text]
+      min_confidence: high
+      none_of:
+        - contains: "sudo"
+        - contains: "root"
+    action:
+      type: auto_reply
+      value: ""
+
+  # ---- max_confidence: handle low-confidence prompts specially ----
+  - id: low-confidence-notify
+    description: |
+      For LOW-confidence signals only (ambiguous prompts), send a notification
+      to the operator instead of auto-replying or escalating.
+      max_confidence: low  means: only match if confidence <= low.
+    match:
+      max_confidence: "low"
+    action:
+      type: notify_only
+      message: "Low-confidence prompt detected — monitoring (no auto-reply)."
+
+  # ---- Catch-all: require human for everything else ----
+  - id: catch-all-human
+    description: |
+      Any prompt that doesn't match the above rules is forwarded to the human.
+      This is the safe default for unrecognised patterns.
+    match: {}
+    action:
+      type: require_human
+
+defaults:
+  no_match: require_human
+  low_confidence: require_human

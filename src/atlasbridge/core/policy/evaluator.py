@@ -1,6 +1,8 @@
 """
 Policy evaluator — deterministic first-match-wins rule engine.
 
+Supports both v0 (Policy) and v1 (PolicyV1) policies.
+
 Usage::
 
     decision = evaluate(
@@ -12,6 +14,7 @@ Usage::
         session_id="xyz789",
         tool_id="claude_code",
         repo="/home/user/project",
+        session_tag="ci",          # v1 only
     )
 """
 
@@ -22,6 +25,7 @@ import re
 import signal
 from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import TYPE_CHECKING
 
 from atlasbridge.core.policy.model import (
     ConfidenceLevel,
@@ -33,6 +37,9 @@ from atlasbridge.core.policy.model import (
     RequireHumanAction,
     confidence_from_str,
 )
+
+if TYPE_CHECKING:
+    from atlasbridge.core.policy.model_v1 import MatchCriteriaV1, PolicyRuleV1, PolicyV1
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +115,29 @@ def _match_confidence(min_confidence: ConfidenceLevel, confidence_str: str) -> t
     )
 
 
+def _match_max_confidence(
+    max_confidence: ConfidenceLevel | None, confidence_str: str
+) -> tuple[bool, str]:
+    if max_confidence is None:
+        return True, "max_confidence: not specified (always matches)"
+    event_level = confidence_from_str(confidence_str)
+    matched = event_level <= max_confidence
+    return (
+        matched,
+        f"max_confidence: {confidence_str} {'≤' if matched else '>'} {max_confidence.value}",
+    )
+
+
+def _match_session_tag(criterion: str | None, session_tag: str) -> tuple[bool, str]:
+    if criterion is None:
+        return True, "session_tag: not specified (always matches)"
+    matched = criterion == session_tag
+    return (
+        matched,
+        f"session_tag: {session_tag!r} {'==' if matched else '!='} {criterion!r}",
+    )
+
+
 def _match_contains(
     contains: str | None,
     contains_is_regex: bool,
@@ -164,7 +194,7 @@ def _evaluate_rule(
     tool_id: str,
     repo: str,
 ) -> RuleMatchResult:
-    """Evaluate a single rule. Returns RuleMatchResult with per-criterion reasons."""
+    """Evaluate a single v0 rule. Returns RuleMatchResult with per-criterion reasons."""
     m = rule.match
     reasons: list[str] = []
 
@@ -187,13 +217,108 @@ def _evaluate_rule(
     return RuleMatchResult(rule_id=rule.id, matched=all_pass, reasons=reasons)
 
 
+def _eval_criteria_block(
+    m: MatchCriteriaV1,
+    prompt_type: str,
+    confidence: str,
+    excerpt: str,
+    tool_id: str,
+    repo: str,
+    session_tag: str,
+) -> tuple[bool, list[str]]:
+    """
+    Evaluate a MatchCriteriaV1 block (flat OR any_of), returning (matched, reasons).
+
+    Used internally by _evaluate_rule_v1 and for any_of/none_of sub-blocks.
+    Does NOT evaluate none_of (callers handle that separately at the rule level).
+    """
+    reasons: list[str] = []
+
+    if m.any_of is not None:
+        # OR semantics: match if ANY sub-block passes
+        for i, sub in enumerate(m.any_of):
+            sub_matched, sub_reasons = _eval_criteria_block(
+                sub, prompt_type, confidence, excerpt, tool_id, repo, session_tag
+            )
+            reasons.append(f"any_of[{i}]: {'✓ matched' if sub_matched else '✗ no match'}")
+            for r in sub_reasons:
+                reasons.append(f"  {r}")
+            if sub_matched:
+                return True, reasons
+        return False, reasons
+
+    # Flat AND checks
+    checks = [
+        _match_tool_id(m.tool_id, tool_id),
+        _match_repo(m.repo, repo),
+        _match_prompt_type(m.prompt_type, prompt_type),
+        _match_confidence(m.min_confidence, confidence),
+        _match_max_confidence(m.max_confidence, confidence),
+        _match_contains(m.contains, m.contains_is_regex, excerpt),
+        _match_session_tag(m.session_tag, session_tag),
+    ]
+
+    all_pass = True
+    for ok, reason in checks:
+        reasons.append(("✓ " if ok else "✗ ") + reason)
+        if not ok:
+            all_pass = False
+            break
+
+    return all_pass, reasons
+
+
+def _evaluate_rule_v1(
+    rule: PolicyRuleV1,
+    prompt_type: str,
+    confidence: str,
+    excerpt: str,
+    tool_id: str,
+    repo: str,
+    session_tag: str,
+) -> RuleMatchResult:
+    """
+    Evaluate a single v1 rule.
+
+    Evaluation order:
+    1. Flat AND criteria (or any_of OR block) — primary match condition
+    2. none_of NOT filter — fail if any sub-block matches
+    """
+    m = rule.match
+    reasons: list[str] = []
+
+    # Step 1: primary match (flat AND or any_of)
+    primary_matched, primary_reasons = _eval_criteria_block(
+        m, prompt_type, confidence, excerpt, tool_id, repo, session_tag
+    )
+    reasons.extend(primary_reasons)
+
+    if not primary_matched:
+        return RuleMatchResult(rule_id=rule.id, matched=False, reasons=reasons)
+
+    # Step 2: none_of NOT filter
+    if m.none_of is not None:
+        for i, sub in enumerate(m.none_of):
+            sub_matched, sub_reasons = _eval_criteria_block(
+                sub, prompt_type, confidence, excerpt, tool_id, repo, session_tag
+            )
+            if sub_matched:
+                reasons.append(f"✗ none_of[{i}]: matched (excluded by NOT condition)")
+                for r in sub_reasons:
+                    reasons.append(f"  {r}")
+                return RuleMatchResult(rule_id=rule.id, matched=False, reasons=reasons)
+            reasons.append(f"✓ none_of[{i}]: did not match (NOT condition satisfied)")
+
+    return RuleMatchResult(rule_id=rule.id, matched=True, reasons=reasons)
+
+
 # ---------------------------------------------------------------------------
 # Top-level evaluate()
 # ---------------------------------------------------------------------------
 
 
 def evaluate(
-    policy: Policy,
+    policy: Policy | PolicyV1,
     prompt_text: str,
     prompt_type: str,
     confidence: str,
@@ -201,12 +326,15 @@ def evaluate(
     session_id: str,
     tool_id: str = "*",
     repo: str = "",
+    session_tag: str = "",
 ) -> PolicyDecision:
     """
     Evaluate the policy against a prompt event. First-match-wins.
 
+    Dispatches to v0 or v1 evaluation based on the policy type.
+
     Args:
-        policy:       Validated Policy instance.
+        policy:       Validated Policy (v0) or PolicyV1 (v1) instance.
         prompt_text:  The prompt excerpt (as seen by the user).
         prompt_type:  PromptType string value (e.g. "yes_no").
         confidence:   Confidence string (e.g. "high", "medium", "low").
@@ -214,23 +342,40 @@ def evaluate(
         session_id:   Session the prompt belongs to.
         tool_id:      Adapter/tool name (e.g. "claude_code").
         repo:         Working directory of the session.
+        session_tag:  Session label (v1 only; used for session_tag rule matching).
 
     Returns:
         :class:`PolicyDecision` with matched rule, action, and explanation.
     """
+    from atlasbridge.core.policy.model_v1 import PolicyV1
+
     policy_hash = policy.content_hash()
     autonomy_mode = policy.autonomy_mode.value
 
+    use_v1 = isinstance(policy, PolicyV1)
+
     # Evaluate rules in order — first match wins
     for rule in policy.rules:
-        result = _evaluate_rule(
-            rule=rule,
-            prompt_type=prompt_type,
-            confidence=confidence,
-            excerpt=prompt_text,
-            tool_id=tool_id,
-            repo=repo,
-        )
+        if use_v1:
+            result = _evaluate_rule_v1(
+                rule=rule,  # type: ignore[arg-type]
+                prompt_type=prompt_type,
+                confidence=confidence,
+                excerpt=prompt_text,
+                tool_id=tool_id,
+                repo=repo,
+                session_tag=session_tag,
+            )
+        else:
+            result = _evaluate_rule(
+                rule=rule,  # type: ignore[arg-type]
+                prompt_type=prompt_type,
+                confidence=confidence,
+                excerpt=prompt_text,
+                tool_id=tool_id,
+                repo=repo,
+            )
+
         if result.matched:
             explanation = (
                 f"Rule {rule.id!r} matched"

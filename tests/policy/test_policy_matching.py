@@ -185,7 +185,7 @@ defaults:
             parse_policy("{invalid: yaml: nested:")
 
     def test_parse_invalid_schema(self) -> None:
-        with pytest.raises(PolicyParseError, match="validation failed"):
+        with pytest.raises(PolicyParseError, match="unsupported policy_version"):
             parse_policy('policy_version: "99"\nname: x\n')
 
     def test_parse_non_mapping_raises(self) -> None:

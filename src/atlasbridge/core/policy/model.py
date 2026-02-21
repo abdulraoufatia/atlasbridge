@@ -66,6 +66,18 @@ class ConfidenceLevel(str, Enum):
         order = {ConfidenceLevel.LOW: 0, ConfidenceLevel.MED: 1, ConfidenceLevel.HIGH: 2}
         return order[self] > order[other]
 
+    def __le__(self, other: object) -> bool:
+        if not isinstance(other, ConfidenceLevel):
+            return NotImplemented
+        order = {ConfidenceLevel.LOW: 0, ConfidenceLevel.MED: 1, ConfidenceLevel.HIGH: 2}
+        return order[self] <= order[other]
+
+    def __lt__(self, other: object) -> bool:
+        if not isinstance(other, ConfidenceLevel):
+            return NotImplemented
+        order = {ConfidenceLevel.LOW: 0, ConfidenceLevel.MED: 1, ConfidenceLevel.HIGH: 2}
+        return order[self] < order[other]
+
 
 # Map from detector Confidence strings to ConfidenceLevel
 _CONFIDENCE_MAP: dict[str, ConfidenceLevel] = {

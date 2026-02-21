@@ -1,0 +1,23 @@
+policy_version: "1"
+name: session-tag-test
+autonomy_mode: full
+
+rules:
+  - id: ci-auto-reply
+    description: Auto-reply only in CI sessions.
+    match:
+      prompt_type: [yes_no]
+      session_tag: "ci"
+    action:
+      type: auto_reply
+      value: "y"
+
+  - id: catch-all
+    description: Everything else requires human input.
+    match: {}
+    action:
+      type: require_human
+
+defaults:
+  no_match: require_human
+  low_confidence: require_human

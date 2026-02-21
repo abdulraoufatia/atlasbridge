@@ -1,8 +1,12 @@
 # AtlasBridge Policy DSL v0
 
 **Version:** DSL v0 (AtlasBridge v0.6.0+)
-**Status:** Implemented
+**Status:** Implemented — superseded by [Policy DSL v1](policy-dsl-v1.md) (AtlasBridge v0.8.0+)
 **Last updated:** 2026-02-21
+
+> **v0 is still fully supported.** v1 is a backward-compatible extension — v0 files work
+> unchanged. To migrate: `atlasbridge policy migrate <file>`.
+> See the [Policy DSL v1 reference](policy-dsl-v1.md) for new features.
 
 ---
 

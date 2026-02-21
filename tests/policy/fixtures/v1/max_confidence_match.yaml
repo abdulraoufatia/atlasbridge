@@ -1,0 +1,30 @@
+policy_version: "1"
+name: max-confidence-test
+autonomy_mode: full
+
+rules:
+  - id: low-only-notify
+    description: Notify (but do not auto-reply) for LOW confidence prompts only.
+    match:
+      max_confidence: "low"
+    action:
+      type: notify_only
+      message: "Low confidence prompt detected — monitoring."
+
+  - id: high-auto-reply
+    description: Auto-reply to high-confidence yes_no prompts.
+    match:
+      prompt_type: [yes_no]
+      min_confidence: high
+    action:
+      type: auto_reply
+      value: "y"
+
+  - id: catch-all
+    match: {}
+    action:
+      type: require_human
+
+defaults:
+  no_match: require_human
+  low_confidence: require_human

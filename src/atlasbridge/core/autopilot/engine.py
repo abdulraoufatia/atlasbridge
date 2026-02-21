@@ -47,6 +47,9 @@ from atlasbridge.core.autopilot.actions import (
 from atlasbridge.core.autopilot.trace import DecisionTrace
 from atlasbridge.core.policy.evaluator import evaluate
 from atlasbridge.core.policy.model import AutonomyMode, Policy, PolicyDecision, PolicyRule
+from atlasbridge.core.policy.model_v1 import PolicyV1
+
+AnyPolicy = Policy | PolicyV1
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +88,7 @@ class AutopilotEngine:
 
     def __init__(
         self,
-        policy: Policy,
+        policy: AnyPolicy,
         trace_path: Path,
         state_path: Path,
         inject_fn: InjectFn,
@@ -193,10 +196,10 @@ class AutopilotEngine:
     # ------------------------------------------------------------------
 
     def _get_rule(self, rule_id: str | None) -> PolicyRule | None:
-        """Return the PolicyRule with the given id, or None."""
+        """Return the rule with the given id, or None (works for v0 and v1 rules)."""
         if rule_id is None:
             return None
-        return next((r for r in self.policy.rules if r.id == rule_id), None)
+        return next((r for r in self.policy.rules if r.id == rule_id), None)  # type: ignore[return-value]
 
     def reset_session(self, session_id: str) -> None:
         """Clear per-rule reply counters for a finished session."""
@@ -206,7 +209,7 @@ class AutopilotEngine:
     # Policy hot-reload
     # ------------------------------------------------------------------
 
-    def reload_policy(self, policy: Policy) -> None:
+    def reload_policy(self, policy: AnyPolicy) -> None:
         """Replace the active policy at runtime (no restart required)."""
         old_hash = self.policy.content_hash()
         self.policy = policy
@@ -227,6 +230,7 @@ class AutopilotEngine:
         prompt_text: str,
         tool_id: str = "*",
         repo: str = "",
+        session_tag: str = "",
     ) -> ActionResult:
         """
         Evaluate the policy against a PromptEvent and execute the resulting action.
@@ -276,6 +280,7 @@ class AutopilotEngine:
                 session_id=session_id,
                 tool_id=tool_id,
                 repo=repo,
+                session_tag=session_tag,
             )
 
             # Record decision to trace (always, regardless of action type)

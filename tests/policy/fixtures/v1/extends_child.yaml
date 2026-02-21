@@ -1,0 +1,26 @@
+policy_version: "1"
+name: child-policy
+autonomy_mode: full
+extends: "extends_base.yaml"
+
+rules:
+  - id: child-deny-destructive
+    description: "Child policy: deny destructive commands."
+    match:
+      contains: "rm -rf"
+      contains_is_regex: false
+    action:
+      type: deny
+      reason: "Destructive command detected."
+
+  - id: base-yes-no
+    description: "Child override: auto-reply n instead of y for yes_no."
+    match:
+      prompt_type: [yes_no]
+    action:
+      type: auto_reply
+      value: "n"
+
+defaults:
+  no_match: require_human
+  low_confidence: require_human

@@ -52,6 +52,7 @@ class DaemonManager:
         self._adapters: dict[str, Any] = {}
         self._running = False
         self._shutdown_event = asyncio.Event()
+        self._policy: Any = None  # Policy | PolicyV1, loaded in _init_autopilot
 
     async def start(self) -> None:
         """Start all subsystems and run until shutdown."""
@@ -64,6 +65,7 @@ class DaemonManager:
             await self._init_channel()
             await self._init_session_manager()
             await self._init_router()
+            await self._init_autopilot()
 
             self._running = True
             self._setup_signal_handlers()
@@ -148,6 +150,21 @@ class DaemonManager:
         from atlasbridge.core.session.manager import SessionManager
 
         self._session_manager = SessionManager()
+
+    async def _init_autopilot(self) -> None:
+        """Load the policy for this session (from --policy file or built-in default)."""
+        from atlasbridge.core.policy.parser import PolicyParseError, default_policy, load_policy
+
+        policy_file = self._config.get("policy_file", "")
+        if policy_file:
+            try:
+                self._policy = load_policy(policy_file)
+                logger.info("Policy loaded from %s", policy_file)
+            except PolicyParseError as exc:
+                logger.error("Failed to load policy %s: %s — using safe default", policy_file, exc)
+                self._policy = default_policy()
+        else:
+            self._policy = default_policy()
 
     async def _init_router(self) -> None:
         if self._session_manager is None or self._channel is None:

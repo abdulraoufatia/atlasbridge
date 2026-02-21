@@ -1,0 +1,25 @@
+policy_version: "1"
+name: none-of-test
+autonomy_mode: full
+
+rules:
+  - id: safe-auto-reply
+    description: Auto-reply to yes_no UNLESS the prompt contains "destroy" or "delete".
+    match:
+      prompt_type: [yes_no]
+      none_of:
+        - contains: "destroy"
+        - contains: "delete"
+    action:
+      type: auto_reply
+      value: "y"
+
+  - id: catch-all
+    description: Catch all remaining.
+    match: {}
+    action:
+      type: require_human
+
+defaults:
+  no_match: require_human
+  low_confidence: require_human

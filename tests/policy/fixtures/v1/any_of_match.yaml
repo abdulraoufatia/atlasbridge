@@ -1,0 +1,24 @@
+policy_version: "1"
+name: any-of-test
+autonomy_mode: full
+
+rules:
+  - id: any-of-rule
+    description: Match yes_no OR confirm_enter prompts via any_of.
+    match:
+      any_of:
+        - prompt_type: [yes_no]
+        - prompt_type: [confirm_enter]
+    action:
+      type: auto_reply
+      value: "y"
+
+  - id: catch-all
+    description: Catch all remaining.
+    match: {}
+    action:
+      type: require_human
+
+defaults:
+  no_match: require_human
+  low_confidence: require_human
