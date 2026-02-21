@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock
-
-import pytest
 
 from tests.prompt_lab.simulator import (
     LabScenario,
@@ -14,8 +11,7 @@ from tests.prompt_lab.simulator import (
     ScenarioResults,
     TelegramStub,
 )
-from atlasbridge.channels.multi import MultiChannel
-from atlasbridge.core.prompt.models import PromptEvent, PromptType
+from atlasbridge.core.prompt.models import PromptType
 
 
 @ScenarioRegistry.register
@@ -26,12 +22,14 @@ class MultiChannelFanoutScenario(LabScenario):
     async def setup(self, pty: PTYSimulator, stub: TelegramStub) -> None:
         await pty.write(b"Deploy to production? [y/n] ")
 
-    def assert_results(self, results: ScenarioResults) -> None:
+    async def assert_results(self, results: ScenarioResults) -> None:
         assert len(results.prompt_events) >= 1, "Expected a YES/NO prompt event"
         event = results.prompt_events[0]
         assert event.prompt_type == PromptType.TYPE_YES_NO
 
-        # Verify MultiChannel fan-out behaviour synchronously
+        from atlasbridge.channels.multi import MultiChannel
+
+        # Verify MultiChannel fan-out behaviour
         ch1 = MagicMock()
         ch1.channel_name = "telegram"
         ch1.send_prompt = AsyncMock(return_value="12345")
@@ -41,7 +39,7 @@ class MultiChannelFanoutScenario(LabScenario):
 
         multi = MultiChannel([ch1, ch2])
 
-        result = asyncio.get_event_loop().run_until_complete(multi.send_prompt(event))
+        result = await multi.send_prompt(event)
         # Both channels received the prompt
         ch1.send_prompt.assert_called_once_with(event)
         ch2.send_prompt.assert_called_once_with(event)
