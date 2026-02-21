@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-
 from tests.prompt_lab.simulator import (
     LabScenario,
     PTYSimulator,
@@ -23,7 +21,7 @@ class SlackAllowlistScenario(LabScenario):
     async def setup(self, pty: PTYSimulator, stub: TelegramStub) -> None:
         await pty.write(b"Delete all files? [y/n] ")
 
-    def assert_results(self, results: ScenarioResults) -> None:
+    async def assert_results(self, results: ScenarioResults) -> None:
         assert len(results.prompt_events) >= 1
         event = results.prompt_events[0]
         assert event.prompt_type == PromptType.TYPE_YES_NO
@@ -38,11 +36,11 @@ class SlackAllowlistScenario(LabScenario):
         # Attempt action from a stranger — should be silently rejected
         stranger_id = "USTRANGER001"
         value = f"ans:{event.prompt_id}:{event.session_id}:{event.idempotency_key}:y"
-        asyncio.get_event_loop().run_until_complete(ch._handle_action(value, stranger_id))
+        await ch._handle_action(value, stranger_id)
         assert ch._reply_queue.empty(), "Non-allowlisted user should not be able to enqueue a reply"
 
         # Same action from allowlisted user — should succeed
-        asyncio.get_event_loop().run_until_complete(ch._handle_action(value, "U1234567890"))
+        await ch._handle_action(value, "U1234567890")
         assert not ch._reply_queue.empty(), "Allowlisted user should be able to reply"
         reply = ch._reply_queue.get_nowait()
         assert reply.value == "y"

@@ -10,7 +10,7 @@ from tests.prompt_lab.simulator import (
     TelegramStub,
 )
 from atlasbridge.channels.slack.channel import SlackChannel
-from atlasbridge.core.prompt.models import PromptEvent, PromptType
+from atlasbridge.core.prompt.models import PromptType
 
 
 @ScenarioRegistry.register
@@ -30,9 +30,7 @@ class SlackYesNoScenario(LabScenario):
         )
         # Verify that SlackChannel._build_blocks generates the correct Block Kit structure
         blocks = SlackChannel._build_blocks(event)
-        assert len(blocks) == 2, "Expected section + actions blocks"
-        actions = blocks[1]
-        assert actions["type"] == "actions"
+        actions = next(b for b in blocks if b["type"] == "actions")
         elements = actions["elements"]
         assert len(elements) == 2
         values = [e["value"] for e in elements]

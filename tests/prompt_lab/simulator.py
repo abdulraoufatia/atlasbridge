@@ -354,7 +354,10 @@ class Simulator:
 
         if not error:
             try:
-                scenario.assert_results(results)
+                ret = scenario.assert_results(results)
+                # Support async assert_results (e.g. scenarios that need await)
+                if asyncio.iscoroutine(ret):
+                    await ret
                 results.passed = True
             except AssertionError as exc:
                 results.error = str(exc)

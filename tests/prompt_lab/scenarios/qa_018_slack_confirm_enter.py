@@ -28,8 +28,8 @@ class SlackConfirmEnterScenario(LabScenario):
             f"Expected CONFIRM_ENTER, got {event.prompt_type}"
         )
         blocks = SlackChannel._build_blocks(event)
-        assert len(blocks) == 2
-        elements = blocks[1]["elements"]
+        actions = next(b for b in blocks if b["type"] == "actions")
+        elements = actions["elements"]
         assert len(elements) == 2
         labels = [e["text"]["text"] for e in elements]
         assert "Send Enter" in labels

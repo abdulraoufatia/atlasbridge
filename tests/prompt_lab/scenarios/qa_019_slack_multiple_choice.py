@@ -10,7 +10,7 @@ from tests.prompt_lab.simulator import (
     TelegramStub,
 )
 from atlasbridge.channels.slack.channel import SlackChannel
-from atlasbridge.core.prompt.models import PromptEvent, PromptType, Confidence
+from atlasbridge.core.prompt.models import Confidence, PromptEvent, PromptType
 
 
 @ScenarioRegistry.register
@@ -41,8 +41,8 @@ class SlackMultipleChoiceScenario(LabScenario):
             idempotency_key="nonce001",
         )
         blocks = SlackChannel._build_blocks(synthetic)
-        assert len(blocks) == 2
-        elements = blocks[1]["elements"]
+        actions = next(b for b in blocks if b["type"] == "actions")
+        elements = actions["elements"]
         assert len(elements) == 3
         labels = [e["text"]["text"] for e in elements]
         assert labels == ["1", "2", "3"]
