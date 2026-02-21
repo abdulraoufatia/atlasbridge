@@ -43,6 +43,16 @@ StatusCards {
     margin-top: 1;
 }
 
+/* ── Guidance panel ─────────────────────────────────────────── */
+
+#guidance {
+    margin-top: 1;
+    margin-bottom: 1;
+    padding: 1 2;
+    border: tall $accent 40%;
+    height: auto;
+}
+
 #welcome-footer-tip {
     color: $text-muted;
     text-style: italic;

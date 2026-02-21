@@ -195,3 +195,53 @@ class WizardState:
                     "allowed_users": parts,
                 }
             }
+
+
+# ---------------------------------------------------------------------------
+# Dynamic guidance message — pure function, no Textual dependency
+# ---------------------------------------------------------------------------
+
+_WORKFLOW_EXAMPLE = (
+    "How it works:\n"
+    "  1. Start daemon      atlasbridge start\n"
+    "  2. Run your tool      atlasbridge run claude\n"
+    "  3. Agent pauses       AtlasBridge sends prompt to your phone\n"
+    "  4. Reply via Telegram/Slack\n"
+    "  5. CLI resumes automatically"
+)
+
+
+def guidance_message(state: AppState, daemon: DaemonStatus) -> str:
+    """Return contextual next-step guidance based on current system state."""
+    if not state.is_configured:
+        return (
+            "Next step: Press [S] to run the setup wizard.\n\n"
+            "You'll choose a channel (Telegram or Slack), enter your\n"
+            "credentials, and allowlist your user ID. Takes ~2 minutes.\n\n"
+            f"{_WORKFLOW_EXAMPLE}"
+        )
+
+    if daemon != DaemonStatus.RUNNING:
+        return (
+            "Next step: Start the daemon, then run a tool.\n\n"
+            "  In your terminal:\n"
+            "    atlasbridge run claude          (foreground, recommended)\n"
+            "    atlasbridge start && atlasbridge run claude\n\n"
+            f"{_WORKFLOW_EXAMPLE}"
+        )
+
+    if state.session_count == 0:
+        return (
+            "Daemon is running. No active sessions yet.\n\n"
+            "  In your terminal:\n"
+            "    atlasbridge run claude\n\n"
+            "When Claude pauses for input, AtlasBridge will forward\n"
+            "the prompt to your phone. Reply there to resume."
+        )
+
+    return (
+        f"You have {state.session_count} active session(s).\n\n"
+        "  Press [L] to view sessions, or [D] to run doctor.\n\n"
+        "When your agent pauses for input, check your phone —\n"
+        "AtlasBridge has already forwarded the prompt."
+    )
