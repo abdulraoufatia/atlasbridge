@@ -210,6 +210,20 @@ def test_wizard_screen_uses_recompose() -> None:
     assert "refresh(layout" not in prev_src, "Must not use refresh(layout=True)"
 
 
+def test_wizard_uses_container_not_static() -> None:
+    """Wizard steps must use Container (not Static) so Input widgets render."""
+    import inspect
+
+    from atlasbridge.ui.screens.wizard import SetupWizardScreen
+
+    src = inspect.getsource(SetupWizardScreen)
+    assert "from textual.containers import Container" in inspect.getsource(
+        inspect.getmodule(SetupWizardScreen)  # type: ignore[arg-type]
+    ), "wizard must import Container from textual.containers"
+    # Step methods must not monkey-patch compose on Static
+    assert "s.compose = lambda" not in src, "Must not monkey-patch compose on Static"
+
+
 def test_tui_setup_screen_uses_recompose() -> None:
     """Legacy tui SetupScreen._refresh_screen must use recompose."""
     import inspect
@@ -219,6 +233,16 @@ def test_tui_setup_screen_uses_recompose() -> None:
     src = inspect.getsource(SetupScreen._refresh_screen)
     assert "recompose" in src
     assert "refresh(layout" not in src
+
+
+def test_tui_setup_uses_container_not_static() -> None:
+    """Legacy tui SetupScreen must use Container for step content."""
+    import inspect
+
+    from atlasbridge.tui.screens.setup import SetupScreen
+
+    src = inspect.getsource(SetupScreen)
+    assert "s.compose = lambda" not in src, "Must not monkey-patch compose on Static"
 
 
 def test_wizard_state_step_transitions_preserve_data() -> None:

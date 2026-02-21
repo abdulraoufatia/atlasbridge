@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from textual.app import ComposeResult
 from textual.binding import Binding
+from textual.containers import Container
 from textual.screen import Screen
 from textual.widgets import (
     Button,
@@ -22,7 +23,6 @@ from textual.widgets import (
     ProgressBar,
     RadioButton,
     RadioSet,
-    Static,
 )
 
 from atlasbridge.tui.state import WIZARD_TOTAL, WizardState
@@ -43,13 +43,13 @@ class SetupScreen(Screen):  # type: ignore[type-arg]
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
-        with Static(id="setup-container"):
+        with Container(id="setup-container"):
             yield Label("AtlasBridge Setup", id="wizard-title")
             yield Label(self._progress_text(), id="progress-label")
             yield ProgressBar(total=WIZARD_TOTAL - 1, show_eta=False, id="wizard-progress")
-            yield self._render_step()
+            yield from self._render_step()
             yield Label("", id="error-label", classes="error-label")
-            with Static(classes="wizard-nav"):
+            with Container(classes="wizard-nav"):
                 if not self._wizard.is_first_step:
                     yield Button("← Back", id="btn-back", variant="default")
                 if not self._wizard.is_last_step:
@@ -62,92 +62,82 @@ class SetupScreen(Screen):  # type: ignore[type-arg]
     # Step rendering
     # ------------------------------------------------------------------
 
-    def _render_step(self) -> Static:
+    def _render_step(self) -> ComposeResult:
         step = self._wizard.step_name
         if step == "channel":
-            return self._step_channel()
-        if step == "credentials":
-            return self._step_credentials()
-        if step == "user_ids":
-            return self._step_user_ids()
-        if step == "confirm":
-            return self._step_confirm()
-        return Static("Done.", id="step-body")
+            yield from self._step_channel()
+        elif step == "credentials":
+            yield from self._step_credentials()
+        elif step == "user_ids":
+            yield from self._step_user_ids()
+        elif step == "confirm":
+            yield from self._step_confirm()
 
-    def _step_channel(self) -> Static:
-        s = Static(id="step-body", classes="step-container")
-        s.compose = lambda: [  # type: ignore[method-assign]
-            Label("Step 1 of 4 — Choose a notification channel", classes="step-title"),
-            Label(
+    def _step_channel(self) -> ComposeResult:
+        with Container(id="step-body"):
+            yield Label("Step 1 of 4 — Choose a notification channel", classes="step-title")
+            yield Label(
                 "AtlasBridge will forward prompts to your phone via this channel.",
                 classes="field-label",
-            ),
-            RadioSet(
+            )
+            yield RadioSet(
                 RadioButton("Telegram  (recommended)", id="rb-telegram", value=True),
                 RadioButton("Slack", id="rb-slack"),
                 id="channel-choice",
-            ),
-        ]
-        return s
+            )
 
-    def _step_credentials(self) -> Static:
-        s = Static(id="step-body", classes="step-container")
+    def _step_credentials(self) -> ComposeResult:
         if self._wizard.channel == "telegram":
-            s.compose = lambda: [  # type: ignore[method-assign]
-                Label("Step 2 of 4 — Telegram credentials", classes="step-title"),
-                Label("Get your bot token from @BotFather on Telegram.", classes="field-label"),
-                Label("Bot token:", classes="field-label"),
-                Input(
-                    placeholder="12345678:ABCDefghIJKLMNopQRSTuvwxyz12345678901",
+            with Container(id="step-body"):
+                yield Label("Step 2 of 4 — Telegram credentials", classes="step-title")
+                yield Label(
+                    "Get your bot token from @BotFather on Telegram.", classes="field-label"
+                )
+                yield Label("Bot token:", classes="field-label")
+                yield Input(
+                    placeholder="Paste your token here",
                     password=True,
                     id="inp-token",
                     value=self._wizard.token,
-                ),
-            ]
+                )
         else:
-            s.compose = lambda: [  # type: ignore[method-assign]
-                Label("Step 2 of 4 — Slack credentials", classes="step-title"),
-                Label(
+            with Container(id="step-body"):
+                yield Label("Step 2 of 4 — Slack credentials", classes="step-title")
+                yield Label(
                     "Create a Slack App with Socket Mode enabled.\n"
                     "Bot token (xoxb-*) from OAuth & Permissions.\n"
                     "App-Level token (xapp-*) from Basic Information → App-Level Tokens.",
                     classes="field-label",
-                ),
-                Label("Bot token (xoxb-*):", classes="field-label"),
-                Input(
-                    placeholder="xoxb-...",
+                )
+                yield Label("Bot token (xoxb-*):", classes="field-label")
+                yield Input(
+                    placeholder="Paste your bot token here",
                     password=True,
                     id="inp-token",
                     value=self._wizard.token,
-                ),
-                Label("App-level token (xapp-*):", classes="field-label"),
-                Input(
-                    placeholder="xapp-...",
+                )
+                yield Label("App-level token (xapp-*):", classes="field-label")
+                yield Input(
+                    placeholder="Paste your app-level token here",
                     password=True,
                     id="inp-app-token",
                     value=self._wizard.app_token,
-                ),
-            ]
-        return s
+                )
 
-    def _step_user_ids(self) -> Static:
-        s = Static(id="step-body", classes="step-container")
+    def _step_user_ids(self) -> ComposeResult:
         if self._wizard.channel == "telegram":
             hint = "Numeric Telegram user IDs, comma-separated. Find yours via @userinfobot."
             placeholder = "123456789, 987654321"
         else:
             hint = "Slack member IDs (e.g. U1234567890). Find in Slack: profile → ··· → Copy member ID."
             placeholder = "U1234567890 U0987654321"
-        s.compose = lambda: [  # type: ignore[method-assign]
-            Label("Step 3 of 4 — Allowlisted user IDs", classes="step-title"),
-            Label(hint, classes="field-label"),
-            Label("User ID(s):", classes="field-label"),
-            Input(placeholder=placeholder, id="inp-users", value=self._wizard.users),
-        ]
-        return s
+        with Container(id="step-body"):
+            yield Label("Step 3 of 4 — Allowlisted user IDs", classes="step-title")
+            yield Label(hint, classes="field-label")
+            yield Label("User ID(s):", classes="field-label")
+            yield Input(placeholder=placeholder, id="inp-users", value=self._wizard.users)
 
-    def _step_confirm(self) -> Static:
-        s = Static(id="step-body", classes="step-container")
+    def _step_confirm(self) -> ComposeResult:
         channel = self._wizard.channel.capitalize()
         user_count = len([u for u in self._wizard.users.replace(",", " ").split() if u])
         if self._wizard.saved:
@@ -176,8 +166,8 @@ class SetupScreen(Screen):  # type: ignore[type-arg]
                 f"  Allowlisted users: {user_count}\n\n"
                 "Press Finish to save your configuration."
             )
-        s.compose = lambda: [Label(text, classes="step-title")]  # type: ignore[method-assign]
-        return s
+        with Container(id="step-body"):
+            yield Label(text, classes="step-title")
 
     # ------------------------------------------------------------------
     # Navigation helpers

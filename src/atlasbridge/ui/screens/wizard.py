@@ -1,14 +1,23 @@
 """
 SetupWizardScreen — 4-step guided configuration flow.
 
+Steps:
+  0 — Choose channel (Telegram / Slack)
+  1 — Enter credentials (token, masked; app_token for Slack)
+  2 — Enter allowlisted user IDs
+  3 — Confirm + save
+
 Widget tree (rebuilt on each step via ``recompose()``)::
 
     Header
-    #wizard-root  (Static)
-      #wizard-title   (Label)
-      #wizard-step    (Static — current step content)
-      #wizard-error   (Label  — validation error, empty when ok)
-      .wizard-nav     (Static — Back / Next / Finish buttons)
+    #wizard-root  (Container)
+      #wizard-title       (Label)
+      #wizard-progress-label (Label)
+      #wizard-progress    (ProgressBar)
+      #wizard-step        (Container — current step content)
+        ... step-specific widgets (Input, RadioSet, etc.)
+      #wizard-error       (Label  — validation error, empty when ok)
+      .wizard-nav         (Container — Back / Next / Finish buttons)
     Footer
 
 Keybindings:
@@ -21,6 +30,7 @@ from __future__ import annotations
 
 from textual.app import ComposeResult
 from textual.binding import Binding
+from textual.containers import Container
 from textual.screen import Screen
 from textual.widgets import (
     Button,
@@ -31,7 +41,6 @@ from textual.widgets import (
     ProgressBar,
     RadioButton,
     RadioSet,
-    Static,
 )
 
 from atlasbridge.ui.state import WIZARD_TOTAL, WizardState
@@ -82,13 +91,13 @@ class SetupWizardScreen(Screen):  # type: ignore[type-arg]
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
-        with Static(id="wizard-root"):
+        with Container(id="wizard-root"):
             yield Label("AtlasBridge Setup", id="wizard-title")
             yield Label(self._progress_text(), id="wizard-progress-label")
             yield ProgressBar(total=WIZARD_TOTAL - 1, show_eta=False, id="wizard-progress")
-            yield self._render_step()
+            yield from self._render_step()
             yield Label("", id="wizard-error", classes="wizard-error")
-            with Static(classes="wizard-nav"):
+            with Container(classes="wizard-nav"):
                 if not self._wizard.is_first_step:
                     yield Button("← Back", id="btn-back", variant="default")
                 if not self._wizard.is_last_step:
@@ -101,82 +110,73 @@ class SetupWizardScreen(Screen):  # type: ignore[type-arg]
         self._focus_first_input()
 
     # ------------------------------------------------------------------
-    # Step rendering
+    # Step rendering — yields widgets directly (no monkey-patching)
     # ------------------------------------------------------------------
 
-    def _render_step(self) -> Static:
+    def _render_step(self) -> ComposeResult:
         step = self._wizard.step_name
         if step == "channel":
-            return self._step_channel()
-        if step == "credentials":
-            return self._step_credentials()
-        if step == "user_ids":
-            return self._step_user_ids()
-        if step == "confirm":
-            return self._step_confirm()
-        return Static("Done.", id="wizard-step")
+            yield from self._step_channel()
+        elif step == "credentials":
+            yield from self._step_credentials()
+        elif step == "user_ids":
+            yield from self._step_user_ids()
+        elif step == "confirm":
+            yield from self._step_confirm()
 
-    def _step_channel(self) -> Static:
-        s = Static(id="wizard-step", classes="wizard-step-container")
-        s.compose = lambda: [  # type: ignore[method-assign]
-            Label("Step 1 of 4 — Choose a notification channel", classes="step-title"),
-            Label(
+    def _step_channel(self) -> ComposeResult:
+        with Container(id="wizard-step"):
+            yield Label("Step 1 of 4 — Choose a notification channel", classes="step-title")
+            yield Label(
                 "AtlasBridge forwards prompts to your phone via this channel.",
                 classes="field-label",
-            ),
-            RadioSet(
+            )
+            yield RadioSet(
                 RadioButton("Telegram  (recommended)", id="rb-telegram", value=True),
                 RadioButton("Slack", id="rb-slack"),
                 id="channel-choice",
-            ),
-        ]
-        return s
+            )
 
-    def _step_credentials(self) -> Static:
-        s = Static(id="wizard-step", classes="wizard-step-container")
+    def _step_credentials(self) -> ComposeResult:
         if self._wizard.channel == "telegram":
-            s.compose = lambda: [  # type: ignore[method-assign]
-                Label("Step 2 of 4 — Telegram credentials", classes="step-title"),
-                Label(
+            with Container(id="wizard-step"):
+                yield Label("Step 2 of 4 — Telegram credentials", classes="step-title")
+                yield Label(
                     "Get your bot token from @BotFather on Telegram.\n"
                     "Press [H] for step-by-step instructions.",
                     classes="field-label",
-                ),
-                Label("Bot token:", classes="field-label"),
-                Input(
-                    placeholder="12345678:ABCDefghIJKLMNopQRSTuvwxyz12345678901",
+                )
+                yield Label("Bot token:", classes="field-label")
+                yield Input(
+                    placeholder="Paste your token here",
                     password=True,
                     id="inp-token",
                     value=self._wizard.token,
-                ),
-            ]
+                )
         else:
-            s.compose = lambda: [  # type: ignore[method-assign]
-                Label("Step 2 of 4 — Slack credentials", classes="step-title"),
-                Label(
+            with Container(id="wizard-step"):
+                yield Label("Step 2 of 4 — Slack credentials", classes="step-title")
+                yield Label(
                     "Create a Slack App with Socket Mode enabled.\n"
                     "Press [H] for step-by-step instructions.",
                     classes="field-label",
-                ),
-                Label("Bot token (xoxb-*):", classes="field-label"),
-                Input(
-                    placeholder="xoxb-...",
+                )
+                yield Label("Bot token (xoxb-*):", classes="field-label")
+                yield Input(
+                    placeholder="Paste your bot token here",
                     password=True,
                     id="inp-token",
                     value=self._wizard.token,
-                ),
-                Label("App-level token (xapp-*):", classes="field-label"),
-                Input(
-                    placeholder="xapp-...",
+                )
+                yield Label("App-level token (xapp-*):", classes="field-label")
+                yield Input(
+                    placeholder="Paste your app-level token here",
                     password=True,
                     id="inp-app-token",
                     value=self._wizard.app_token,
-                ),
-            ]
-        return s
+                )
 
-    def _step_user_ids(self) -> Static:
-        s = Static(id="wizard-step", classes="wizard-step-container")
+    def _step_user_ids(self) -> ComposeResult:
         if self._wizard.channel == "telegram":
             hint = "Numeric Telegram user IDs, comma-separated. Find yours via @userinfobot."
             placeholder = "123456789, 987654321"
@@ -186,16 +186,13 @@ class SetupWizardScreen(Screen):  # type: ignore[type-arg]
                 "Find in Slack: profile → ··· → Copy member ID."
             )
             placeholder = "U1234567890 U0987654321"
-        s.compose = lambda: [  # type: ignore[method-assign]
-            Label("Step 3 of 4 — Allowlisted user IDs", classes="step-title"),
-            Label(hint, classes="field-label"),
-            Label("User ID(s):", classes="field-label"),
-            Input(placeholder=placeholder, id="inp-users", value=self._wizard.users),
-        ]
-        return s
+        with Container(id="wizard-step"):
+            yield Label("Step 3 of 4 — Allowlisted user IDs", classes="step-title")
+            yield Label(hint, classes="field-label")
+            yield Label("User ID(s):", classes="field-label")
+            yield Input(placeholder=placeholder, id="inp-users", value=self._wizard.users)
 
-    def _step_confirm(self) -> Static:
-        s = Static(id="wizard-step", classes="wizard-step-container")
+    def _step_confirm(self) -> ComposeResult:
         channel = self._wizard.channel.capitalize()
         user_count = len([u for u in self._wizard.users.replace(",", " ").split() if u])
         masked = "*" * 8 + self._wizard.token[-4:] if len(self._wizard.token) > 4 else "****"
@@ -206,8 +203,8 @@ class SetupWizardScreen(Screen):  # type: ignore[type-arg]
             f"  Allowlisted users: {user_count}\n\n"
             "Press Finish to save your configuration."
         )
-        s.compose = lambda: [Label(text, classes="step-title")]  # type: ignore[method-assign]
-        return s
+        with Container(id="wizard-step"):
+            yield Label(text, classes="step-title")
 
     # ------------------------------------------------------------------
     # Navigation helpers

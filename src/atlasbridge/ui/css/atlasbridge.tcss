@@ -92,10 +92,16 @@ _Card .card-value {
 }
 
 #wizard-step {
+    height: auto;
     margin-top: 1;
     margin-bottom: 1;
     padding: 1;
     border: tall $panel-lighten-1;
+}
+
+#wizard-step Input {
+    margin-top: 1;
+    margin-bottom: 1;
 }
 
 .step-title {
