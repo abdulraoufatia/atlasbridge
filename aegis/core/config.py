@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import os
-import sys
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field, SecretStr, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import BaseModel, Field, SecretStr, field_validator
 
 from aegis.core.constants import (
     AEGIS_DIR_NAME,
@@ -117,6 +115,56 @@ class AdaptersConfig(BaseModel):
     claude: AdapterClaudeConfig = Field(default_factory=AdapterClaudeConfig)
 
 
+class AutoPRConcurrencyConfig(BaseModel):
+    max_active_prs: int = 1
+
+
+class AutoPRConfig(BaseModel):
+    """Configuration for the automated PR remediation engine."""
+
+    enabled: bool = False
+    mode: str = "polling"  # "polling" | "webhook"
+    poll_interval_seconds: int = 300
+    # Filter: only process PRs from these authors (empty = all)
+    authors: list[str] = Field(default_factory=lambda: ["dependabot[bot]"])
+    # Filter: only process PRs with these labels (empty = any)
+    labels: list[str] = Field(default_factory=list)
+    max_retries: int = 3
+    merge_method: str = "squash"  # "squash" | "merge" | "rebase"
+    delete_branch_on_merge: bool = True
+    require_all_checks: bool = True
+    # If non-empty, only act on PRs for these repos (owner/repo format)
+    allowlist_repos: list[str] = Field(default_factory=list)
+    concurrency: AutoPRConcurrencyConfig = Field(default_factory=AutoPRConcurrencyConfig)
+    # dry_run=True: log everything but never push, never merge
+    dry_run: bool = True
+    # CI polling: max time to wait for checks to complete
+    ci_timeout_seconds: int = 1200  # 20 minutes
+    ci_poll_interval_seconds: int = 30
+    # GitHub token for API calls; override with AEGIS_GITHUB_TOKEN env var
+    github_token: str = ""
+    # Repository to operate on (owner/repo); override with AEGIS_GITHUB_REPO
+    github_repo: str = ""
+    # Optional: path to repo on disk (default: current working directory)
+    repo_path: str = ""
+    # Test command to run locally
+    test_command: str = "pytest tests/ -q"
+
+    @field_validator("mode")
+    @classmethod
+    def validate_mode(cls, v: str) -> str:
+        if v not in ("polling", "webhook"):
+            raise ValueError("auto_pr.mode must be 'polling' or 'webhook'")
+        return v
+
+    @field_validator("merge_method")
+    @classmethod
+    def validate_merge_method(cls, v: str) -> str:
+        if v not in ("squash", "merge", "rebase"):
+            raise ValueError("auto_pr.merge_method must be 'squash', 'merge', or 'rebase'")
+        return v
+
+
 # ---------------------------------------------------------------------------
 # Root config
 # ---------------------------------------------------------------------------
@@ -130,6 +178,7 @@ class AegisConfig(BaseModel):
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     adapters: AdaptersConfig = Field(default_factory=AdaptersConfig)
+    auto_pr: AutoPRConfig = Field(default_factory=AutoPRConfig)
 
     # Computed paths (not stored in config file)
     _config_path: Path | None = None
@@ -208,6 +257,10 @@ def _apply_env_overrides(data: dict[str, Any]) -> None:
         data.setdefault("database", {})["path"] = db
     if timeout := os.environ.get("AEGIS_APPROVAL_TIMEOUT_SECONDS"):
         data.setdefault("prompts", {})["timeout_seconds"] = int(timeout)
+    if gh_token := os.environ.get("AEGIS_GITHUB_TOKEN"):
+        data.setdefault("auto_pr", {})["github_token"] = gh_token
+    if gh_repo := os.environ.get("AEGIS_GITHUB_REPO"):
+        data.setdefault("auto_pr", {})["github_repo"] = gh_repo
 
 
 def save_config(config_data: dict[str, Any], path: Path | None = None) -> Path:

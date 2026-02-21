@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import json
 import sqlite3
+from collections.abc import Generator
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Generator
+from typing import Any
 
 from aegis.store.models import AuditEvent, PromptRecord, Session
 
@@ -138,17 +138,14 @@ class Database:
             self._conn.executescript(sql)
             with self.transaction():
                 self._conn.execute(
-                    "INSERT INTO schema_version(version, applied_at, description) "
-                    "VALUES (?, ?, ?)",
-                    (i, datetime.now(timezone.utc).isoformat(), f"Migration {i:03d}"),
+                    "INSERT INTO schema_version(version, applied_at, description) VALUES (?, ?, ?)",
+                    (i, datetime.now(UTC).isoformat(), f"Migration {i:03d}"),
                 )
 
     def _get_schema_version(self) -> int:
         assert self._conn is not None
         try:
-            row = self._conn.execute(
-                "SELECT MAX(version) FROM schema_version"
-            ).fetchone()
+            row = self._conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
             return row[0] or 0
         except sqlite3.OperationalError:
             return 0
@@ -173,15 +170,11 @@ class Database:
         sets = ", ".join(f"{k} = :{k}" for k in fields)
         params = {**fields, "id": session_id}
         with self.transaction():
-            self._conn.execute(
-                f"UPDATE sessions SET {sets} WHERE id = :id", params
-            )
+            self._conn.execute(f"UPDATE sessions SET {sets} WHERE id = :id", params)
 
     def get_session(self, session_id: str) -> Session | None:
         assert self._conn is not None
-        row = self._conn.execute(
-            "SELECT * FROM sessions WHERE id = ?", (session_id,)
-        ).fetchone()
+        row = self._conn.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)).fetchone()
         return Session.from_row(dict(row)) if row else None
 
     def list_active_sessions(self) -> list[Session]:
@@ -212,9 +205,7 @@ class Database:
         sets = ", ".join(f"{k} = :{k}" for k in fields)
         params = {**fields, "id": prompt_id}
         with self.transaction():
-            cur = self._conn.execute(
-                f"UPDATE prompts SET {sets} WHERE id = :id", params
-            )
+            cur = self._conn.execute(f"UPDATE prompts SET {sets} WHERE id = :id", params)
             return cur.rowcount
 
     def decide_prompt(
@@ -248,40 +239,38 @@ class Database:
                 {
                     "id": prompt_id,
                     "status": status,
-                    "decided_at": datetime.now(timezone.utc).isoformat(),
+                    "decided_at": datetime.now(UTC).isoformat(),
                     "decided_by": decided_by,
                     "response_normalized": response_normalized,
                     "nonce": nonce,
-                    "now": datetime.now(timezone.utc).isoformat(),
+                    "now": datetime.now(UTC).isoformat(),
                 },
             )
             return cur.rowcount
 
     def get_prompt(self, prompt_id: str) -> PromptRecord | None:
         assert self._conn is not None
-        row = self._conn.execute(
-            "SELECT * FROM prompts WHERE id = ?", (prompt_id,)
-        ).fetchone()
+        row = self._conn.execute("SELECT * FROM prompts WHERE id = ?", (prompt_id,)).fetchone()
         return PromptRecord.from_row(dict(row)) if row else None
 
     def list_pending_prompts(self, session_id: str | None = None) -> list[PromptRecord]:
         assert self._conn is not None
         if session_id:
             rows = self._conn.execute(
-                "SELECT * FROM prompts WHERE status IN ('pending','telegram_sent','awaiting_response') "
+                "SELECT * FROM prompts WHERE status IN ('pending','telegram_sent','awaiting_response') "  # noqa: E501
                 "AND session_id = ? ORDER BY created_at ASC",
                 (session_id,),
             ).fetchall()
         else:
             rows = self._conn.execute(
-                "SELECT * FROM prompts WHERE status IN ('pending','telegram_sent','awaiting_response') "
+                "SELECT * FROM prompts WHERE status IN ('pending','telegram_sent','awaiting_response') "  # noqa: E501
                 "ORDER BY created_at ASC"
             ).fetchall()
         return [PromptRecord.from_row(dict(r)) for r in rows]
 
     def list_expired_pending(self) -> list[PromptRecord]:
         assert self._conn is not None
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         rows = self._conn.execute(
             "SELECT * FROM prompts WHERE status IN ('pending','telegram_sent','awaiting_response') "
             "AND expires_at < ?",
@@ -289,13 +278,10 @@ class Database:
         ).fetchall()
         return [PromptRecord.from_row(dict(r)) for r in rows]
 
-    def list_prompts_for_session(
-        self, session_id: str, limit: int = 50
-    ) -> list[PromptRecord]:
+    def list_prompts_for_session(self, session_id: str, limit: int = 50) -> list[PromptRecord]:
         assert self._conn is not None
         rows = self._conn.execute(
-            "SELECT * FROM prompts WHERE session_id = ? "
-            "ORDER BY created_at DESC LIMIT ?",
+            "SELECT * FROM prompts WHERE session_id = ? ORDER BY created_at DESC LIMIT ?",
             (session_id, limit),
         ).fetchall()
         return [PromptRecord.from_row(dict(r)) for r in rows]
@@ -311,18 +297,17 @@ class Database:
             self._conn.execute(
                 "INSERT INTO audit_events "
                 "(id, event_type, ts, session_id, prompt_id, data_json, prev_hash, hash) "
-                "VALUES (:id, :event_type, :ts, :session_id, :prompt_id, :data_json, :prev_hash, :hash)",
+                "VALUES (:id, :event_type, :ts, :session_id, :prompt_id, :data_json, :prev_hash, :hash)",  # noqa: E501
                 row,
             )
 
     def get_last_audit_event(self) -> AuditEvent | None:
         assert self._conn is not None
-        row = self._conn.execute(
-            "SELECT * FROM audit_events ORDER BY seq DESC LIMIT 1"
-        ).fetchone()
+        row = self._conn.execute("SELECT * FROM audit_events ORDER BY seq DESC LIMIT 1").fetchone()
         if row:
             d = dict(row)
-            return AuditEvent(**{k: v for k, v in d.items() if k in AuditEvent.__dataclass_fields__})
+            fields = AuditEvent.__dataclass_fields__
+            return AuditEvent(**{k: v for k, v in d.items() if k in fields})
         return None
 
     def list_recent_audit_events(self, limit: int = 50) -> list[AuditEvent]:
@@ -333,5 +318,6 @@ class Database:
         result = []
         for r in rows:
             d = dict(r)
-            result.append(AuditEvent(**{k: v for k, v in d.items() if k in AuditEvent.__dataclass_fields__}))
+            fields = AuditEvent.__dataclass_fields__
+            result.append(AuditEvent(**{k: v for k, v in d.items() if k in fields}))
         return result

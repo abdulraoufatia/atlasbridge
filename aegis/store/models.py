@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _dt(s: str | None) -> datetime | None:
@@ -44,7 +44,7 @@ class Session:
         }
 
     @classmethod
-    def from_row(cls, row: dict[str, Any]) -> "Session":
+    def from_row(cls, row: dict[str, Any]) -> Session:
         return cls(**{k: v for k, v in row.items() if k in cls.__dataclass_fields__})
 
     @property
@@ -106,14 +106,14 @@ class PromptRecord:
         }
 
     @classmethod
-    def from_row(cls, row: dict[str, Any]) -> "PromptRecord":
+    def from_row(cls, row: dict[str, Any]) -> PromptRecord:
         d = dict(row)
         d["nonce_used"] = bool(d.get("nonce_used", 0))
         return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
 
     @property
     def is_expired(self) -> bool:
-        return datetime.now(timezone.utc) > datetime.fromisoformat(self.expires_at)
+        return datetime.now(UTC) > datetime.fromisoformat(self.expires_at)
 
     @property
     def short_id(self) -> str:
@@ -122,7 +122,7 @@ class PromptRecord:
     @property
     def ttl_remaining_seconds(self) -> float:
         exp = datetime.fromisoformat(self.expires_at)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         return max(0.0, (exp - now).total_seconds())
 
 

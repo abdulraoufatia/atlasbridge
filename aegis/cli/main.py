@@ -28,7 +28,6 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from aegis.core.constants import PromptStatus
 from aegis.core.exceptions import AegisError, ConfigNotFoundError
 
 console = Console()
@@ -60,9 +59,9 @@ def cli(ctx: click.Context, debug: bool) -> None:
 
 @cli.command()
 @click.option("--token", envvar="AEGIS_TELEGRAM_BOT_TOKEN", help="Telegram bot token.")
-@click.option("--users", envvar="AEGIS_TELEGRAM_ALLOWED_USERS", help="Comma-separated Telegram user IDs.")
-@click.option("--timeout", type=int, default=600, show_default=True, help="Prompt timeout (seconds).")
-@click.option("--free-text", is_flag=True, default=False, help="Enable free-text prompt forwarding.")
+@click.option("--users", envvar="AEGIS_TELEGRAM_ALLOWED_USERS", help="Comma-separated user IDs.")
+@click.option("--timeout", type=int, default=600, show_default=True, help="Prompt timeout (s).")
+@click.option("--free-text", is_flag=True, default=False, help="Enable free-text forwarding.")
 def setup(token: str | None, users: str | None, timeout: int, free_text: bool) -> None:
     """Run the interactive setup wizard."""
     from aegis.core.config import save_config
@@ -90,6 +89,7 @@ def setup(token: str | None, users: str | None, timeout: int, free_text: bool) -
     # Validate before writing
     try:
         from aegis.core.config import AegisConfig
+
         AegisConfig.model_validate(config_data)
     except Exception as exc:
         err_console.print(f"[red]Validation error:[/red] {exc}")
@@ -128,6 +128,7 @@ def run(ctx: click.Context, command: tuple[str, ...], session_id: str | None) ->
     """
     try:
         from aegis.core.config import load_config
+
         config = load_config()
     except ConfigNotFoundError as exc:
         err_console.print(f"[red]{exc}[/red]")
@@ -205,6 +206,7 @@ def status() -> None:
     """Show active Aegis sessions."""
     try:
         from aegis.core.config import load_config
+
         config = load_config()
     except AegisError as exc:
         err_console.print(f"[red]{exc}[/red]")
@@ -285,12 +287,14 @@ def _require_python() -> str:
 
 def _check_config() -> str:
     from aegis.core.config import load_config
+
     cfg = load_config()
     return str(cfg._config_path)
 
 
 def _check_telegram_token() -> str:
     from aegis.core.config import load_config
+
     cfg = load_config()
     tok = cfg.telegram.bot_token.get_secret_value()
     return f"{tok[:8]}…"
@@ -299,6 +303,7 @@ def _check_telegram_token() -> str:
 def _check_db() -> str:
     from aegis.core.config import load_config
     from aegis.store.database import Database
+
     cfg = load_config()
     db = Database(cfg.db_path)
     db.connect()
@@ -318,6 +323,7 @@ def approvals(session: str | None, show_all: bool) -> None:
     """List pending (or recent) prompts."""
     try:
         from aegis.core.config import load_config
+
         config = load_config()
     except AegisError as exc:
         err_console.print(f"[red]{exc}[/red]")
@@ -329,7 +335,10 @@ def approvals(session: str | None, show_all: bool) -> None:
     db.connect()
     try:
         if show_all:
-            prompts = db.list_prompts_for_session(session or "", limit=50) if session else _list_recent(db)
+            if session:
+                prompts = db.list_prompts_for_session(session or "", limit=50)
+            else:
+                prompts = _list_recent(db)
         else:
             prompts = db.list_pending_prompts(session_id=_expand_session_id(db, session))
     finally:
@@ -359,7 +368,6 @@ def approvals(session: str | None, show_all: bool) -> None:
 
 
 def _list_recent(db: Any) -> list[Any]:
-    from aegis.store.database import Database
     # Return last 50 prompts across all sessions
     sessions = db.list_active_sessions()
     prompts = []
@@ -390,6 +398,7 @@ def logs(lines: int, follow: bool) -> None:
     """View Aegis log output."""
     try:
         from aegis.core.config import load_config
+
         config = load_config()
     except AegisError as exc:
         err_console.print(f"[red]{exc}[/red]")
@@ -404,6 +413,7 @@ def logs(lines: int, follow: bool) -> None:
         os.execvp("tail", ["tail", "-f", str(log_path)])
     else:
         import subprocess
+
         subprocess.run(["tail", f"-n{lines}", str(log_path)])
 
 
@@ -422,6 +432,7 @@ def audit_verify() -> None:
     """Verify the integrity of the audit log hash chain."""
     try:
         from aegis.core.config import load_config
+
         config = load_config()
     except AegisError as exc:
         err_console.print(f"[red]{exc}[/red]")
@@ -509,7 +520,259 @@ def uninstall_service() -> None:
 
 def _find_aegis_bin() -> str | None:
     import shutil
+
     return shutil.which("aegis")
+
+
+# ---------------------------------------------------------------------------
+# pr-auto — automated PR remediation commands
+# ---------------------------------------------------------------------------
+
+
+@cli.group("pr-auto")
+def pr_auto() -> None:
+    """Automated PR remediation and merge engine."""
+
+
+@pr_auto.command("start")
+@click.option("--dry-run/--no-dry-run", default=None, help="Override dry_run from config.")
+def pr_auto_start(dry_run: bool | None) -> None:
+    """Start the PR automation daemon (background polling)."""
+    import platform
+
+    if platform.system() == "Windows":
+        err_console.print("[red]pr-auto start is not supported on Windows (no fork).[/red]")
+        sys.exit(1)
+
+    try:
+        from aegis.core.config import load_config
+
+        config = load_config()
+    except AegisError as exc:
+        err_console.print(f"[red]{exc}[/red]")
+        sys.exit(exc.exit_code)
+
+    from aegis.core.daemon_services.pr_automation_service import is_running, start
+
+    if is_running():
+        console.print("[yellow]PR automation is already running.[/yellow]")
+        return
+
+    cfg = _build_auto_pr_config(config, dry_run_override=dry_run)
+    poll_interval = config.auto_pr.poll_interval_seconds
+
+    if cfg.dry_run:
+        console.print("[yellow]dry_run=true — will not push or merge.[/yellow]")
+
+    pid = start(cfg, poll_interval)
+    console.print(f"[green]✓[/green] PR automation started (pid={pid})")
+    console.print(f"  Poll interval: {poll_interval}s")
+    console.print(f"  Repo: {cfg.github_repo}")
+    console.print("  Use [bold]aegis pr-auto status[/bold] to check progress.")
+
+
+@pr_auto.command("stop")
+def pr_auto_stop() -> None:
+    """Stop the PR automation daemon."""
+    from aegis.core.daemon_services.pr_automation_service import stop
+
+    if stop():
+        console.print("[green]✓[/green] PR automation stopped.")
+    else:
+        console.print("[dim]PR automation was not running.[/dim]")
+
+
+@pr_auto.command("status")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON.")
+def pr_auto_status(as_json: bool) -> None:
+    """Show PR automation daemon status and last cycle results."""
+    from aegis.core.daemon_services.pr_automation_service import get_status
+
+    data = get_status()
+
+    if as_json:
+        import json as _json
+
+        console.print(_json.dumps(data, indent=2))
+        return
+
+    running = data.get("running", False)
+    status_str = "[green]running[/green]" if running else "[dim]stopped[/dim]"
+    console.print(f"Status: {status_str}")
+
+    last = data.get("last_cycle")
+    if last:
+        console.print(f"Last cycle: {last}")
+
+    results = data.get("results", [])
+    if not results:
+        console.print("[dim]No PR results yet.[/dim]")
+        return
+
+    table = Table(title="Last Cycle Results")
+    table.add_column("PR", style="cyan")
+    table.add_column("Title")
+    table.add_column("Outcome")
+    table.add_column("Reason / SHA")
+
+    for r in results:
+        if r.get("merged"):
+            outcome = "[green]merged[/green]"
+            detail = r.get("commit_sha", "")[:8]
+        elif r.get("skipped"):
+            outcome = "[dim]skipped[/dim]"
+            detail = r.get("skip_reason", "")
+        else:
+            outcome = "[red]error[/red]"
+            detail = r.get("error", "")[:40]
+
+        table.add_row(
+            f"#{r.get('pr_number', '?')}",
+            (r.get("pr_title") or "")[:50],
+            outcome,
+            detail,
+        )
+
+    console.print(table)
+
+
+@pr_auto.command("run-once")
+@click.option("--dry-run/--no-dry-run", default=None, help="Override dry_run from config.")
+@click.option("--json", "as_json", is_flag=True, help="Output results as JSON.")
+def pr_auto_run_once(dry_run: bool | None, as_json: bool) -> None:
+    """Run one PR triage cycle immediately (foreground, no daemon)."""
+    try:
+        from aegis.core.config import load_config
+
+        config = load_config()
+    except AegisError as exc:
+        err_console.print(f"[red]{exc}[/red]")
+        sys.exit(exc.exit_code)
+
+    cfg = _build_auto_pr_config(config, dry_run_override=dry_run)
+
+    if cfg.dry_run and not as_json:
+        console.print("[yellow]dry_run=true — will not push or merge.[/yellow]")
+
+    if not cfg.github_token:
+        err_console.print(
+            "[red]No GitHub token configured.[/red]\n"
+            "Set AEGIS_GITHUB_TOKEN or add auto_pr.github_token to config."
+        )
+        sys.exit(1)
+
+    if not cfg.github_repo:
+        err_console.print(
+            "[red]No GitHub repo configured.[/red]\n"
+            "Set AEGIS_GITHUB_REPO or add auto_pr.github_repo to config."
+        )
+        sys.exit(1)
+
+    from aegis.core.daemon_services.pr_automation_service import run_once
+
+    try:
+        results = asyncio.run(run_once(cfg))
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Interrupted.[/yellow]")
+        sys.exit(130)
+    except Exception as exc:
+        err_console.print(f"[red]Error:[/red] {exc}")
+        sys.exit(1)
+
+    if as_json:
+        import json as _json
+
+        console.print(
+            _json.dumps(
+                [
+                    {
+                        "pr_number": r.pr_number,
+                        "pr_title": r.pr_title,
+                        "branch": r.branch,
+                        "merged": r.merged,
+                        "skipped": r.skipped,
+                        "skip_reason": str(r.skip_reason) if r.skip_reason else None,
+                        "fix_attempts": r.fix_attempts,
+                        "commit_sha": r.commit_sha,
+                        "error": r.error,
+                        "protection_snapshot": r.protection_snapshot,
+                        "timestamp": r.timestamp,
+                    }
+                    for r in results
+                ],
+                indent=2,
+            )
+        )
+        return
+
+    if not results:
+        console.print("[dim]No open PRs found.[/dim]")
+        return
+
+    table = Table(title="PR Triage Results")
+    table.add_column("PR", style="cyan")
+    table.add_column("Branch")
+    table.add_column("Outcome")
+    table.add_column("Fix attempts")
+    table.add_column("Detail")
+
+    for r in results:
+        if r.merged:
+            outcome = "[green]merged[/green]"
+            detail = r.commit_sha[:8] if r.commit_sha else ""
+        elif r.skipped:
+            outcome = "[dim]skipped[/dim]"
+            detail = str(r.skip_reason or "")
+        else:
+            outcome = "[red]error[/red]"
+            detail = (r.error or "")[:50]
+
+        table.add_row(
+            f"#{r.pr_number}",
+            r.branch[:30],
+            outcome,
+            str(r.fix_attempts),
+            detail,
+        )
+
+    console.print(table)
+
+
+@pr_auto.command("report")
+@click.option("--json", "as_json", is_flag=True, default=True, help="Output as JSON (default).")
+def pr_auto_report(as_json: bool) -> None:
+    """Print a JSON report of the last PR automation cycle."""
+    import json as _json
+
+    from aegis.core.daemon_services.pr_automation_service import get_status
+
+    data = get_status()
+    console.print(_json.dumps(data, indent=2))
+
+
+def _build_auto_pr_config(config: Any, dry_run_override: bool | None = None) -> Any:
+    """Construct AutoPRConfig from AegisConfig with optional overrides."""
+    from aegis.core.pr_automation import AutoPRConfig
+
+    apc = config.auto_pr
+    dry_run = dry_run_override if dry_run_override is not None else apc.dry_run
+
+    return AutoPRConfig(
+        github_token=apc.github_token or os.environ.get("AEGIS_GITHUB_TOKEN", ""),
+        github_repo=apc.github_repo or os.environ.get("AEGIS_GITHUB_REPO", ""),
+        repo_path=Path(apc.repo_path) if apc.repo_path else Path.cwd(),
+        authors=apc.authors,
+        labels=apc.labels,
+        merge_method=apc.merge_method,
+        delete_branch_on_merge=apc.delete_branch_on_merge,
+        require_all_checks=apc.require_all_checks,
+        max_retries=apc.max_retries,
+        ci_timeout_seconds=apc.ci_timeout_seconds,
+        ci_poll_interval_seconds=apc.ci_poll_interval_seconds,
+        test_command=apc.test_command,
+        dry_run=dry_run,
+        anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY", ""),
+    )
 
 
 # ---------------------------------------------------------------------------

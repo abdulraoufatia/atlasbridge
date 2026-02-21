@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -69,7 +69,7 @@ class AuditWriter:
         ev = AuditEvent(
             id=event_id,
             event_type=event_type,
-            ts=datetime.now(timezone.utc).isoformat(),
+            ts=datetime.now(UTC).isoformat(),
             session_id=session_id,
             prompt_id=prompt_id,
             data_json=json.dumps(data or {}),
@@ -128,7 +128,7 @@ def _read_last_hash(path: Path) -> str | None:
             f.seek(max(0, size - 4096))
             content = f.read().rstrip(b"\n")
             last_nl = content.rfind(b"\n")
-            line = content[last_nl + 1:] if last_nl != -1 else content
+            line = content[last_nl + 1 :] if last_nl != -1 else content
         if not line:
             return None
         obj = json.loads(line)

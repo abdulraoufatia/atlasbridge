@@ -8,7 +8,6 @@ independently of the bot logic.
 from __future__ import annotations
 
 import textwrap
-from typing import Any
 
 from aegis.core.constants import PromptType
 from aegis.store.models import PromptRecord
@@ -95,7 +94,7 @@ def _format_multiple_choice(prompt: PromptRecord, tool: str) -> tuple[str, _Keyb
     for i, choice in enumerate(choices, start=1):
         label = textwrap.shorten(choice, width=30, placeholder="…")
         rows.append([_btn(f"{i}. {label}", f"ans:{prompt.id}:{prompt.nonce}:{i}")])
-    rows.append([_btn(f"⏩  Use default (1)", f"ans:{prompt.id}:{prompt.nonce}:default")])
+    rows.append([_btn("⏩  Use default (1)", f"ans:{prompt.id}:{prompt.nonce}:default")])
 
     return text, _keyboard(*rows)
 
@@ -106,9 +105,7 @@ def _format_free_text(prompt: PromptRecord, tool: str) -> tuple[str, _Keyboard]:
         + "\n\n📝 *Reply to this message* with your text response."
         + f"\n_(max {200} characters)_"
     )
-    kb = _keyboard(
-        [_btn("⏩  Use default (empty)", f"ans:{prompt.id}:{prompt.nonce}:default")]
-    )
+    kb = _keyboard([_btn("⏩  Use default (empty)", f"ans:{prompt.id}:{prompt.nonce}:default")])
     return text, kb
 
 
@@ -135,29 +132,17 @@ def _format_unknown(prompt: PromptRecord, tool: str) -> tuple[str, _Keyboard]:
 
 def format_timeout_notice(prompt: PromptRecord, injected: str, tool: str = "Claude Code") -> str:
     excerpt = textwrap.shorten(prompt.excerpt, width=120, placeholder="…")
-    return (
-        f"⏰ *{tool}* prompt timed out\n\n"
-        f"```\n{excerpt}\n```\n\n"
-        f"Auto-injected: *{injected!r}*"
-    )
+    return f"⏰ *{tool}* prompt timed out\n\n```\n{excerpt}\n```\n\nAuto-injected: *{injected!r}*"
 
 
 def format_session_started(session_id: str, tool: str, cwd: str) -> str:
-    return (
-        f"▶️ *Aegis session started*\n\n"
-        f"Tool: `{tool}`\n"
-        f"CWD: `{cwd}`\n"
-        f"Session: `{session_id[:8]}`"
-    )
+    return f"▶️ *Aegis session started*\n\nTool: `{tool}`\nCWD: `{cwd}`\nSession: `{session_id[:8]}`"
 
 
 def format_session_ended(session_id: str, tool: str, exit_code: int | None) -> str:
     status = "✅ exited 0" if exit_code == 0 else f"⚠️ exited {exit_code}"
     return (
-        f"⏹ *Aegis session ended*\n\n"
-        f"Tool: `{tool}`\n"
-        f"Session: `{session_id[:8]}`\n"
-        f"Status: {status}"
+        f"⏹ *Aegis session ended*\n\nTool: `{tool}`\nSession: `{session_id[:8]}`\nStatus: {status}"
     )
 
 
@@ -174,10 +159,7 @@ def format_response_accepted(prompt: PromptRecord, response: str) -> str:
 
 
 def format_already_decided(prompt: PromptRecord) -> str:
-    return (
-        f"⚠️ Prompt `{prompt.short_id}` was already answered "
-        f"(status: {prompt.status})."
-    )
+    return f"⚠️ Prompt `{prompt.short_id}` was already answered (status: {prompt.status})."
 
 
 def format_expired(prompt: PromptRecord) -> str:

@@ -45,10 +45,10 @@ import os
 import select
 import signal
 import sys
-import tty
 import termios
+import tty
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import ptyprocess  # type: ignore[import]
@@ -59,7 +59,6 @@ from aegis.core.config import AegisConfig
 from aegis.core.constants import (
     INJECT_BYTES,
     PromptStatus,
-    PromptType,
     SessionStatus,
     SupervisorState,
 )
@@ -104,12 +103,8 @@ class PTYSupervisor:
         self._bot = bot
         self._session_id = session_id or str(uuid.uuid4())
 
-        self._detector = PromptDetector(
-            threshold=config.adapters.claude.detection_threshold
-        )
-        self._engine = PolicyEngine(
-            free_text_enabled=config.prompts.free_text_enabled
-        )
+        self._detector = PromptDetector(threshold=config.adapters.claude.detection_threshold)
+        self._engine = PolicyEngine(free_text_enabled=config.prompts.free_text_enabled)
 
         # asyncio.Queue: telegram bot puts (prompt_id, normalized_value) here
         self._response_queue: asyncio.Queue[tuple[str, str]] = asyncio.Queue()
@@ -196,16 +191,14 @@ class PTYSupervisor:
             # Restore terminal
             if old_term_settings is not None:
                 try:
-                    termios.tcsetattr(
-                        sys.stdin.fileno(), termios.TCSADRAIN, old_term_settings
-                    )
+                    termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_term_settings)
                 except Exception:
                     pass
 
             self._db.update_session(
                 self._session_id,
                 status=SessionStatus.COMPLETED if exit_code == 0 else SessionStatus.CRASHED,
-                ended_at=datetime.now(timezone.utc).isoformat(),
+                ended_at=datetime.now(UTC).isoformat(),
                 exit_code=exit_code,
             )
             self._audit.write_event(
@@ -225,8 +218,6 @@ class PTYSupervisor:
 
     async def _event_loop(self) -> int:
         """Run PTY reader, stdin relay, stall watchdog, and response consumer."""
-        loop = asyncio.get_event_loop()
-
         tasks = [
             asyncio.create_task(self._pty_reader(), name="pty-reader"),
             asyncio.create_task(self._stdin_relay(), name="stdin-relay"),
@@ -235,9 +226,7 @@ class PTYSupervisor:
         ]
 
         # Wait for child to exit (detected in pty_reader) or any task to fail
-        done, pending = await asyncio.wait(
-            tasks, return_when=asyncio.FIRST_COMPLETED
-        )
+        done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
 
         for t in pending:
             t.cancel()
@@ -367,9 +356,7 @@ class PTYSupervisor:
 
             # Fire blocking heuristic
             result = self._detector.detect_blocking(stripped[-512:])
-            log.debug(
-                "Stall heuristic fired after %.1fs (conf=%.2f)", elapsed, result.confidence
-            )
+            log.debug("Stall heuristic fired after %.1fs (conf=%.2f)", elapsed, result.confidence)
             await self._handle_detection(result)
 
     # ------------------------------------------------------------------
@@ -454,9 +441,7 @@ class PTYSupervisor:
         import secrets
 
         timeout = self._config.prompts.timeout_seconds
-        expires_at = (
-            datetime.now(timezone.utc) + timedelta(seconds=timeout)
-        ).isoformat()
+        expires_at = (datetime.now(UTC) + timedelta(seconds=timeout)).isoformat()
 
         from aegis.core.constants import SAFE_DEFAULTS
 
@@ -511,7 +496,7 @@ class PTYSupervisor:
             self._db.update_prompt(
                 prompt_id,
                 status=status,
-                decided_at=datetime.now(timezone.utc).isoformat(),
+                decided_at=datetime.now(UTC).isoformat(),
             )
             self._audit.write_event(
                 event_id=str(uuid.uuid4()),

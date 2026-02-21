@@ -33,7 +33,6 @@ import httpx
 from aegis.channels.base import BaseChannel
 from aegis.channels.telegram.templates import (
     format_already_decided,
-    format_error_notice,
     format_expired,
     format_prompt,
     format_response_accepted,
@@ -43,7 +42,6 @@ from aegis.channels.telegram.templates import (
     parse_callback_data,
 )
 from aegis.core.constants import PromptStatus, PromptType
-from aegis.core.exceptions import TelegramAuthError
 from aegis.store.database import Database
 from aegis.store.models import PromptRecord
 
@@ -274,13 +272,13 @@ class TelegramBot(BaseChannel):
         # Acknowledge and update message
         await self._answer_callback(cq_id, f"✅ Recorded: {normalized!r}")
         if chat_id and msg_id:
-            await self._edit_message(
-                chat_id, msg_id, format_response_accepted(prompt, normalized)
-            )
+            await self._edit_message(chat_id, msg_id, format_response_accepted(prompt, normalized))
 
         # Signal the supervisor
         await self._response_queue.put((prompt_id, normalized))
-        log.info("Response accepted: prompt_id=%s value=%r by=%s", prompt_id, normalized, decided_by)
+        log.info(
+            "Response accepted: prompt_id=%s value=%r by=%s", prompt_id, normalized, decided_by
+        )
 
     # ------------------------------------------------------------------
     # Message handler (free-text reply)
