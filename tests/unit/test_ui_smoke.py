@@ -272,6 +272,74 @@ def test_channel_token_setup_docs_exist() -> None:
     assert "xapp-" in content
 
 
+# ---------------------------------------------------------------------------
+# Dynamic guidance messages
+# ---------------------------------------------------------------------------
+
+
+def test_guidance_not_configured() -> None:
+    """Unconfigured state shows setup prompt and workflow example."""
+    from atlasbridge.tui.state import AppState, DaemonStatus, guidance_message
+
+    msg = guidance_message(AppState(), DaemonStatus.UNKNOWN)
+    assert "setup wizard" in msg.lower()
+    assert "How it works" in msg
+    assert "atlasbridge run claude" in msg
+
+
+def test_guidance_configured_daemon_stopped() -> None:
+    """Configured but daemon not running shows start instructions."""
+    from atlasbridge.tui.state import (
+        AppState,
+        ConfigStatus,
+        DaemonStatus,
+        guidance_message,
+    )
+
+    state = AppState(config_status=ConfigStatus.LOADED)
+    msg = guidance_message(state, DaemonStatus.STOPPED)
+    assert "start the daemon" in msg.lower()
+    assert "atlasbridge run claude" in msg
+    assert "How it works" in msg
+
+
+def test_guidance_daemon_running_no_sessions() -> None:
+    """Daemon running with no sessions shows run tool prompt."""
+    from atlasbridge.tui.state import (
+        AppState,
+        ConfigStatus,
+        DaemonStatus,
+        guidance_message,
+    )
+
+    state = AppState(config_status=ConfigStatus.LOADED, session_count=0)
+    msg = guidance_message(state, DaemonStatus.RUNNING)
+    assert "no active sessions" in msg.lower()
+    assert "atlasbridge run claude" in msg
+
+
+def test_guidance_active_sessions() -> None:
+    """Active sessions shows session count and management hint."""
+    from atlasbridge.tui.state import (
+        AppState,
+        ConfigStatus,
+        DaemonStatus,
+        guidance_message,
+    )
+
+    state = AppState(config_status=ConfigStatus.LOADED, session_count=3)
+    msg = guidance_message(state, DaemonStatus.RUNNING)
+    assert "3 active session" in msg
+    assert "[L]" in msg
+
+
+def test_guidance_is_importable_from_ui_state() -> None:
+    """guidance_message must be accessible via the ui.state re-export."""
+    from atlasbridge.tui.state import guidance_message
+
+    assert callable(guidance_message)
+
+
 def test_cli_ui_non_tty_exits_nonzero(monkeypatch) -> None:
     """``atlasbridge ui`` without a TTY should exit 1."""
     import sys as _sys
