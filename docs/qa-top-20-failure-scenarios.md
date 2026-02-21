@@ -44,7 +44,7 @@ Many interactive CLIs — including Claude Code in certain states — emit a pro
 **Setup**
 
 ```bash
-aegis lab run partial-line-prompt
+atlasbridge lab run partial-line-prompt
 ```
 
 The Prompt Lab scenario `partial-line-prompt` spawns a synthetic child process that:
@@ -108,7 +108,7 @@ Some CLIs render dynamic status lines by emitting ANSI escape sequences and carr
 **Setup**
 
 ```bash
-aegis lab run ansi-redraw-prompt
+atlasbridge lab run ansi-redraw-prompt
 ```
 
 The scenario replays the following byte sequence to the PTY master at 50 ms intervals, simulating a spinner that resolves to a prompt:
@@ -159,7 +159,7 @@ A CLI may emit a visible prompt string and then overwrite it with spaces or a bl
 **Setup**
 
 ```bash
-aegis lab run overwrite-before-block
+atlasbridge lab run overwrite-before-block
 ```
 
 The scenario emits:
@@ -210,7 +210,7 @@ The most invisible failure mode: the wrapped process calls `read(0, ...)` and bl
 **Setup**
 
 ```bash
-aegis lab run silent-block
+atlasbridge lab run silent-block
 ```
 
 The scenario spawns a child that immediately calls `read(0, 1)` without writing any output first. The PTY supervisor's stall watchdog fires after `stuck_timeout_seconds`.
@@ -256,7 +256,7 @@ Interactive CLI workflows often ask multiple questions in sequence: confirm a ch
 **Setup**
 
 ```bash
-aegis lab run sequential-prompts
+atlasbridge lab run sequential-prompts
 ```
 
 The scenario runs a script that asks:
@@ -322,8 +322,8 @@ def test_alpha_choice():
 Integration path:
 
 ```bash
-aegis lab run multiple-choice-numeric
-aegis lab run multiple-choice-alpha
+atlasbridge lab run multiple-choice-numeric
+atlasbridge lab run multiple-choice-alpha
 ```
 
 **Expected Behavior**
@@ -385,7 +385,7 @@ def test_yes_no_classification(text):
 ```
 
 ```bash
-aegis lab run yes-no-variants
+atlasbridge lab run yes-no-variants
 ```
 
 **Expected Behavior**
@@ -442,7 +442,7 @@ def test_confirm_enter_classification(text):
 ```
 
 ```bash
-aegis lab run press-enter
+atlasbridge lab run press-enter
 ```
 
 **Expected Behavior**
@@ -496,7 +496,7 @@ def test_free_text_overlong_rejected():
 ```
 
 ```bash
-aegis lab run free-text-length
+atlasbridge lab run free-text-length
 ```
 
 **Expected Behavior**
@@ -538,7 +538,7 @@ Telegram's `getUpdates` long-poll API guarantees at-least-once delivery, not exa
 **Setup**
 
 ```bash
-aegis lab run duplicate-callback
+atlasbridge lab run duplicate-callback
 ```
 
 The scenario uses the Prompt Lab's Telegram stub to deliver the same `callback_query` update ID twice in sequence within 500 ms, simulating a redelivery. The bot token and nonce in both callbacks are identical.
@@ -587,7 +587,7 @@ A user may leave their phone unattended and tap an approval long after the promp
 **Setup**
 
 ```bash
-aegis lab run late-reply-after-ttl
+atlasbridge lab run late-reply-after-ttl
 ```
 
 The scenario sets `timeout_seconds = 2` for the test session, then:
@@ -634,7 +634,7 @@ AtlasBridge maintains multiple prompt records across sessions. A callback that e
 **Setup**
 
 ```bash
-aegis lab run wrong-session-reply
+atlasbridge lab run wrong-session-reply
 ```
 
 The scenario:
@@ -688,7 +688,7 @@ A user may legitimately run two `atlasbridge run` invocations simultaneously —
 **Setup**
 
 ```bash
-aegis lab run concurrent-sessions
+atlasbridge lab run concurrent-sessions
 ```
 
 The scenario starts two independent PTY supervisors (session A and session B), each with their own synthetic child. Both children emit a `(y/n)` prompt simultaneously. The bot receives two distinct Telegram messages with distinct `prompt_id` values.
@@ -731,7 +731,7 @@ For `TYPE_FREE_TEXT` prompts, the user replies by sending a text message (not a 
 **Setup**
 
 ```bash
-aegis lab run ambiguous-text-reply
+atlasbridge lab run ambiguous-text-reply
 ```
 
 The scenario:
@@ -776,7 +776,7 @@ Telegram's API may be temporarily unreachable due to outages or network interrup
 **Setup**
 
 ```bash
-aegis lab run telegram-outage
+atlasbridge lab run telegram-outage
 ```
 
 The scenario:
@@ -825,7 +825,7 @@ The AtlasBridge daemon may be killed and restarted by launchd, systemd, or the u
 **Setup**
 
 ```bash
-aegis lab run daemon-restart-mid-prompt
+atlasbridge lab run daemon-restart-mid-prompt
 ```
 
 The scenario:
@@ -871,7 +871,7 @@ The wrapped CLI may crash (SIGSEGV, unhandled exception, OOM) while AtlasBridge 
 **Setup**
 
 ```bash
-aegis lab run child-crash-mid-prompt
+atlasbridge lab run child-crash-mid-prompt
 ```
 
 The scenario detects a prompt, then sends SIGKILL to the child process, simulating a crash.
@@ -916,7 +916,7 @@ Some AI CLI tools produce extremely high-volume output streams — thousands of 
 **Setup**
 
 ```bash
-aegis lab run output-flood
+atlasbridge lab run output-flood
 ```
 
 The scenario spawns a child that produces 100,000 lines of output at maximum speed, then emits a `(y/n)` prompt and blocks.
@@ -968,7 +968,7 @@ PTYs echo input back to the master side by default. When AtlasBridge injects a r
 **Setup**
 
 ```bash
-aegis lab run injection-echo-loop
+atlasbridge lab run injection-echo-loop
 ```
 
 The scenario:
@@ -1015,7 +1015,7 @@ Windows uses the ConPTY (Console Pseudo-Terminal) API instead of POSIX PTYs. Out
 **Setup**
 
 ```bash
-aegis lab run conpty-readiness --platform windows
+atlasbridge lab run conpty-readiness --platform windows
 ```
 
 The test is only executed on Windows CI runners (or via WSL2 with ConPTY emulation). The scenario:
@@ -1122,22 +1122,22 @@ The Prompt Lab is a deterministic simulator that reproduces failure scenarios wi
 uv pip install -e ".[dev]"
 
 # List all available scenarios
-aegis lab list
+atlasbridge lab list
 
 # Run a single scenario
-aegis lab run partial-line-prompt
+atlasbridge lab run partial-line-prompt
 
 # Run all scenarios and report
-aegis lab run --all
+atlasbridge lab run --all
 
 # Run scenarios matching a filter
-aegis lab run --filter "QA-01*"
+atlasbridge lab run --filter "QA-01*"
 
 # Run with verbose output
-aegis lab run --all --verbose
+atlasbridge lab run --all --verbose
 
 # Run with JSON output for CI parsing
-aegis lab run --all --json > qa-results.json
+atlasbridge lab run --all --json > qa-results.json
 ```
 
 ### Scenario Architecture
@@ -1193,7 +1193,7 @@ In CI, `atlasbridge lab run --all --json` produces a machine-readable report use
 ```yaml
 # .github/workflows/qa.yml
 - name: Run QA scenarios
-  run: aegis lab run --all --json --output qa-results.json
+  run: atlasbridge lab run --all --json --output qa-results.json
 
 - name: Check mandatory scenarios
   run: python scripts/check_qa_gate.py --results qa-results.json --release v0.2.0
@@ -1210,7 +1210,7 @@ New scenarios are added by creating a file in `tests/prompt_lab/scenarios/` foll
 When a scenario fails, use `--verbose` to see the full PTY output, all audit log events, and the Telegram stub's message log:
 
 ```bash
-aegis lab run partial-line-prompt --verbose --debug
+atlasbridge lab run partial-line-prompt --verbose --debug
 
 # Output:
 # [PTY OUTPUT] "Do you want to continue? (y/n)"

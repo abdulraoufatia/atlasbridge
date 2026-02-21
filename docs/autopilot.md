@@ -20,7 +20,7 @@ The Autopilot Engine does not replace the relay. It is an additional decision la
 ### Component diagram
 
 ```
-                         aegis run claude
+                         atlasbridge run claude
                                │
                                ▼
                          DaemonManager

@@ -17,9 +17,9 @@ The multi-agent model exists because different parts of the codebase have fundam
 | Role | Short name | Primary concerns |
 |---|---|---|
 | Principal Systems Architect | Architect | Architecture, PRD, cross-cutting design decisions, interface specs |
-| Staff Platform Engineer | Platform | `src/aegis/os/`, `src/aegis/core/`, daemon lifecycle, CI pipeline |
-| Staff Integrations Engineer | Integrations | `src/aegis/adapters/`, CLI tool compatibility, adapter testing |
-| Staff Channel Engineer | Channel | `src/aegis/channels/`, Telegram, Slack, WhatsApp channel implementations |
+| Staff Platform Engineer | Platform | `src/atlasbridge/os/`, `src/atlasbridge/core/`, daemon lifecycle, CI pipeline |
+| Staff Integrations Engineer | Integrations | `src/atlasbridge/adapters/`, CLI tool compatibility, adapter testing |
+| Staff Channel Engineer | Channel | `src/atlasbridge/channels/`, Telegram, Slack, WhatsApp channel implementations |
 | QA/Reliability Engineer | QA | `tests/`, Prompt Lab, CI gating matrix, coverage enforcement |
 | Docs/DX Engineer | Docs | `docs/`, `README.md`, `CLAUDE.md`, CLI help text, changelog |
 
@@ -84,7 +84,7 @@ Examples:
 ```
 feat(detector): add MED-confidence structural pattern for numbered lists
 fix(pty): release injection gate on write timeout to prevent deadlock
-docs(cli): add aegis run --dry-run example to cli-ux.md
+docs(cli): add atlasbridge run --dry-run example to cli-ux.md
 test(lab): add QA-019 echo loop regression scenario
 chore(ci): pin ubuntu-latest to ubuntu-22.04 for reproducibility
 ```
@@ -115,7 +115,7 @@ Before a PR can be merged to `main`:
 
 ### Staff Platform Engineer
 
-**Owns:** `src/aegis/os/` (PTY backend, OS abstraction), `src/aegis/core/` (config, constants, exceptions), `src/aegis/bridge/pty_supervisor.py`, daemon lifecycle, `.github/workflows/`
+**Owns:** `src/atlasbridge/os/` (PTY backend, OS abstraction), `src/atlasbridge/core/` (config, constants, exceptions), `src/atlasbridge/bridge/pty_supervisor.py`, daemon lifecycle, `.github/workflows/`
 
 **Responsibilities:**
 - Implement and maintain the PTY supervisor and OS backend.
@@ -127,17 +127,17 @@ Before a PR can be merged to `main`:
 
 ### Staff Integrations Engineer
 
-**Owns:** `src/aegis/adapters/`, adapter test fixtures under `tests/adapters/`
+**Owns:** `src/atlasbridge/adapters/`, adapter test fixtures under `tests/adapters/`
 
 **Responsibilities:**
 - Implement and maintain tool adapters (Claude, OpenAI, Gemini CLI, etc.).
 - Test compatibility of `atlasbridge run` with each supported CLI tool.
-- Maintain the `aegis adapter list` output and adapter capability matrix.
+- Maintain the `atlasbridge adapter list` output and adapter capability matrix.
 - Coordinate with the Platform Engineer when a new tool requires PTY-layer changes.
 
 ### Staff Channel Engineer
 
-**Owns:** `src/aegis/channels/`, `tests/channels/`
+**Owns:** `src/atlasbridge/channels/`, `tests/channels/`
 
 **Responsibilities:**
 - Implement and maintain channel integrations: Telegram, Slack, WhatsApp.
@@ -162,7 +162,7 @@ Before a PR can be merged to `main`:
 
 ### Docs/DX Engineer
 
-**Owns:** `docs/cli-ux.md`, `docs/setup-flow.md`, `README.md`, `CLAUDE.md`, CLI help text strings in `src/aegis/cli/main.py`
+**Owns:** `docs/cli-ux.md`, `docs/setup-flow.md`, `README.md`, `CLAUDE.md`, CLI help text strings in `src/atlasbridge/cli/main.py`
 
 **Responsibilities:**
 - Keep `CLAUDE.md` current as the source of truth for AI agents working on the codebase.
@@ -287,17 +287,17 @@ E2E tests live in `tests/e2e/`. They:
 
 | Module path | Coverage target |
 |---|---|
-| `src/aegis/core/` | 80% line coverage |
-| `src/aegis/os/` | 80% line coverage |
-| `src/aegis/channels/telegram/` | 70% line coverage |
-| `src/aegis/adapters/` | 70% line coverage |
-| `src/aegis/cli/` | 60% line coverage (CLI wiring is hard to unit test) |
+| `src/atlasbridge/core/` | 80% line coverage |
+| `src/atlasbridge/os/` | 80% line coverage |
+| `src/atlasbridge/channels/telegram/` | 70% line coverage |
+| `src/atlasbridge/adapters/` | 70% line coverage |
+| `src/atlasbridge/cli/` | 60% line coverage (CLI wiring is hard to unit test) |
 
 Coverage is measured by `pytest-cov` and reported in CI. A drop below the target is a CI failure.
 
 ### Prompt Lab gates releases
 
-The Prompt Lab is not optional. Every PR that touches `src/aegis/os/`, `src/aegis/bridge/`, or `src/aegis/policy/` must include a passing Prompt Lab run in CI. See `docs/reliability.md` for the full CI gating matrix.
+The Prompt Lab is not optional. Every PR that touches `src/atlasbridge/os/`, `src/atlasbridge/bridge/`, or `src/atlasbridge/policy/` must include a passing Prompt Lab run in CI. See `docs/reliability.md` for the full CI gating matrix.
 
 ---
 
@@ -311,7 +311,7 @@ The CI pipeline runs on every push to every branch. It must be green before any 
 
 ```yaml
 - name: Security Scan
-  run: bandit -r src/aegis/ -c pyproject.toml
+  run: bandit -r src/atlasbridge/ -c pyproject.toml
 ```
 
 Runs Bandit with the configuration in `pyproject.toml`. Findings at severity HIGH are blocking. Findings at severity MEDIUM are warnings. LOW is informational.
@@ -322,10 +322,10 @@ Runs Bandit with the configuration in `pyproject.toml`. Findings at severity HIG
 - name: Lint
   run: ruff check . && ruff format --check .
 - name: Type Check
-  run: mypy src/aegis/
+  run: mypy src/atlasbridge/
 ```
 
-Ruff enforces the style and import rules defined in `pyproject.toml`. Mypy runs in strict mode on `src/aegis/`. Type errors are blocking.
+Ruff enforces the style and import rules defined in `pyproject.toml`. Mypy runs in strict mode on `src/atlasbridge/`. Type errors are blocking.
 
 #### Tests (matrix)
 
@@ -340,7 +340,7 @@ strategy:
 
 Each matrix cell runs:
 ```bash
-pytest tests/unit/ tests/integration/ -q --cov=src/aegis --cov-report=xml
+pytest tests/unit/ tests/integration/ -q --cov=src/atlasbridge --cov-report=xml
 ```
 
 Coverage is uploaded to Codecov from the macOS/3.11 cell only.
@@ -397,24 +397,24 @@ pytest tests/e2e/ -v
 Run Prompt Lab via the CLI:
 
 ```bash
-aegis lab run --all
+atlasbridge lab run --all
 ```
 
 Run all linting, formatting, type checking, and security scanning:
 
 ```bash
-ruff check . && ruff format --check . && mypy src/aegis/ && bandit -r src/aegis/ -c pyproject.toml
+ruff check . && ruff format --check . && mypy src/atlasbridge/ && bandit -r src/atlasbridge/ -c pyproject.toml
 ```
 
 Run a single Prompt Lab scenario:
 
 ```bash
-aegis lab run QA-004
+atlasbridge lab run QA-004
 pytest tests/prompt_lab/ -k QA-004 -v
 ```
 
 Check coverage locally:
 
 ```bash
-pytest tests/unit/ tests/integration/ --cov=src/aegis --cov-report=term-missing
+pytest tests/unit/ tests/integration/ --cov=src/atlasbridge --cov-report=term-missing
 ```

@@ -103,7 +103,7 @@ STRIDE = **S**poofing · **T**ampering · **R**epudiation · **I**nformation Dis
 
 **Mitigations:**
 - Daemon socket uses process-owner authentication (same UID required)
-- Session tokens generated per `aegis wrap` invocation, verified on each event
+- Session tokens generated per `atlasbridge run` invocation, verified on each event
 - Approval notifications include tool call hash; discrepancy would be visible
 
 **Residual risk:** Medium — local code execution is a strong precondition. If attacker has local code exec, the machine is already compromised.
@@ -229,7 +229,7 @@ STRIDE = **S**poofing · **T**ampering · **R**epudiation · **I**nformation Dis
 
 **Mitigations:**
 - All tool calls logged with full arguments at interception point
-- Session ID links tool call to specific `aegis wrap` invocation
+- Session ID links tool call to specific `atlasbridge run` invocation
 
 **Residual risk:** Low.
 
@@ -267,7 +267,7 @@ STRIDE = **S**poofing · **T**ampering · **R**epudiation · **I**nformation Dis
 - Bot token stored in `~/.atlasbridge/config.toml` (0600), not environment by default
 - structlog masks values matching token patterns (regex: `\d+:[A-Za-z0-9_-]{35}`)
 - `.env` in `.gitignore`
-- `aegis config get telegram.bot_token` outputs `***REDACTED***` by default
+- `atlasbridge config get telegram.bot_token` outputs `***REDACTED***` by default
 - Doctor checks that `.env` is not in the git index
 
 **Residual risk:** Low with correct configuration.
@@ -338,7 +338,7 @@ STRIDE = **S**poofing · **T**ampering · **R**epudiation · **I**nformation Dis
 **Mitigations:**
 - Configurable timeout action on Telegram unavailability: `deny` (default) or `allow` (dangerous)
 - Exponential backoff on polling failures
-- Local fallback: `aegis approvals approve <id>` via CLI works even without Telegram
+- Local fallback: `atlasbridge approvals approve <id>` via CLI works even without Telegram
 - Daemon continues running; pending approvals are queued for when connectivity returns
 
 **Residual risk:** Medium — Telegram outage blocks mobile approvals but CLI override remains.
@@ -392,7 +392,7 @@ STRIDE = **S**poofing · **T**ampering · **R**epudiation · **I**nformation Dis
 **Impact:** Critical
 
 **Mitigations:**
-- PTY adapter runs subprocess with restricted environment (no `AEGIS_*` vars passed through)
+- PTY adapter runs subprocess with restricted environment (no `ATLASBRIDGE_*` vars passed through)
 - Subprocess runs as same user (no privilege escalation possible)
 - Signal handling: SIGTERM/SIGINT from subprocess doesn't kill daemon
 - Future: namespaced execution (Phase 4)

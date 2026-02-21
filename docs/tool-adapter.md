@@ -20,7 +20,7 @@ AtlasBridge must work with multiple AI CLI tools (Claude Code, OpenAI CLI, and f
 - **Vendor neutral**: Adding a new tool requires only a new adapter implementation
 - **Protocol agnostic**: Different tools emit tool calls in different formats — the adapter handles parsing
 - **Fail-safe**: If the adapter can't parse an event, it defaults to `require_approval`
-- **Transparent**: From the user's perspective, `aegis wrap claude` behaves exactly like `claude`
+- **Transparent**: From the user's perspective, `atlasbridge run claude` behaves exactly like `claude`
 
 ---
 
@@ -29,7 +29,7 @@ AtlasBridge must work with multiple AI CLI tools (Claude Code, OpenAI CLI, and f
 ```python
 from abc import ABC, abstractmethod
 from typing import AsyncIterator
-from aegis.core.events import ToolCallEvent, ToolCallResult
+from atlasbridge.core.events import ToolCallEvent, ToolCallResult
 
 class ToolAdapter(ABC):
     """
@@ -335,7 +335,7 @@ class GenericPTYAdapter(ToolAdapter):
 
 ## Adapter Detection
 
-`aegis wrap <tool>` auto-detects the correct adapter:
+`atlasbridge run <tool>` auto-detects the correct adapter:
 
 ```python
 def detect_adapter(tool_name: str) -> type[ToolAdapter]:
@@ -359,14 +359,14 @@ def detect_adapter(tool_name: str) -> type[ToolAdapter]:
 
 To add support for a new AI tool:
 
-1. Create `aegis/bridge/adapters/<tool_name>.py`
+1. Create `atlasbridge/bridge/adapters/<tool_name>.py`
 2. Subclass `ToolAdapter`
 3. Decorate with `@AdapterRegistry.register("<tool_name>")`
 4. Implement all abstract methods
 5. Add tests in `tests/unit/bridge/test_<tool_name>_adapter.py`
 6. Document tool call event format in the adapter's docstring
 
-The new adapter is immediately available as `aegis wrap <tool_name>` with no changes to the core codebase.
+The new adapter is immediately available as `atlasbridge run <tool_name>` with no changes to the core codebase.
 
 ---
 
@@ -380,4 +380,4 @@ def supported_versions(self) -> list[str]:
     return [">=1.0.0,<2.0.0"]   # semver constraint
 ```
 
-At `aegis wrap` time, the adapter checks the tool's version and warns if the version is outside the supported range. The tool still runs but a compatibility warning is shown.
+At `atlasbridge run` time, the adapter checks the tool's version and warns if the version is outside the supported range. The tool still runs but a compatibility warning is shown.

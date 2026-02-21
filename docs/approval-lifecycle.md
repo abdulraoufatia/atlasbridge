@@ -88,9 +88,9 @@ This document defines the complete approval state machine, lifecycle events, tim
 |------|----|---------|-------|
 | *(create)* | `PENDING` | Policy returns `require_approval` | Tool call valid |
 | `PENDING` | `APPROVED` | User taps Approve in Telegram | User in whitelist; nonce valid; not expired |
-| `PENDING` | `APPROVED` | `aegis approvals approve <id>` | Not expired |
+| `PENDING` | `APPROVED` | `atlasbridge approvals approve <id>` | Not expired |
 | `PENDING` | `DENIED` | User taps Deny in Telegram | User in whitelist; nonce valid |
-| `PENDING` | `DENIED` | `aegis approvals deny <id>` | Always allowed |
+| `PENDING` | `DENIED` | `atlasbridge approvals deny <id>` | Always allowed |
 | `PENDING` | `EXPIRED` | Expiry timer fires | `now >= expires_at` |
 | `APPROVED` | `EXECUTING` | Tool call execution begins | — |
 | `EXECUTING` | `COMPLETED` | Tool call returns success | — |
@@ -129,7 +129,7 @@ The `WHERE status = 'pending' AND nonce_used = 0` guard ensures only the first r
 
 The expiry loop checks `status = 'pending'` before acting. Same atomic update pattern ensures exactly one transition wins.
 
-### Race: Multiple `aegis approvals approve` CLI calls
+### Race: Multiple `atlasbridge approvals approve` CLI calls
 
 Same DB guard applies.
 
@@ -185,10 +185,10 @@ Your AI session (claude, PID 9876) has requested 10 approvals
 in the last 60 seconds. This may be unusual activity.
 
 The session has been paused. Resume it with:
-  aegis approvals resume <session_id>
+  atlasbridge approvals resume <session_id>
 
 Or deny all pending:
-  aegis approvals deny-all
+  atlasbridge approvals deny-all
 ```
 
 ---
@@ -220,7 +220,7 @@ remind_at = [120, 240]   # seconds after creation; empty = no reminders
 
 - Full ID: UUID v4 (e.g., `550e8400-e29b-41d4-a716-446655440000`)
 - Short display ID: first 6 characters of UUID hex (e.g., `a1b2c3`)
-- Short ID used in CLI output, Telegram messages, and `aegis approvals show`
+- Short ID used in CLI output, Telegram messages, and `atlasbridge approvals show`
 
 ---
 
@@ -252,7 +252,7 @@ on_denied = "~/.atlasbridge/hooks/on_denied.sh"
 on_expired = "~/.atlasbridge/hooks/on_expired.sh"
 ```
 
-Hook scripts receive the approval record as a JSON file via `$AEGIS_APPROVAL_JSON`.
+Hook scripts receive the approval record as a JSON file via `$ATLASBRIDGE_APPROVAL_JSON`.
 
 ---
 

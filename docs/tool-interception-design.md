@@ -19,7 +19,7 @@ AtlasBridge must intercept tool calls made by AI agents (Claude Code, OpenAI CLI
 Wrap the AI CLI with a parent process that reads stdout/stderr and writes to stdin:
 
 ```
-aegis → subprocess(claude) → pipe → aegis interceptor
+atlasbridge → subprocess(claude) → pipe → atlasbridge interceptor
 ```
 
 **Pros:**
@@ -152,7 +152,7 @@ sequenceDiagram
     participant DB as SQLite Store
     participant AL as Audit Log
 
-    U->>A: aegis wrap claude
+    U->>A: atlasbridge run claude
     A->>C: spawn in PTY slave
     C-->>U: (relayed) Claude UI ready
 
@@ -279,15 +279,15 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant AW as aegis wrap CLI
+    participant AW as atlasbridge run CLI
     participant D as AtlasBridge Daemon
     participant C as Claude CLI
 
-    U->>AW: aegis wrap claude
+    U->>AW: atlasbridge run claude
     AW->>D: connect to daemon socket
     D-->>AW: connection refused (daemon not running)
     AW-->>U: Error: AtlasBridge daemon is not running
-                 Start it with: aegis start
+                 Start it with: atlasbridge start
     Note over C: Claude is NOT launched — fail safe
 ```
 
@@ -307,7 +307,7 @@ sequenceDiagram
     Note over C: Claude CLI blocks (waiting for response)
     Note over C: After 30s timeout in Claude itself → Claude resumes with error
 
-    Note over A: AtlasBridge restarts (aegis start)
+    Note over A: AtlasBridge restarts (atlasbridge start)
     A->>DB: query pending approvals
     DB-->>A: approval a1b2c3 PENDING (expired? check)
     alt expired
@@ -371,12 +371,12 @@ The wrapped tool is launched with a sanitized environment:
 **Removed from child environment:**
 - `ATLASBRIDGE_TELEGRAM_BOT_TOKEN`
 - `ATLASBRIDGE_TELEGRAM_ALLOWED_USERS`
-- `AEGIS_*` (all AtlasBridge config vars)
+- `ATLASBRIDGE_*` (all AtlasBridge config vars)
 - `CLAUDE_API_KEY` passthrough is preserved (Claude needs it)
 
 **Added to child environment:**
-- `AEGIS_SESSION_ID` — session ID for this invocation (read-only, for logging)
-- `AEGIS_SOCKET_PATH` — path to IPC socket (for plugins, Phase 3)
+- `ATLASBRIDGE_SESSION_ID` — session ID for this invocation (read-only, for logging)
+- `ATLASBRIDGE_SOCKET_PATH` — path to IPC socket (for plugins, Phase 3)
 
 ---
 
@@ -385,12 +385,12 @@ The wrapped tool is launched with a sanitized environment:
 | Signal | Source | AtlasBridge behavior |
 |--------|--------|----------------|
 | SIGINT (Ctrl+C) | User | Forward to Claude CLI; if approval in-flight, notify user; daemon continues |
-| SIGTERM | OS / aegis stop | Forward to Claude CLI; drain in-flight approvals (deny after 5s); shutdown |
+| SIGTERM | OS / atlasbridge stop | Forward to Claude CLI; drain in-flight approvals (deny after 5s); shutdown |
 | SIGPIPE | Broken pipe | Log and exit gracefully |
 | SIGHUP | `atlasbridge stop --reload` | Reload config; re-read policy; restart Telegram polling |
 
 **SIGINT detail:**
-When the user presses Ctrl+C in an `aegis wrap` session:
+When the user presses Ctrl+C in an `atlasbridge run` session:
 1. SIGINT is forwarded to Claude CLI (which may exit or handle it)
 2. AtlasBridge checks for in-flight approvals
 3. If no pending approvals: AtlasBridge waits for Claude to exit, then exits itself
@@ -422,7 +422,7 @@ Some tool calls may execute for a long time (e.g., `bash` running tests for 5 mi
 
 ## Cancellation Propagation
 
-When a user cancels an operation (via Telegram "Cancel" button or `aegis approvals deny`):
+When a user cancels an operation (via Telegram "Cancel" button or `atlasbridge approvals deny`):
 1. Approval status → DENIED
 2. PTY adapter writes an error to Claude's stdin: `{"error": "Operation cancelled by user"}`
 3. Claude CLI receives the error and handles it (usually stops the current operation)

@@ -186,7 +186,7 @@ Windows support will not ship until QA scenario QA-020 (`ConPTYBaselineScenario`
 ConPTY support is an opt-in flag until it exits experimental status:
 
 ```bash
-aegis run claude --backend conpty   # explicit opt-in (v0.5.0)
+atlasbridge run claude --backend conpty   # explicit opt-in (v0.5.0)
 ```
 
 ---
@@ -268,9 +268,9 @@ The Prompt Lab is a mandatory test harness for prompt detection scenarios. It is
 ### CLI interface
 
 ```bash
-aegis lab run <scenario>     # run a single scenario by QA ID or name
-aegis lab run --all          # run all registered scenarios
-aegis lab list               # list all registered scenarios with descriptions
+atlasbridge lab run <scenario>     # run a single scenario by QA ID or name
+atlasbridge lab run --all          # run all registered scenarios
+atlasbridge lab list               # list all registered scenarios with descriptions
 ```
 
 ### pytest integration
@@ -339,7 +339,7 @@ QA-009   FreeTextConstraintScenario   macos, linux       registered
 QA-018   OutputFloodScenario          macos, linux       registered
 QA-019   EchoLoopScenario             macos, linux       registered
 
-11 scenarios registered. Run with: aegis lab run --all
+11 scenarios registered. Run with: atlasbridge lab run --all
 ```
 
 ### Usage in CI

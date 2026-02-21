@@ -19,7 +19,7 @@ The adapter does **not** classify operations as risky or dangerous. It only asks
 ## 2. Launch model
 
 ```
-aegis run claude [args...]
+atlasbridge run claude [args...]
 ```
 
 Spawns `claude` inside a `ptyprocess.PtyProcess` with:
@@ -190,7 +190,7 @@ The safe default for YES/NO cannot be overridden to `y` — the config validator
 ## 7. Session lifecycle
 
 ```
-aegis run claude
+atlasbridge run claude
     │
     ▼ PTY spawned, session saved to DB
     │ Telegram: "▶️ Session started"

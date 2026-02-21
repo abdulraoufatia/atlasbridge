@@ -9,7 +9,7 @@
 
 ## Prompt detection
 
-`aegis/policy/detector.py` — `PromptDetector`
+`atlasbridge/policy/detector.py` — `PromptDetector`
 
 Three-layer detection:
 
@@ -27,7 +27,7 @@ Default: `0.65`. Configurable via `adapters.claude.detection_threshold` in confi
 
 ## Routing
 
-`aegis/policy/engine.py` — `PolicyEngine`
+`atlasbridge/policy/engine.py` — `PolicyEngine`
 
 Simple dispatch:
 

@@ -40,7 +40,7 @@ CREATE TABLE schema_version (
 
 ### `sessions`
 
-Represents a single `aegis wrap <tool>` invocation.
+Represents a single `atlasbridge run <tool>` invocation.
 
 ```sql
 CREATE TABLE sessions (
@@ -216,7 +216,7 @@ class Approval:
 
 ## Migrations
 
-Migration files live in `aegis/store/migrations/`:
+Migration files live in `atlasbridge/store/migrations/`:
 
 ```
 001_initial.sql         — sessions, approvals, schema_version
@@ -283,8 +283,8 @@ The hash chain allows `atlasbridge doctor` to verify the audit log has not been 
 | `tool_call_executed` | Tool call executed (after approval) |
 | `tool_call_blocked` | Tool call blocked (deny decision) |
 | `tool_call_failed` | Tool call execution failed |
-| `session_started` | `aegis wrap` session began |
-| `session_ended` | `aegis wrap` session ended |
+| `session_started` | `atlasbridge run` session began |
+| `session_ended` | `atlasbridge run` session ended |
 | `policy_loaded` | Policy file loaded or reloaded |
 | `daemon_started` | Daemon started |
 | `daemon_stopped` | Daemon stopped |

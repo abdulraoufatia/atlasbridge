@@ -89,11 +89,11 @@ flowchart TD
 
 ```mermaid
 graph TD
-    subgraph cli["src/aegis/cli/"]
+    subgraph cli["src/atlasbridge/cli/"]
         MAIN["main.py\nClick commands:\nrun, setup, status,\ndoctor, approvals,\nlogs, audit"]
     end
 
-    subgraph core["src/aegis/core/"]
+    subgraph core["src/atlasbridge/core/"]
         DAEMON["daemon/\nDaemon lifecycle\nSIGHUP config reload"]
         SCHEDULER["scheduler/\nTTL expiry loop\nRetention cleanup"]
         SESSION_MOD["session/\nSession dataclass\nLifecycle management"]
@@ -103,20 +103,20 @@ graph TD
         AUDIT_MOD["audit/\nAuditWriter\nHash chain\nverify_chain()"]
     end
 
-    subgraph os_layer["src/aegis/os/tty/"]
+    subgraph os_layer["src/atlasbridge/os/tty/"]
         TTY_BASE["base.py\nBasePTY ABC\nspawn, read, write,\nresize, terminate"]
         MACOS["macos.py\nptyprocess backend\nmacOS terminal dims"]
         LINUX["linux.py\nptyprocess backend\nLinux PTY (planned)"]
         WINDOWS["windows.py\nConPTY backend\n(planned)"]
     end
 
-    subgraph adapters["src/aegis/adapters/"]
+    subgraph adapters["src/atlasbridge/adapters/"]
         ADP_BASE["base.py\nBaseAdapter ABC\nstart_session()\ndetect_prompt()\ninject_reply()"]
         CLAUDE_ADP["claude_code.py\nClaudeAdapter\nregex + stall detection\nvalue normalisation"]
         OPENAI_ADP["openai_cli.py\nOpenAIAdapter stub\n(planned)"]
     end
 
-    subgraph channels["src/aegis/channels/"]
+    subgraph channels["src/atlasbridge/channels/"]
         CH_BASE["base.py\nBaseChannel ABC\nsend_prompt()\nreceive_reply()\nnotify()\nclose()"]
         TG["telegram/\nbot.py — long-poll\ntemplates.py — keyboards\nrate_limiter.py"]
         SLACK["slack/\nSlack stub (planned)"]
@@ -154,7 +154,7 @@ The package is structured so that the `core/` layer has zero knowledge of specif
 
 On macOS and Linux, AtlasBridge uses `ptyprocess.PtyProcess.spawn()` to launch the child process inside a pseudoterminal pair. The supervisor holds the master file descriptor; the child process holds the slave. Before spawning, AtlasBridge calls `os.get_terminal_size()` to capture the current host terminal dimensions and passes them to `ptyprocess` so the child sees an accurate `TIOCGWINSZ` response. The host terminal is then placed into raw mode (`tty.setraw(sys.stdin.fileno())`) so that all bytes — including control sequences, escape codes, and Ctrl-key events — pass through unmodified. On exit or crash, `termios.tcsetattr` restores the saved terminal attributes.
 
-On Windows (planned), AtlasBridge will use the ConPTY API (`kernel32.CreatePseudoConsole`) through a thin C extension or the `winpty` library. The PTY base class (`BasePTY`) is already defined so that swapping in a ConPTY backend requires only a new `src/aegis/os/tty/windows.py` implementation.
+On Windows (planned), AtlasBridge will use the ConPTY API (`kernel32.CreatePseudoConsole`) through a thin C extension or the `winpty` library. The PTY base class (`BasePTY`) is already defined so that swapping in a ConPTY backend requires only a new `src/atlasbridge/os/tty/windows.py` implementation.
 
 ### 4.2 Async Event Loop: Four Concurrent Tasks
 
@@ -559,7 +559,7 @@ The Telegram implementation uses HTTPS long-polling (`getUpdates` with 30 s time
 
 Adding a new channel (Slack, WhatsApp, web UI) requires:
 
-1. Create `src/aegis/channels/<name>/` package.
+1. Create `src/atlasbridge/channels/<name>/` package.
 2. Implement `BaseChannel` with the four abstract methods.
 3. Register the channel name in `AtlasBridgeConfig` as a valid `channel` value.
 4. No changes to `core/`, `adapters/`, or the PTY supervisor are required.
@@ -720,7 +720,7 @@ CREATE TABLE replies (
 
 ### 10.2 Schema Migrations
 
-Migration files live in `src/aegis/core/store/migrations/` numbered as `001_initial.sql`, `002_...sql`, etc. The migration runner applies all unapplied migrations in sequence, recording each in `schema_version`. Migrations are forward-only. The database is backed up to `~/.atlasbridge/atlasbridge.db.bak` before any migration run.
+Migration files live in `src/atlasbridge/core/store/migrations/` numbered as `001_initial.sql`, `002_...sql`, etc. The migration runner applies all unapplied migrations in sequence, recording each in `schema_version`. Migrations are forward-only. The database is backed up to `~/.atlasbridge/atlasbridge.db.bak` before any migration run.
 
 ### 10.3 Append-Only Audit Log with Hash Chain
 
@@ -745,7 +745,7 @@ Each line is a JSON object:
 
 The `hash` field is `SHA-256(full JSON string excluding the "hash" field itself)`. The `prev_hash` field is the `hash` of the immediately preceding entry (or the literal string `"genesis"` for the first entry). This forms a tamper-evident hash chain. Any modification to a historical entry invalidates all subsequent hashes.
 
-`aegis audit verify` recomputes the chain from entry 1 and reports the first discrepancy, if any.
+`atlasbridge audit verify` recomputes the chain from entry 1 and reports the first discrepancy, if any.
 
 ### 10.4 Structured Event Types
 
@@ -764,19 +764,19 @@ The `hash` field is `SHA-256(full JSON string excluding the "hash" field itself)
 
 ```bash
 # Stream audit log entries in real time
-aegis logs --tail
+atlasbridge logs --tail
 
 # Export a support bundle (logs + DB schema dump + config redacted)
-aegis debug bundle --output ~/aegis-debug-$(date +%Y%m%d).tar.gz
+atlasbridge debug bundle --output ~/atlasbridge-debug-$(date +%Y%m%d).tar.gz
 
 # Verify audit log hash chain
-aegis audit verify
+atlasbridge audit verify
 
 # Show pending prompts across all sessions
-aegis approvals
+atlasbridge approvals
 
 # Show historical sessions
-aegis status --all
+atlasbridge status --all
 ```
 
 ---
@@ -847,7 +847,7 @@ The Telegram bot token must be treated as a secret. If it is compromised, anyone
 | Configuration | `pydantic` v2 + `tomllib` | Typed, validated config with IDE completion; TOML is human-editable and has no ambiguous quoting rules |
 | Persistence | `sqlite3` (stdlib) in WAL mode | Zero-dependency local store; WAL allows concurrent reads during long-poll; sufficient for single-machine workload |
 | CLI framework | `click` | Composable command groups; decorator-based; straightforward testability via `CliRunner` |
-| Terminal output | `rich` | Status tables, spinners, and coloured output for `atlasbridge status`, `atlasbridge doctor`, `aegis approvals` |
+| Terminal output | `rich` | Status tables, spinners, and coloured output for `atlasbridge status`, `atlasbridge doctor`, `atlasbridge approvals` |
 | Logging | stdlib `logging` + optional `structlog` | Structured JSON output when `structlog` is installed; falls back to plain text; no mandatory heavy dependency |
 | Audit hash chain | `hashlib.sha256` (stdlib) | No external dependency; SHA-256 is sufficient for tamper-evidence in this context |
 | Nonce generation | `secrets.token_hex` (stdlib) | CSPRNG-backed; 128 bits of entropy per nonce; no external dependency |

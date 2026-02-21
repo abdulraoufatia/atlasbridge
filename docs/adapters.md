@@ -16,7 +16,7 @@ Every AI CLI tool presents prompts differently. Claude Code shows approval dialo
 
 The design goals are:
 
-- **Zero core changes** — adding support for a new tool requires creating one new file in `src/aegis/adapters/` and registering it.
+- **Zero core changes** — adding support for a new tool requires creating one new file in `src/atlasbridge/adapters/` and registering it.
 - **Fail-safe** — if an adapter cannot parse or classify an event, it must return `None` from `detect_prompt`. The blocking heuristic (Layer 3 in the supervisor) then catches it.
 - **PTY fidelity** — every adapter must preserve the full terminal experience: colour, readline, cursor control, Ctrl-C handling. A user running `atlasbridge run <tool>` should see no difference from running the tool directly.
 - **Transparent injection** — when the user replies, the adapter's `inject_reply` writes exactly the bytes the tool expects, no more, no less.
@@ -28,10 +28,10 @@ The current production adapter is `ClaudeCodeAdapter`. The `OpenAIAdapter` is a 
 
 ## 2. BaseAdapter Interface
 
-The following code constitutes the canonical definition of the adapter contract. All adapters in `src/aegis/adapters/` must subclass `BaseAdapter` and implement every abstract method.
+The following code constitutes the canonical definition of the adapter contract. All adapters in `src/atlasbridge/adapters/` must subclass `BaseAdapter` and implement every abstract method.
 
 ```python
-# src/aegis/adapters/base.py
+# src/atlasbridge/adapters/base.py
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -124,7 +124,7 @@ class BaseAdapter(ABC):
             The full command and arguments, e.g. ["claude", "--model", "opus"].
         env:
             Optional environment overrides. The adapter is responsible for
-            sanitising the child environment (stripping AEGIS_* secrets).
+            sanitising the child environment (stripping ATLASBRIDGE_* secrets).
 
         Returns
         -------
@@ -373,7 +373,7 @@ Used for: Escape key injection (`"\x1b"`), Ctrl-C (`"\x03"`), Ctrl-D (`"\x04"`),
 | `TYPE_FREE_TEXT` | `append` | `b"my text\r"` |
 | `TYPE_FREE_TEXT` (empty default) | `none` | `b"\r"` |
 
-The supervisor's `INJECT_BYTES` lookup table (in `aegis/core/constants.py`) pre-computes these mappings for the common cases. The adapter's `inject_reply` implementation should consult this table first, then fall back to the newline policy for custom values.
+The supervisor's `INJECT_BYTES` lookup table (in `atlasbridge/core/constants.py`) pre-computes these mappings for the common cases. The adapter's `inject_reply` implementation should consult this table first, then fall back to the newline policy for custom values.
 
 ---
 
@@ -434,7 +434,7 @@ After a successful injection, the output buffer is cleared (`_output_buffer.clea
 
 The `ClaudeCodeAdapter` is the production adapter for the Claude CLI (`claude` binary). It wraps Claude in a PTY using `ptyprocess.PtyProcess`, monitors its output via a 4096-byte rolling buffer, and classifies prompts using a three-layer detection stack that mirrors the existing `PromptDetector`.
 
-Source location: `src/aegis/adapters/claude.py` (target path; currently implemented inline in `aegis/bridge/pty_supervisor.py`).
+Source location: `src/atlasbridge/adapters/claude.py` (target path; currently implemented inline in `atlasbridge/bridge/pty_supervisor.py`).
 
 ### 6.2 Detection Patterns Specific to Claude Code
 
@@ -584,9 +584,9 @@ The OpenAI CLI (`openai`) differs from Claude Code in several ways that affect a
 **Stub registration:**
 
 ```python
-# src/aegis/adapters/openai_cli.py
-from aegis.adapters.base import BaseAdapter
-from aegis.adapters.registry import AdapterRegistry
+# src/atlasbridge/adapters/openai_cli.py
+from atlasbridge.adapters.base import BaseAdapter
+from atlasbridge.adapters.registry import AdapterRegistry
 
 @AdapterRegistry.register("openai")
 class OpenAIAdapter(BaseAdapter):
@@ -606,21 +606,21 @@ To add support for a new AI CLI tool, follow these steps:
 ### Step 1: Create the adapter module
 
 ```
-src/aegis/adapters/<tool_name>.py
+src/atlasbridge/adapters/<tool_name>.py
 ```
 
 For example, for a hypothetical `gemini` CLI:
 
 ```
-src/aegis/adapters/gemini.py
+src/atlasbridge/adapters/gemini.py
 ```
 
 ### Step 2: Subclass BaseAdapter
 
 ```python
-# src/aegis/adapters/gemini.py
-from aegis.adapters.base import BaseAdapter, PromptEvent, Reply
-from aegis.adapters.registry import AdapterRegistry
+# src/atlasbridge/adapters/gemini.py
+from atlasbridge.adapters.base import BaseAdapter, PromptEvent, Reply
+from atlasbridge.adapters.registry import AdapterRegistry
 from typing import Any, AsyncIterator
 
 
@@ -715,14 +715,14 @@ pytest tests/prompt_lab/ -v --capture=no
 
 ### Adding Scenarios
 
-To capture a new scenario from a live session, set `AEGIS_CAPTURE_PROMPTS=1` before running:
+To capture a new scenario from a live session, set `ATLASBRIDGE_CAPTURE_PROMPTS=1` before running:
 
 ```bash
-AEGIS_CAPTURE_PROMPTS=1 aegis run claude
+ATLASBRIDGE_CAPTURE_PROMPTS=1 atlasbridge run claude
 ```
 
 AtlasBridge writes a `.json` scenario file to `~/.atlasbridge/captured_scenarios/` for each detected prompt. Copy these files to `tests/prompt_lab/scenarios/` and annotate them with the expected fields.
 
 ### Regression Protection
 
-The Prompt Lab CI job (`pytest tests/prompt_lab/`) runs on every pull request that modifies `src/aegis/adapters/`. A PR that breaks any existing scenario must either fix the regression or, if the tool's output format changed, update the scenario file with a documented rationale.
+The Prompt Lab CI job (`pytest tests/prompt_lab/`) runs on every pull request that modifies `src/atlasbridge/adapters/`. A PR that breaks any existing scenario must either fix the regression or, if the tool's output format changed, update the scenario file with a documented rationale.

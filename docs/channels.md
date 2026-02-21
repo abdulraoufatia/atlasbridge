@@ -18,7 +18,7 @@ Different messaging platforms have radically different APIs: Telegram uses long 
 
 ### Why This Matters for Extensibility
 
-The current production channel is Telegram. The Slack channel is planned for Phase 4. WhatsApp and a web UI are on the future roadmap. Because all three must implement `BaseChannel`, the supervisor codebase requires zero changes when a new channel ships. The routing layer (`aegis/core/routing/`) simply holds a list of active channel instances and forwards prompts to all of them (or to a configured primary).
+The current production channel is Telegram. The Slack channel is planned for Phase 4. WhatsApp and a web UI are on the future roadmap. Because all three must implement `BaseChannel`, the supervisor codebase requires zero changes when a new channel ships. The routing layer (`atlasbridge/core/routing/`) simply holds a list of active channel instances and forwards prompts to all of them (or to a configured primary).
 
 The abstraction also enables multi-channel deployments: a user who wants both Telegram and Slack notifications can configure both channels; the first reply from either platform wins.
 
@@ -27,13 +27,13 @@ The abstraction also enables multi-channel deployments: a user who wants both Te
 ## 2. BaseChannel Interface
 
 ```python
-# src/aegis/channels/base.py
+# src/atlasbridge/channels/base.py
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import AsyncIterator
 
-from aegis.adapters.base import PromptEvent, Reply
+from atlasbridge.adapters.base import PromptEvent, Reply
 
 
 class BaseChannel(ABC):
@@ -193,11 +193,11 @@ class BaseChannel(ABC):
 
 ### 3.1 Status
 
-**Implementation status:** Production. Fully implemented in `aegis/channels/telegram/`.
+**Implementation status:** Production. Fully implemented in `atlasbridge/channels/telegram/`.
 
 Source files:
-- `aegis/channels/telegram/bot.py` — `TelegramBot(BaseChannel)`, long-poll loop, callback dispatch
-- `aegis/channels/telegram/templates.py` — message formatters, keyboard builders, callback parser
+- `atlasbridge/channels/telegram/bot.py` — `TelegramBot(BaseChannel)`, long-poll loop, callback dispatch
+- `atlasbridge/channels/telegram/templates.py` — message formatters, keyboard builders, callback parser
 
 ### 3.2 Long Polling Architecture
 
@@ -472,7 +472,7 @@ If `decide_prompt` returns `rows_affected = 0` (nonce mismatch, already answered
 
 ### 4.1 Status
 
-**Implementation status:** Planned, Phase 4. The `src/aegis/channels/slack/` package contains only an `__init__.py` placeholder.
+**Implementation status:** Planned, Phase 4. The `src/atlasbridge/channels/slack/` package contains only an `__init__.py` placeholder.
 
 ### 4.2 Architecture Choices
 
@@ -486,8 +486,8 @@ AtlasBridge will use Slack's **Socket Mode** rather than the Event API. The rati
 **Slash commands vs. Interactive Components:**
 
 Both will be supported:
-- `/aegis sessions` — list active sessions (slash command)
-- `/aegis cancel <id>` — cancel a pending prompt (slash command)
+- `/atlasbridge sessions` — list active sessions (slash command)
+- `/atlasbridge cancel <id>` — cancel a pending prompt (slash command)
 - Inline `Approve` / `Deny` buttons for each prompt message (interactive components, handled via Socket Mode)
 
 ### 4.3 Block Kit Layout
@@ -515,20 +515,20 @@ Each prompt message uses Slack's Block Kit. The layout for a `TYPE_YES_NO` promp
           "type": "button",
           "text": { "type": "plain_text", "text": "Yes" },
           "style": "primary",
-          "action_id": "aegis_reply",
+          "action_id": "atlasbridge_reply",
           "value": "ans:{prompt_id}:{nonce}:y"
         },
         {
           "type": "button",
           "text": { "type": "plain_text", "text": "No" },
           "style": "danger",
-          "action_id": "aegis_reply",
+          "action_id": "atlasbridge_reply",
           "value": "ans:{prompt_id}:{nonce}:n"
         },
         {
           "type": "button",
           "text": { "type": "plain_text", "text": "Use default (n)" },
-          "action_id": "aegis_reply",
+          "action_id": "atlasbridge_reply",
           "value": "ans:{prompt_id}:{nonce}:default"
         }
       ]
@@ -560,7 +560,7 @@ Planned for Phase 4. The `SlackChannel` class will implement `BaseChannel` ident
 
 - `SlackChannel` implementation with Socket Mode
 - Block Kit templates for all five prompt types
-- Slash command handler for `/aegis`
+- Slash command handler for `/atlasbridge`
 - Integration tests against Slack's Bolt test client
 - Documentation update in this file
 
@@ -661,7 +661,7 @@ When multiple sessions are active simultaneously, the channel must display them 
 ### Step 1: Create the channel package
 
 ```
-src/aegis/channels/<channel_name>/
+src/atlasbridge/channels/<channel_name>/
     __init__.py
     channel.py       # BaseChannel subclass
     templates.py     # message formatters (optional, recommended)
@@ -670,9 +670,9 @@ src/aegis/channels/<channel_name>/
 ### Step 2: Subclass BaseChannel
 
 ```python
-# src/aegis/channels/mychanne/channel.py
-from aegis.channels.base import BaseChannel
-from aegis.adapters.base import PromptEvent, Reply
+# src/atlasbridge/channels/mychanne/channel.py
+from atlasbridge.channels.base import BaseChannel
+from atlasbridge.adapters.base import PromptEvent, Reply
 from typing import AsyncIterator
 
 
@@ -705,7 +705,7 @@ Refer to Section 2 for the full docstrings. Pay particular attention to:
 
 ### Step 4: Add configuration support
 
-Add a `[<channel_name>]` section to the `AtlasBridgeConfig` Pydantic model in `aegis/core/config.py`:
+Add a `[<channel_name>]` section to the `AtlasBridgeConfig` Pydantic model in `atlasbridge/core/config.py`:
 
 ```python
 class MyChannelConfig(BaseModel):
@@ -718,7 +718,7 @@ Add the config section to the TOML template generated by `atlasbridge setup`.
 
 ### Step 5: Register the channel
 
-Add the channel to the channel factory in `aegis/core/routing/`:
+Add the channel to the channel factory in `atlasbridge/core/routing/`:
 
 ```python
 def build_channels(config: AtlasBridgeConfig) -> list[BaseChannel]:
