@@ -54,6 +54,7 @@ class DaemonManager:
         self._running = False
         self._shutdown_event = asyncio.Event()
         self._policy: Any = None  # Policy | PolicyV1, loaded in _init_autopilot
+        self._intent_router: Any = None  # IntentRouter, wraps _router
 
     async def start(self) -> None:
         """Start all subsystems and run until shutdown."""
@@ -68,6 +69,7 @@ class DaemonManager:
             await self._init_session_manager()
             await self._init_router()
             await self._init_autopilot()
+            self._init_intent_router()
 
             self._running = True
             self._setup_signal_handlers()
@@ -190,6 +192,22 @@ class DaemonManager:
         else:
             self._policy = default_policy()
 
+    def _init_intent_router(self) -> None:
+        """Wrap the PromptRouter with intent classification."""
+        if self._router is None or self._policy is None:
+            return
+
+        from atlasbridge.core.routing.intent import IntentRouter, PolicyRouteClassifier
+
+        classifier = PolicyRouteClassifier(policy=self._policy)
+        self._intent_router = IntentRouter(
+            prompt_router=self._router,
+            classifier=classifier,
+            # Handlers are None in Feature 1 — all intents fall through to channel.
+            # Wired in Feature 2: autopilot_handler, deny_handler.
+        )
+        logger.info("intent_router_initialized")
+
     async def _init_router(self) -> None:
         if self._session_manager is None or self._channel is None:
             return
@@ -270,6 +288,9 @@ class DaemonManager:
         event_q: asyncio.Queue[Any] = asyncio.Queue()
         eof_reached = asyncio.Event()
 
+        # Use intent router when available, fall back to prompt router
+        router = self._intent_router or self._router
+
         async def _read_loop() -> None:
             try:
                 while True:
@@ -278,7 +299,7 @@ class DaemonManager:
                         break
                     tty_blocked = await adapter.await_input_state(session_id)
                     ev = detector.analyse(chunk, tty_blocked=tty_blocked)
-                    if ev is not None and self._router is not None:
+                    if ev is not None and router is not None:
                         await event_q.put(ev)
             finally:
                 eof_reached.set()
@@ -287,8 +308,8 @@ class DaemonManager:
             while not eof_reached.is_set() or not event_q.empty():
                 try:
                     ev = await asyncio.wait_for(event_q.get(), timeout=0.2)
-                    if self._router is not None:
-                        await self._router.route_event(ev)
+                    if router is not None:
+                        await router.route_event(ev)
                 except TimeoutError:
                     continue
 
@@ -301,8 +322,8 @@ class DaemonManager:
                 except Exception:  # noqa: BLE001
                     running = False
                 ev = detector.check_silence(process_running=running)
-                if ev is not None and self._router is not None:
-                    await self._router.route_event(ev)
+                if ev is not None and router is not None:
+                    await router.route_event(ev)
 
         try:
             async with asyncio.TaskGroup() as tg:
@@ -324,7 +345,8 @@ class DaemonManager:
     async def _run_loop(self) -> None:
         """Run the reply consumer, TTL sweeper, and adapter session until shutdown."""
         tasks: list[asyncio.Task[Any]] = []
-        if self._channel and self._router:
+        router = self._intent_router or self._router
+        if self._channel and router:
             tasks.append(asyncio.create_task(self._reply_consumer(), name="reply_consumer"))
         tasks.append(asyncio.create_task(self._ttl_sweeper(), name="ttl_sweeper"))
         if self._config.get("tool") and self._config.get("command"):
@@ -339,10 +361,11 @@ class DaemonManager:
     async def _reply_consumer(self) -> None:
         """Consume replies from the channel and hand them to the router."""
         assert self._channel is not None
-        assert self._router is not None
+        router = self._intent_router or self._router
+        assert router is not None
         async for reply in self._channel.receive_replies():
             try:
-                await self._router.handle_reply(reply)
+                await router.handle_reply(reply)
             except Exception as exc:  # noqa: BLE001
                 logger.error("reply_handling_error", error=str(exc))
 
@@ -350,8 +373,9 @@ class DaemonManager:
         """Periodically expire overdue prompts."""
         while self._running:
             await asyncio.sleep(10.0)
-            if self._router:
-                await self._router.expire_overdue()
+            router = self._intent_router or self._router
+            if router:
+                await router.expire_overdue()
 
     # ------------------------------------------------------------------
     # Signal handling
