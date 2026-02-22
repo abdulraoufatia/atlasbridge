@@ -163,6 +163,69 @@ To disable all automation immediately: set the `DISABLE_PROJECT_AUTOMATION` repo
 
 ---
 
+## Starting and Managing Sprints
+
+### Starting Sprint 1 (first time)
+
+No sprint exists initially. All 29 issues start in Backlog with no Sprint value. To kick off S1:
+
+```bash
+# Preview what will be pulled in
+python scripts/automation/sprint_rotate.py --rotate --dry-run
+
+# Execute — pulls top 8 Backlog items (by priority) into S1
+python scripts/automation/sprint_rotate.py --rotate
+
+# Pull more or fewer items
+python scripts/automation/sprint_rotate.py --rotate --max-items 5
+```
+
+This sets Sprint = `S1` and Status = `Planned` on the selected items.
+
+### During a sprint
+
+Work items as normal. When a PR closes an issue (via `Closes #N` in the PR body), the automation sets the issue's Status to `Done`.
+
+Check progress at any time:
+
+```bash
+python scripts/automation/sprint_rotate.py --check
+```
+
+Output:
+```
+Sprint Status:
+  Current: S1
+  Status:  in_progress
+  Items:   3/8 done
+  Backlog: 21 items available
+```
+
+### When a sprint completes
+
+When all items in the current sprint are Done, the next sprint starts automatically:
+
+- **On PR merge**: `pr-status-sync` detects the last item is Done and triggers `sprint-rotation`
+- **Weekly cron**: Every Monday at 9am UTC, `sprint-rotation` checks and rotates if complete
+- **Manual**: Run `python scripts/automation/sprint_rotate.py --rotate`
+
+The auto-chain pulls the next batch of items from Backlog into `S(N+1)`.
+
+### Manual sprint management
+
+```bash
+# Force-start next sprint even if current isn't complete
+python scripts/automation/sprint_rotate.py --rotate
+
+# Trigger rotation from GitHub Actions UI
+# Go to Actions → Sprint Rotation → Run workflow → set dry_run=false
+
+# Check status without mutating
+python scripts/automation/sprint_rotate.py --check
+```
+
+---
+
 ## Adding New Classification Rules
 
 1. Edit `scripts/automation/triage.py`
