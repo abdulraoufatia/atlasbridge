@@ -171,6 +171,11 @@ class PromptDetector:
             )
         return None
 
+    @property
+    def last_output_time(self) -> float:
+        """Monotonic timestamp of the last PTY output received."""
+        return self._state.last_output_time
+
     def mark_injected(self) -> None:
         """Call immediately after injecting a reply — starts echo suppression window."""
         self._state.injection_time = time.monotonic()
