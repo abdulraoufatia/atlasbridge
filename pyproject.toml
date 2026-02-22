@@ -191,24 +191,32 @@ markers = [
     "unit: unit tests (no I/O)",
     "integration: integration tests (may use SQLite, network mocks)",
     "slow: slow tests",
+    "safety: critical contract/invariant safety tests",
+    "e2e: full end-to-end workflow tests",
+    "optional: cloud/enterprise tests that can be skipped",
+    "performance: latency-sensitive benchmark tests",
 ]
 
 [tool.coverage.run]
 source = ["atlasbridge"]
 omit = [
     "tests/*",
-    "*/atlasbridge/cli/main.py",
-    "*/atlasbridge/os/*",
-    "*/atlasbridge/core/daemon/*",
-    "*/atlasbridge/channels/*",
+    # Tier 3: UI/CLI/OS — require TTY, display, or OS-specific runtime
     "*/atlasbridge/cli/*",
+    "*/atlasbridge/os/*",
     "*/atlasbridge/tui/*",
     "*/atlasbridge/ui/*",
     "*/atlasbridge/console/*",
+    # Tier 3: Channel/adapter implementations — require network/PTY runtime
+    "*/atlasbridge/channels/telegram/channel.py",
+    "*/atlasbridge/channels/slack/channel.py",
+    "*/atlasbridge/channels/multi.py",
+    "*/atlasbridge/adapters/claude_code.py",
+    "*/atlasbridge/__main__.py",
 ]
 
 [tool.coverage.report]
-fail_under = 80
+fail_under = 85
 show_missing = true
 
 [tool.bandit]
