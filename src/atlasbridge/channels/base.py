@@ -24,7 +24,12 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from typing import Any
 
+import structlog
+
+from atlasbridge.core.exceptions import ChannelUnavailableError
 from atlasbridge.core.prompt.models import PromptEvent, Reply
+
+logger = structlog.get_logger()
 
 
 class ChannelCircuitBreaker:
@@ -60,6 +65,12 @@ class ChannelCircuitBreaker:
         self._failures += 1
         if self._failures >= self.threshold and self._opened_at is None:
             self._opened_at = time.monotonic()
+            logger.warning(
+                "circuit_breaker_opened",
+                failures=self._failures,
+                threshold=self.threshold,
+                recovery_seconds=self.recovery_seconds,
+            )
 
     def reset(self) -> None:
         self._failures = 0
@@ -187,6 +198,36 @@ class BaseChannel(ABC):
         """
 
     # ------------------------------------------------------------------
+    # Circuit-breaker guarded send
+    # ------------------------------------------------------------------
+
+    async def guarded_send(self, event: PromptEvent) -> str:
+        """Send a prompt through the circuit breaker.
+
+        If the circuit is open, raises ``ChannelUnavailableError``.
+        On success, records the success. On failure, records the failure
+        and re-raises.
+        """
+        cb = self.circuit_breaker
+        if cb.is_open:
+            logger.warning(
+                "circuit_breaker_rejected",
+                channel=self.channel_name,
+                failures=cb._failures,
+            )
+            raise ChannelUnavailableError(
+                f"Circuit breaker open for {self.channel_name} "
+                f"({cb._failures} consecutive failures)"
+            )
+        try:
+            result = await self.send_prompt(event)
+            cb.record_success()
+            return result
+        except Exception:
+            cb.record_failure()
+            raise
+
+    # ------------------------------------------------------------------
     # Health check
     # ------------------------------------------------------------------
 
@@ -196,4 +237,14 @@ class BaseChannel(ABC):
 
         Called by `atlasbridge doctor`. Default returns {"status": "ok"}.
         """
-        return {"status": "ok", "channel": self.channel_name}
+        cb = self.circuit_breaker
+        status = "degraded" if cb.is_open else "ok"
+        return {
+            "status": status,
+            "channel": self.channel_name,
+            "circuit_breaker": {
+                "open": cb.is_open,
+                "failures": cb._failures,
+                "threshold": cb.threshold,
+            },
+        }

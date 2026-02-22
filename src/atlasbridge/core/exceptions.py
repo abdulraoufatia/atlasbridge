@@ -21,6 +21,10 @@ class ChannelError(AtlasBridgeError):
     """Raised when a notification channel fails."""
 
 
+class ChannelUnavailableError(ChannelError):
+    """Raised when a channel's circuit breaker is open."""
+
+
 class AdapterError(AtlasBridgeError):
     """Raised when a tool adapter fails."""
 
