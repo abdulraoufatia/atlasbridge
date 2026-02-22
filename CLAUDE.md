@@ -286,6 +286,7 @@ Policy module layout:
 | v0.9.0 | Phase A.2 | Released | Contract freeze + safety guards — 155 safety tests, 8 frozen surfaces |
 | v0.9.1 | Phase C.1 | Released | Local dashboard MVP — localhost-only, read-only FastAPI dashboard, 1166 tests |
 | v0.9.2 | Phase C.2 | Released | Dashboard hardening — filtering, pagination, light theme, auto-refresh, 1228 tests |
+| v0.9.3 | Phase C.3 | Released | Remote-ready UX — safety guard, session export, mobile layout, deployment guide, 1260 tests |
 | v1.0.0 | GA | Planned | Stable adapter + channel API, all platforms, all agents |
 
 ---
