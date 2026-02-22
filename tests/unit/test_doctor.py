@@ -258,3 +258,406 @@ class TestCheckTelegramReachability:
 
         result = _check_telegram_reachability()
         assert result is None
+
+
+# ---------------------------------------------------------------------------
+# --fix: database creation and migration
+# ---------------------------------------------------------------------------
+
+
+class TestFixDatabase:
+    def test_fix_database_creates_new_db(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_fix_database creates a new database when none exists."""
+        monkeypatch.setenv("ATLASBRIDGE_DATA_DIR", str(tmp_path))
+        monkeypatch.setattr("atlasbridge.core.config.atlasbridge_dir", lambda: tmp_path)
+
+        from rich.console import Console
+
+        from atlasbridge.cli._doctor import _fix_database
+
+        db_path = tmp_path / "atlasbridge.db"
+        assert not db_path.exists()
+
+        _fix_database(Console(quiet=True))
+
+        assert db_path.exists()
+
+        # Verify schema was applied
+        import sqlite3
+
+        conn = sqlite3.connect(str(db_path))
+        from atlasbridge.core.store.migrations import LATEST_SCHEMA_VERSION, get_user_version
+
+        assert get_user_version(conn) == LATEST_SCHEMA_VERSION
+        conn.close()
+
+    def test_fix_database_runs_migration_on_old_schema(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_fix_database runs pending migrations on an existing database with old schema."""
+        monkeypatch.setattr("atlasbridge.core.config.atlasbridge_dir", lambda: tmp_path)
+
+        import sqlite3
+
+        db_path = tmp_path / "atlasbridge.db"
+        conn = sqlite3.connect(str(db_path))
+        conn.execute("PRAGMA user_version = 0")
+        conn.close()
+
+        from rich.console import Console
+
+        from atlasbridge.cli._doctor import _fix_database
+
+        _fix_database(Console(quiet=True))
+
+        conn = sqlite3.connect(str(db_path))
+        from atlasbridge.core.store.migrations import LATEST_SCHEMA_VERSION, get_user_version
+
+        assert get_user_version(conn) == LATEST_SCHEMA_VERSION
+        conn.close()
+
+    def test_fix_database_noop_on_current_schema(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_fix_database is a no-op when database is already at latest schema."""
+        monkeypatch.setattr("atlasbridge.core.config.atlasbridge_dir", lambda: tmp_path)
+
+        import sqlite3
+
+        from atlasbridge.core.store.migrations import LATEST_SCHEMA_VERSION
+
+        db_path = tmp_path / "atlasbridge.db"
+        conn = sqlite3.connect(str(db_path))
+        conn.execute(f"PRAGMA user_version = {LATEST_SCHEMA_VERSION}")
+        conn.close()
+
+        from rich.console import Console
+
+        from atlasbridge.cli._doctor import _fix_database
+
+        _fix_database(Console(quiet=True))
+
+        # File was opened but no schema changes should have occurred
+        conn = sqlite3.connect(str(db_path))
+        from atlasbridge.core.store.migrations import get_user_version
+
+        assert get_user_version(conn) == LATEST_SCHEMA_VERSION
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
+# --fix: stale PID cleanup
+# ---------------------------------------------------------------------------
+
+
+class TestFixStalePid:
+    def test_fix_stale_pid_removes_stale_file(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_fix_stale_pid removes PID file when process is not alive."""
+        monkeypatch.setattr("atlasbridge.core.constants._default_data_dir", lambda: tmp_path)
+
+        pid_file = tmp_path / "atlasbridge.pid"
+        pid_file.write_text("99999999")  # Likely not a real PID
+
+        from rich.console import Console
+
+        from atlasbridge.cli._doctor import _fix_stale_pid
+
+        _fix_stale_pid(Console(quiet=True))
+
+        assert not pid_file.exists()
+
+    def test_fix_stale_pid_keeps_live_process(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_fix_stale_pid does not remove PID file when process is alive."""
+        import os
+
+        monkeypatch.setattr("atlasbridge.core.constants._default_data_dir", lambda: tmp_path)
+
+        pid_file = tmp_path / "atlasbridge.pid"
+        pid_file.write_text(str(os.getpid()))  # Current process — definitely alive
+
+        from rich.console import Console
+
+        from atlasbridge.cli._doctor import _fix_stale_pid
+
+        _fix_stale_pid(Console(quiet=True))
+
+        assert pid_file.exists()  # Should NOT have been removed
+
+    def test_fix_stale_pid_noop_when_no_pid_file(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_fix_stale_pid is a no-op when no PID file exists."""
+        monkeypatch.setattr("atlasbridge.core.constants._default_data_dir", lambda: tmp_path)
+
+        from rich.console import Console
+
+        from atlasbridge.cli._doctor import _fix_stale_pid
+
+        _fix_stale_pid(Console(quiet=True))
+        # No exception, no side effects
+
+    def test_fix_stale_pid_removes_invalid_pid_file(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_fix_stale_pid removes PID file with non-numeric content."""
+        monkeypatch.setattr("atlasbridge.core.constants._default_data_dir", lambda: tmp_path)
+
+        pid_file = tmp_path / "atlasbridge.pid"
+        pid_file.write_text("not-a-pid")
+
+        from rich.console import Console
+
+        from atlasbridge.cli._doctor import _fix_stale_pid
+
+        _fix_stale_pid(Console(quiet=True))
+
+        assert not pid_file.exists()
+
+
+# ---------------------------------------------------------------------------
+# --fix: file permissions
+# ---------------------------------------------------------------------------
+
+
+class TestFixPermissions:
+    def test_fix_permissions_repairs_config_file(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_fix_permissions sets config.toml to 0600 when too open."""
+        cfg = tmp_path / "config.toml"
+        cfg.write_text(MINIMAL_TOML)
+        cfg.chmod(0o644)  # Too open
+        monkeypatch.setenv("ATLASBRIDGE_CONFIG", str(cfg))
+
+        from rich.console import Console
+
+        from atlasbridge.cli._doctor import _fix_permissions
+
+        _fix_permissions(Console(quiet=True))
+
+        assert cfg.stat().st_mode & 0o777 == 0o600
+
+    def test_fix_permissions_repairs_config_dir(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_fix_permissions sets config directory to 0700 when too open."""
+        cfg_dir = tmp_path / "atlasbridge"
+        cfg_dir.mkdir(mode=0o755)
+        cfg = cfg_dir / "config.toml"
+        cfg.write_text(MINIMAL_TOML)
+        cfg.chmod(0o600)
+        monkeypatch.setenv("ATLASBRIDGE_CONFIG", str(cfg))
+
+        from rich.console import Console
+
+        from atlasbridge.cli._doctor import _fix_permissions
+
+        _fix_permissions(Console(quiet=True))
+
+        assert cfg_dir.stat().st_mode & 0o777 == 0o700
+
+    def test_fix_permissions_noop_when_correct(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_fix_permissions is a no-op when permissions are already correct."""
+        cfg_dir = tmp_path / "atlasbridge"
+        cfg_dir.mkdir(mode=0o700)
+        cfg = cfg_dir / "config.toml"
+        cfg.write_text(MINIMAL_TOML)
+        cfg.chmod(0o600)
+        monkeypatch.setenv("ATLASBRIDGE_CONFIG", str(cfg))
+
+        from rich.console import Console
+
+        from atlasbridge.cli._doctor import _fix_permissions
+
+        _fix_permissions(Console(quiet=True))
+
+        assert cfg.stat().st_mode & 0o777 == 0o600
+        assert cfg_dir.stat().st_mode & 0o777 == 0o700
+
+
+# ---------------------------------------------------------------------------
+# New check functions
+# ---------------------------------------------------------------------------
+
+
+class TestCheckStalePid:
+    def test_check_stale_pid_returns_none_when_no_file(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("atlasbridge.core.constants._default_data_dir", lambda: tmp_path)
+        from atlasbridge.cli._doctor import _check_stale_pid
+
+        assert _check_stale_pid() is None
+
+    def test_check_stale_pid_warns_when_stale(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("atlasbridge.core.constants._default_data_dir", lambda: tmp_path)
+        (tmp_path / "atlasbridge.pid").write_text("99999999")
+
+        from atlasbridge.cli._doctor import _check_stale_pid
+
+        result = _check_stale_pid()
+        assert result is not None
+        assert result["status"] == "warn"
+        assert "stale" in result["detail"]
+
+    def test_check_stale_pid_pass_when_alive(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import os
+
+        monkeypatch.setattr("atlasbridge.core.constants._default_data_dir", lambda: tmp_path)
+        (tmp_path / "atlasbridge.pid").write_text(str(os.getpid()))
+
+        from atlasbridge.cli._doctor import _check_stale_pid
+
+        result = _check_stale_pid()
+        assert result is not None
+        assert result["status"] == "pass"
+
+
+class TestCheckPermissions:
+    def test_check_permissions_pass_when_correct(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        cfg_dir = tmp_path / "atlasbridge"
+        cfg_dir.mkdir(mode=0o700)
+        cfg = cfg_dir / "config.toml"
+        cfg.write_text(MINIMAL_TOML)
+        cfg.chmod(0o600)
+        monkeypatch.setenv("ATLASBRIDGE_CONFIG", str(cfg))
+
+        from atlasbridge.cli._doctor import _check_permissions
+
+        result = _check_permissions()
+        assert result is not None
+        assert result["status"] == "pass"
+
+    def test_check_permissions_warn_when_too_open(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        cfg = tmp_path / "config.toml"
+        cfg.write_text(MINIMAL_TOML)
+        cfg.chmod(0o644)
+        monkeypatch.setenv("ATLASBRIDGE_CONFIG", str(cfg))
+
+        from atlasbridge.cli._doctor import _check_permissions
+
+        result = _check_permissions()
+        assert result is not None
+        assert result["status"] == "warn"
+
+    def test_check_permissions_none_when_no_config(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("ATLASBRIDGE_CONFIG", str(tmp_path / "nope.toml"))
+
+        from atlasbridge.cli._doctor import _check_permissions
+
+        assert _check_permissions() is None
+
+
+# ---------------------------------------------------------------------------
+# --fix idempotency
+# ---------------------------------------------------------------------------
+
+
+class TestFixIdempotency:
+    def test_fix_is_idempotent(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Running all fix functions twice produces no additional changes."""
+        monkeypatch.setenv("ATLASBRIDGE_CONFIG", str(tmp_path / "config.toml"))
+        monkeypatch.setattr("atlasbridge.core.config.atlasbridge_dir", lambda: tmp_path)
+        monkeypatch.setattr("atlasbridge.core.constants._default_data_dir", lambda: tmp_path)
+
+        from rich.console import Console
+
+        from atlasbridge.cli._doctor import (
+            _fix_config,
+            _fix_database,
+            _fix_permissions,
+            _fix_stale_pid,
+        )
+
+        console = Console(quiet=True)
+
+        # First run — creates config and database
+        _fix_config(console)
+        _fix_database(console)
+        _fix_stale_pid(console)
+        _fix_permissions(console)
+
+        cfg = tmp_path / "config.toml"
+        db = tmp_path / "atlasbridge.db"
+        assert cfg.exists()
+        assert db.exists()
+
+        cfg_content = cfg.read_text()
+        cfg_mtime = cfg.stat().st_mtime
+
+        # Second run — should be a no-op
+        _fix_config(console)
+        _fix_database(console)
+        _fix_stale_pid(console)
+        _fix_permissions(console)
+
+        assert cfg.read_text() == cfg_content
+        assert cfg.stat().st_mtime == cfg_mtime
+
+
+# ---------------------------------------------------------------------------
+# --fix safety: never deletes user data
+# ---------------------------------------------------------------------------
+
+
+class TestFixSafety:
+    def test_fix_never_deletes_config(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_fix_config never deletes or overwrites an existing config file."""
+        cfg = tmp_path / "config.toml"
+        cfg.write_text("# My precious config\n" + MINIMAL_TOML)
+        monkeypatch.setenv("ATLASBRIDGE_CONFIG", str(cfg))
+
+        from rich.console import Console
+
+        from atlasbridge.cli._doctor import _fix_config
+
+        _fix_config(Console(quiet=True))
+
+        content = cfg.read_text()
+        assert "My precious config" in content
+
+    def test_fix_never_deletes_database(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_fix_database never deletes or overwrites an existing database."""
+        monkeypatch.setattr("atlasbridge.core.config.atlasbridge_dir", lambda: tmp_path)
+
+        import sqlite3
+
+        db_path = tmp_path / "atlasbridge.db"
+        conn = sqlite3.connect(str(db_path))
+        conn.execute("CREATE TABLE user_data (id TEXT)")
+        conn.execute("INSERT INTO user_data VALUES ('important')")
+        conn.commit()
+        conn.close()
+
+        from rich.console import Console
+
+        from atlasbridge.cli._doctor import _fix_database
+
+        _fix_database(Console(quiet=True))
+
+        conn = sqlite3.connect(str(db_path))
+        rows = conn.execute("SELECT * FROM user_data").fetchall()
+        conn.close()
+        assert rows == [("important",)]

@@ -285,6 +285,174 @@ def _fix_config(console: Console) -> None:
             console.print(f"  [red]ERR[/red]  Cannot create config at {cfg_path}: {exc}")
 
 
+def _fix_database(console: Console) -> None:
+    """Create missing database and run pending migrations."""
+    from atlasbridge.core.config import atlasbridge_dir
+    from atlasbridge.core.constants import DB_FILENAME
+
+    db_path = atlasbridge_dir() / DB_FILENAME
+    if db_path.exists():
+        # Run pending migrations on existing database
+        import sqlite3
+
+        from atlasbridge.core.store.migrations import (
+            LATEST_SCHEMA_VERSION,
+            get_user_version,
+            run_migrations,
+        )
+
+        conn = sqlite3.connect(str(db_path), check_same_thread=False)
+        try:
+            version = get_user_version(conn)
+            if version < LATEST_SCHEMA_VERSION:
+                run_migrations(conn, db_path)
+                console.print(
+                    f"  [green]FIX[/green]  Database migrated v{version} → "
+                    f"v{LATEST_SCHEMA_VERSION}: {db_path}"
+                )
+        except Exception as exc:  # noqa: BLE001
+            console.print(f"  [red]ERR[/red]  Database migration failed: {exc}")
+        finally:
+            conn.close()
+        return
+
+    # Create new database
+    import sqlite3
+
+    from atlasbridge.core.store.migrations import run_migrations
+
+    try:
+        db_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        conn = sqlite3.connect(str(db_path), check_same_thread=False)
+        conn.execute("PRAGMA journal_mode=WAL")
+        run_migrations(conn, db_path)
+        conn.close()
+        console.print(f"  [green]FIX[/green]  Created database: {db_path}")
+    except Exception as exc:  # noqa: BLE001
+        console.print(f"  [red]ERR[/red]  Cannot create database: {exc}")
+
+
+def _fix_stale_pid(console: Console) -> None:
+    """Remove stale daemon PID file if the process is not alive."""
+    import os
+
+    from atlasbridge.core.constants import PID_FILENAME, _default_data_dir
+
+    pid_path = _default_data_dir() / PID_FILENAME
+    if not pid_path.exists():
+        return
+
+    try:
+        pid = int(pid_path.read_text().strip())
+    except (ValueError, OSError):
+        pid_path.unlink(missing_ok=True)
+        console.print("  [green]FIX[/green]  Removed invalid PID file")
+        return
+
+    try:
+        os.kill(pid, 0)
+        # Process is alive — do not remove
+    except (ProcessLookupError, PermissionError):
+        pid_path.unlink(missing_ok=True)
+        console.print(f"  [green]FIX[/green]  Removed stale PID file (PID {pid} not alive)")
+
+
+def _fix_permissions(console: Console) -> None:
+    """Repair file permissions on config file and data directory."""
+    import stat
+
+    cfg_path = _config_path()
+    if cfg_path.exists():
+        mode = cfg_path.stat().st_mode & 0o777
+        if mode != 0o600:
+            try:
+                cfg_path.chmod(0o600)
+                console.print(
+                    f"  [green]FIX[/green]  Config permissions: "
+                    f"{stat.filemode(mode)} → {stat.filemode(0o600)}"
+                )
+            except OSError as exc:
+                console.print(f"  [red]ERR[/red]  Cannot fix config permissions: {exc}")
+
+    if cfg_path.parent.exists():
+        dir_mode = cfg_path.parent.stat().st_mode & 0o777
+        if dir_mode != 0o700:
+            try:
+                cfg_path.parent.chmod(0o700)
+                console.print(
+                    f"  [green]FIX[/green]  Config dir permissions: "
+                    f"{stat.filemode(dir_mode)} → {stat.filemode(0o700)}"
+                )
+            except OSError as exc:
+                console.print(f"  [red]ERR[/red]  Cannot fix dir permissions: {exc}")
+
+
+def _check_stale_pid() -> dict | None:
+    """Check for stale daemon PID file."""
+    import os
+
+    from atlasbridge.core.constants import PID_FILENAME, _default_data_dir
+
+    pid_path = _default_data_dir() / PID_FILENAME
+    if not pid_path.exists():
+        return None
+
+    try:
+        pid = int(pid_path.read_text().strip())
+    except (ValueError, OSError):
+        return {
+            "name": "Daemon PID",
+            "status": "warn",
+            "detail": f"invalid PID file at {pid_path} — run: atlasbridge doctor --fix",
+        }
+
+    try:
+        os.kill(pid, 0)
+        return {
+            "name": "Daemon PID",
+            "status": "pass",
+            "detail": f"daemon running (PID {pid})",
+        }
+    except (ProcessLookupError, PermissionError):
+        return {
+            "name": "Daemon PID",
+            "status": "warn",
+            "detail": (f"stale PID file (PID {pid} not alive) — run: atlasbridge doctor --fix"),
+        }
+
+
+def _check_permissions() -> dict | None:
+    """Check that config file and directory have restrictive permissions."""
+    import stat
+
+    cfg_path = _config_path()
+    if not cfg_path.exists():
+        return None
+
+    issues: list[str] = []
+
+    mode = cfg_path.stat().st_mode & 0o777
+    if mode != 0o600:
+        issues.append(f"config.toml is {stat.filemode(mode)} (expected -rw-------)")
+
+    if cfg_path.parent.exists():
+        dir_mode = cfg_path.parent.stat().st_mode & 0o777
+        if dir_mode != 0o700:
+            issues.append(f"config dir is {stat.filemode(dir_mode)} (expected drwx------)")
+
+    if issues:
+        return {
+            "name": "File permissions",
+            "status": "warn",
+            "detail": "; ".join(issues) + " — run: atlasbridge doctor --fix",
+        }
+    return {
+        "name": "File permissions",
+        "status": "pass",
+        "detail": "config.toml 0600, config dir 0700",
+    }
+
+
 def _check_database() -> dict:
     """Check that the SQLite database is accessible and at the correct schema version."""
     try:
@@ -361,17 +529,22 @@ def _check_adapters() -> dict:
 def cmd_doctor(fix: bool, as_json: bool, console: Console) -> None:
     if fix:
         _fix_config(console)
+        _fix_database(console)
+        _fix_stale_pid(console)
+        _fix_permissions(console)
 
     checks_raw: list[dict | None] = [
         _check_python_version(),
         _check_platform(),
         _check_ptyprocess(),
         _check_config(),
+        _check_permissions(),
         _check_bot_token(),
         _check_telegram_reachability(),
         _check_database(),
         _check_adapters(),
         _check_ui_assets(),
+        _check_stale_pid(),
         _check_poller_lock(),
         _check_systemd(),
         _check_systemd_service(),
