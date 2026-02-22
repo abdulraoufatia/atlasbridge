@@ -61,7 +61,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Guard: must be a tag ref
+      - name: Guard — must be a tag ref
         run: |
           if [[ "${GITHUB_REF}" != refs/tags/v* ]]; then
             echo "WARNING: Not a tag ref (${GITHUB_REF}). Skipping publish."

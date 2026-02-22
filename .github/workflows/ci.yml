@@ -178,7 +178,7 @@ jobs:
         if: matrix.python-version == '3.11' && matrix.os == 'ubuntu-latest'
         run: |
           echo "=== Core Package Coverage ==="
-          pytest tests/ --cov=atlasbridge.core --cov-report=term --cov-fail-under=85 -q
+          coverage report --include="src/atlasbridge/core/*" --fail-under=85
           echo "Core coverage floor: 85% (target: 90%)"
 
       - name: Upload coverage report
