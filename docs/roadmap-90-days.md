@@ -1,17 +1,19 @@
 # AtlasBridge Roadmap
 
-**Version:** 0.8.5
+**Version:** 0.9.3
 **Status:** Active
-**Last updated:** 2026-02-21
+**Last updated:** 2026-02-22
 
 ---
 
 ## Where We Are
 
-AtlasBridge v0.8.2 is released and available on PyPI. The core autonomous runtime is production-capable on macOS and Linux with a mature policy engine and zero-touch setup experience.
+AtlasBridge v0.9.3 is released and available on PyPI. The core autonomous runtime is production-capable on macOS and Linux with a mature policy engine, zero-touch setup, and a local governance dashboard.
 
 Key capabilities shipped:
 
+- **Local Dashboard** — localhost-only, read-only FastAPI dashboard with filtering, pagination, auto-refresh, light/dark theme, responsive mobile layout, session export (JSON + HTML)
+- **Contract Stability** — 8 frozen API surfaces with 155 safety tests; adapter, channel, policy, audit, config schemas frozen
 - **Policy DSL v1** — compound conditions (`any_of`/`none_of`), session scoping (`session_tag`), confidence bounds (`max_confidence`), policy inheritance (`extends`), trace rotation
 - **Zero-touch setup** — config migration from legacy paths, `--from-env` bootstrap, keyring integration, `atlasbridge config` CLI
 - **Autopilot Engine** — three autonomy modes (Off / Assist / Full) with instant kill switch, per-rule rate limits, policy hot-reload
@@ -48,6 +50,11 @@ The positioning is settled: **policy-driven autonomous runtime for AI CLI agents
 | v0.8.3 | Enterprise architecture foundation — Phase A scaffold + Phase B/C specs | Released |
 | v0.8.4 | Core product stability fixes — adapter resilience, Telegram error handling, UX | Released |
 | v0.8.5 | Phase 1 Core Runtime Kernel — all exit criteria pass | Released |
+| v0.8.6 | Phase B — Hybrid Governance Scaffolding (spec only) | Released |
+| v0.9.0 | Contract freeze + safety guards — 155 safety tests, 8 frozen surfaces | Released |
+| v0.9.1 | Phase C.1 — Local Dashboard MVP (localhost-only, read-only) | Released |
+| v0.9.2 | Phase C.2 — Dashboard Hardening (filtering, pagination, themes) | Released |
+| v0.9.3 | Phase C.3 — Remote-Ready Local UX (export, mobile, SSH/proxy docs) | Released |
 
 ### v0.7.1 — Policy Engine Hardening (Released)
 
@@ -146,30 +153,76 @@ The positioning is settled: **policy-driven autonomous runtime for AI CLI agents
 - **Smoke test script** — `scripts/smoke_test_phase1.sh` validates all exit criteria in one run
 - **677 tests passing** — zero failures, zero deprecation warnings, lint clean
 
+### v0.8.6 — Phase B: Hybrid Governance Scaffolding (Released)
+
+**Theme:** Enterprise governance scaffolding (spec only, no cloud execution).
+
+**Delivered:**
+
+- Enterprise edition gating, RBAC, deterministic risk classifier
+- Hash-chained DecisionTraceEntryV2, policy pinning and governance lifecycle
+- Cloud interface ABCs with disabled no-op stubs
+- 66 new tests
+
+### v0.9.0 — Contract Freeze + Safety Guards (Released)
+
+**Theme:** Freeze all 8 contract surfaces and add comprehensive safety tests.
+
+**Delivered:**
+
+- **155 safety tests** across 18 files — adapter, channel, policy, audit, config, CLI, release artifacts, injection path safety
+- **Contract surfaces frozen** — `BaseAdapter` ABC, `BaseChannel` ABC, Policy DSL schema, audit log schema, config schema, safety-critical defaults, CLI surface, release artifacts
+- **`BaseAdapter.get_detector()`** — public method replacing private `_detectors` access
+- **`ChannelCircuitBreaker`** — 3-failure threshold with 30s auto-recovery
+- **`db migrate`** CLI command with `--dry-run` for preview
+- **Prompt-to-injection `latency_ms`** metric in audit events and structured logs
+- Import-layering tests, router integration tests with real SQLite, end-to-end daemon lifecycle tests
+
+### v0.9.1 — Phase C.1: Local Dashboard MVP (Released)
+
+**Theme:** Localhost-only, read-only web dashboard for governance visibility.
+
+**Delivered:**
+
+- **FastAPI app** with 5 HTML routes + 1 JSON API endpoint (`/api/integrity/verify`)
+- **Read-only SQLite** access (`file:...?mode=ro`) — no WAL contention
+- **Content sanitization** — ANSI stripping, token redaction (6 patterns), truncation
+- **Dark-themed server-rendered UI** — stats cards, session detail, trace viewer, integrity check
+- CLI: `atlasbridge dashboard start` / `atlasbridge dashboard status`
+- Optional dependency group: `pip install 'atlasbridge[dashboard]'`
+- 53 dashboard feature tests + 8 localhost-only safety tests (1166 total)
+
+### v0.9.2 — Phase C.2: Dashboard Hardening (Released)
+
+**Theme:** Production-grade filtering, pagination, and operator UX.
+
+**Delivered:**
+
+- **Server-side filtering** — sessions by status, tool, search query
+- **Pagination** for decision traces with page navigation
+- **JSON API endpoints** — `GET /api/stats`, `GET /api/sessions`
+- **Auto-refresh toggle** with 5-second polling and localStorage persistence
+- **Light theme toggle** with CSS custom properties
+- **Structured access logging** with secret-redacting middleware
+- **Rate-limited integrity verify** — `POST /api/integrity/verify` with 10-second throttle
+- 62 new tests (1228 total)
+
+### v0.9.3 — Phase C.3: Remote-Ready Local UX (Released)
+
+**Theme:** Safely usable from remote devices via SSH tunnel or reverse proxy.
+
+**Delivered:**
+
+- **`--i-understand-risk` safety guard** — non-loopback binding requires explicit, verbose flag (hidden from `--help`)
+- **Session export** — `atlasbridge dashboard export --session <id>` (JSON to stdout, HTML to file)
+- **Export API** — `GET /api/sessions/{session_id}/export` JSON endpoint
+- **Deployment guide** — `docs/dashboard.md` with SSH tunnel, Nginx/Caddy reverse proxy, security warnings
+- **Responsive mobile layout** — CSS breakpoints at 768px/480px, hamburger nav, touch targets, table scrolling
+- 32 new tests (1260 total)
+
 ---
 
 ## Upcoming Milestones
-
-### v0.9.0 — Windows (ConPTY, Experimental)
-
-**Theme:** Run AtlasBridge wherever AI agents run.
-
-**Deliverables:**
-
-- ConPTY adapter (`src/atlasbridge/os/tty/windows.py`) wrapping the Windows ConPTY API
-- CRLF normalisation before `PromptDetector` (all four prompt types work correctly)
-- QA-020 scenario (CRLF variants — all passing)
-- `atlasbridge version --experimental` reports `windows_conpty: enabled`
-- Windows CI runner on `windows-latest` (best-effort, non-blocking)
-- WSL2 setup guide in `docs/` (recommended path for Windows users)
-
-**Definition of done:**
-
-- [ ] `atlasbridge run claude` works on Windows 11 with `--experimental` flag
-- [ ] QA-020 passes — all CRLF prompt variants detected and classified correctly
-- [ ] No `UnicodeDecodeError` on Unicode ConPTY output
-- [ ] Windows CI runner produces a result on every PR (pass or fail, not timeout)
-- [ ] `CHANGELOG.md` updated; `v0.9.0` tag created
 
 ---
 
@@ -277,7 +330,11 @@ Under high-volume output (100k+ lines/session), `PromptDetector.detect()` could 
 | v0.8.3 | Enterprise architecture foundation | Released |
 | v0.8.4 | Core product stability fixes | Released |
 | v0.8.5 | Phase 1 Core Runtime Kernel | Released |
-| v0.9.0 | Windows ConPTY (experimental) | Planned |
+| v0.8.6 | Phase B — Hybrid Governance Scaffolding | Released |
+| v0.9.0 | Contract freeze + safety guards | Released |
+| v0.9.1 | Phase C.1 — Local Dashboard MVP | Released |
+| v0.9.2 | Phase C.2 — Dashboard Hardening | Released |
+| v0.9.3 | Phase C.3 — Remote-Ready Local UX | Released |
 | v1.0.0 | GA — stable, multi-platform, multi-agent | Planned |
 
 Versions follow SemVer. Breaking changes to `BaseAdapter` or `BaseChannel` require a minor version bump in v0.x and a major bump at v1.0+.

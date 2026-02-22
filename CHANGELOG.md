@@ -11,6 +11,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.9.3] — 2026-02-22
+
+### Added
+
+- **Phase C.3 — Remote-Ready Local UX**: safely usable from remote devices via SSH tunnel or reverse proxy
+  - `--i-understand-risk` safety guard: non-loopback binding requires explicit, verbose flag (hidden from `--help`)
+  - Loopback check now runs before fastapi dependency check for correct error ordering
+  - `start_server()` gains `allow_non_loopback` keyword argument
+- **Session export** — full session bundle (metadata, prompts, traces, audit events) with sanitized output
+  - `atlasbridge dashboard export --session <id>` CLI command (JSON to stdout, HTML to file)
+  - `--format json` (default) / `--format html` (self-contained, inline CSS, no external deps)
+  - `--output <path>` option for file output
+  - `GET /api/sessions/{session_id}/export` JSON API endpoint
+  - `DashboardRepo.export_session()` convenience method
+- **Deployment guide** — `docs/dashboard.md`
+  - SSH tunnel guide (local forwarding, persistent tunnel, mobile SSH clients)
+  - Reverse proxy examples (Nginx with basic auth, Caddy with basicauth)
+  - Bold "DO NOT EXPOSE WITHOUT AUTH" security warnings
+  - Export usage guide, mobile access notes, troubleshooting
+- **Responsive mobile layout**
+  - CSS breakpoints at 768px (tablet) and 480px (phone)
+  - Hamburger nav toggle with `.nav-links.open` JS handler
+  - `.table-responsive` wrapper with `overflow-x: auto` on all 7 tables
+  - 44px minimum touch targets on buttons, links, pagination
+  - Filter bar vertical stacking, stat cards 2-col / 1-col reflow
+- 32 new tests (1260 total): risk flag enforcement, export JSON/HTML/API, no-secret-leakage, CLI integration
+
+---
+
+## [0.9.2] — 2026-02-22
+
+### Added
+
+- **Phase C.2 — Dashboard Hardening + Operator UX**
+  - Server-side filtering: sessions by status, tool, search query
+  - Pagination for decision traces with page navigation
+  - `GET /api/stats` and `GET /api/sessions` JSON API endpoints
+  - Auto-refresh toggle with 5-second polling and localStorage persistence
+  - Light theme toggle with CSS custom properties
+  - Structured access logging with secret-redacting middleware
+  - `POST /api/integrity/verify` with 10-second rate limit (429 throttle)
+  - `timeago` Jinja2 filter across all templates
+- 62 new tests (1228 total): filter combinations, empty states, banner/nav presence, no raw tokens
+
+---
+
 ## [0.9.1] — 2026-02-22
 
 ### Added
@@ -250,7 +296,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/abdulraoufatia/atlasbridge/compare/v0.8.5...HEAD
+[Unreleased]: https://github.com/abdulraoufatia/atlasbridge/compare/v0.9.3...HEAD
+[0.9.3]: https://github.com/abdulraoufatia/atlasbridge/compare/v0.9.2...v0.9.3
+[0.9.2]: https://github.com/abdulraoufatia/atlasbridge/compare/v0.9.1...v0.9.2
+[0.9.1]: https://github.com/abdulraoufatia/atlasbridge/compare/v0.9.0...v0.9.1
+[0.9.0]: https://github.com/abdulraoufatia/atlasbridge/compare/v0.8.5...v0.9.0
 [0.8.5]: https://github.com/abdulraoufatia/atlasbridge/compare/v0.8.1...v0.8.5
 [0.8.1]: https://github.com/abdulraoufatia/atlasbridge/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/abdulraoufatia/atlasbridge/compare/v0.7.5...v0.8.0
