@@ -182,7 +182,7 @@ jobs:
           echo "Core coverage floor: 85% (target: 90%)"
 
       - name: Upload coverage report
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         if: matrix.python-version == '3.11' && matrix.os == 'ubuntu-latest'
         with:
           file: ./coverage.xml
