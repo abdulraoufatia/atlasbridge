@@ -2,10 +2,24 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import click
 from rich.console import Console
 
 console = Console()
+
+
+@dataclass
+class _CloudConfig:
+    """Cloud integration configuration (Phase B spec — not yet implemented)."""
+
+    enabled: bool = False
+    endpoint: str = ""
+    org_id: str = ""
+    api_token: str = ""
+    control_channel: str = "disabled"
+    stream_audit: bool = False
 
 
 @click.command("edition")
@@ -51,10 +65,8 @@ def cloud_group():
 @click.option("--json", "as_json", is_flag=True, default=False)
 def cloud_status(as_json):
     """[EXPERIMENTAL] Show cloud integration status."""
-    from atlasbridge.cloud import is_cloud_enabled
-
     config = _load_cloud_config()
-    enabled = is_cloud_enabled(config)
+    enabled = config.enabled and bool(config.endpoint)
     status = {
         "enabled": enabled,
         "endpoint": config.endpoint or "(not configured)",
@@ -80,21 +92,19 @@ def cloud_status(as_json):
 
 
 def _load_cloud_config():
-    """Load CloudConfig from user config, falling back to defaults."""
-    from atlasbridge.cloud import CloudConfig
-
+    """Load cloud config from user config, falling back to defaults."""
     try:
         from atlasbridge.core.config import _config_file_path, load_config
 
         cfg_path = _config_file_path()
         if not cfg_path.exists():
-            return CloudConfig()
+            return _CloudConfig()
         cfg = load_config(cfg_path)
         cloud_section = getattr(cfg, "cloud", None)
         if cloud_section and isinstance(cloud_section, dict):
-            return CloudConfig(
-                **{k: v for k, v in cloud_section.items() if hasattr(CloudConfig, k)}
+            return _CloudConfig(
+                **{k: v for k, v in cloud_section.items() if hasattr(_CloudConfig, k)}
             )
     except Exception:  # noqa: BLE001
         pass
-    return CloudConfig()
+    return _CloudConfig()

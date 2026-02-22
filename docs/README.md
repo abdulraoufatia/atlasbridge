@@ -34,6 +34,7 @@ This index helps you find the right document fast, whether you are a new user, a
 5. [Dev Workflow (Multi-Agent)](dev-workflow-multi-agent.md) — agent roles, branch ownership
 6. [Release Process](release.md) — tagging, TestPyPI, OIDC publishing
 7. [Roadmap](roadmap-90-days.md) — milestones and planned work
+8. [Sprint Automation Prompt](sprint-automation-prompt.md) — portable sprint workflow for Claude Code
 
 ---
 
@@ -69,6 +70,7 @@ This index helps you find the right document fast, whether you are a new user, a
 | [telegram-setup.md](telegram-setup.md) | User | Step-by-step Telegram bot setup: BotFather, /start, chat_id, verification | During first-time Telegram setup | Current |
 | [troubleshooting.md](troubleshooting.md) | User | Common issues and solutions: adapters, Telegram 409/400, doctor, upgrade | When something goes wrong | Current |
 | [upgrade.md](upgrade.md) | User | Upgrading safely: config preservation, migration, verification | Before or after `pip install -U` | Current |
+| [cloud-spec.md](cloud-spec.md) | Contributor | Phase B cloud governance interfaces: auth, transport, protocol, audit stream | When implementing cloud features (Phase B) | Design Only |
 | [enterprise-architecture.md](enterprise-architecture.md) | Contributor | Enterprise architecture overview: editions, RBAC, risk, governance | When working on enterprise features | Experimental |
 | [enterprise-saas-architecture.md](enterprise-saas-architecture.md) | Contributor | Phase C SaaS design: multi-tenant, dashboard, trust boundaries | For future cloud planning | Design Only |
 | [enterprise-transition-contracts.md](enterprise-transition-contracts.md) | Contributor | Phase A→B→C transition contracts and migration paths | When planning phase transitions | Design Only |
@@ -88,6 +90,7 @@ This index helps you find the right document fast, whether you are a new user, a
 | [invariants.md](invariants.md) | Both | Correctness invariants: relay, policy, audit, dashboard, console | Before modifying safety-critical code | Current |
 | [releasing.md](releasing.md) | Contributor | Release process: tag-only publishing, version bumping, CI gates | When cutting a release | Current |
 | [automation-architecture.md](automation-architecture.md) | Contributor | GitHub Actions automation: issue triage, PR status sync, sprint rotation, governance guard | When modifying or extending project automation | Current |
+| [sprint-automation-prompt.md](sprint-automation-prompt.md) | Contributor | Portable sprint-driven development prompt for Claude Code: tier-ordered execution, test-gated progression, memory system, wiki/project board automation | When setting up sprint automation on a new project | Current |
 | [positioning-v1.md](positioning-v1.md) | Both | v1.0 positioning: what AtlasBridge is/is not, target audience, invariants, compatibility | Before v1.0 launch | Current |
 | [ga-readiness-checklist.md](ga-readiness-checklist.md) | Contributor | GA readiness audit: contract freeze, coverage, threat model, CI matrix, verdict | Before tagging v1.0 | Current |
 | [saas-alpha-roadmap.md](saas-alpha-roadmap.md) | Contributor | 90-day SaaS Alpha path: stabilization, observe-only cloud, multi-tenant alpha | For post-v1.0 planning | Design Only |

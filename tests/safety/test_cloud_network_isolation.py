@@ -1,12 +1,12 @@
 """
-Safety test: Cloud module network isolation.
+Safety test: Cloud module removed — verify no residual cloud imports.
 
-The cloud module (src/atlasbridge/cloud/) contains INTERFACE DEFINITIONS ONLY.
-No network-capable libraries may be imported.  This AST-based scanner walks
-every .py file in the module and fails if any banned import is found.
+The cloud module (src/atlasbridge/cloud/) was extracted to docs/cloud-spec.md
+in v0.8.2. These tests verify the module is fully removed and no production
+code depends on it.
 
-Banned modules: requests, httpx, aiohttp, urllib3, socket, websockets,
-                urllib.request, http.client, grpc
+When Phase B implementation restores the cloud module, re-add the AST-based
+network isolation scanner (see docs/cloud-spec.md for the interface spec).
 """
 
 from __future__ import annotations
@@ -14,107 +14,42 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-import pytest
-
-CLOUD_DIR = Path(__file__).resolve().parents[2] / "src" / "atlasbridge" / "cloud"
-
-BANNED_MODULES: frozenset[str] = frozenset(
-    {
-        "requests",
-        "httpx",
-        "aiohttp",
-        "urllib3",
-        "socket",
-        "websockets",
-        "urllib.request",
-        "http.client",
-        "grpc",
-    }
-)
-
-BANNED_TOP_LEVEL: frozenset[str] = frozenset({m.split(".")[0] for m in BANNED_MODULES})
+SRC_ROOT = Path(__file__).resolve().parents[2] / "src" / "atlasbridge"
+CLOUD_DIR = SRC_ROOT / "cloud"
 
 
-def _get_cloud_py_files() -> list[Path]:
-    """Return all .py files under the cloud module directory."""
-    assert CLOUD_DIR.is_dir(), f"Cloud module not found at {CLOUD_DIR}"
-    return sorted(CLOUD_DIR.glob("**/*.py"))
+class TestCloudModuleRemoved:
+    """Guard: cloud module must not exist as source code."""
 
-
-def _extract_imports(source: str) -> list[str]:
-    """Extract all imported module names from Python source using AST."""
-    tree = ast.parse(source)
-    modules: list[str] = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                modules.append(alias.name)
-        elif isinstance(node, ast.ImportFrom):
-            if node.module:
-                modules.append(node.module)
-    return modules
-
-
-class TestCloudNetworkIsolation:
-    """AST-based static analysis: no network imports in cloud module."""
-
-    def test_cloud_dir_exists(self) -> None:
-        assert CLOUD_DIR.is_dir(), f"Cloud module not found at {CLOUD_DIR}"
-
-    def test_cloud_module_has_python_files(self) -> None:
-        files = _get_cloud_py_files()
-        assert len(files) > 0, "Cloud module should contain at least one .py file"
-
-    def test_no_banned_imports_in_cloud_module(self) -> None:
-        """Scan every .py file under cloud/ for banned network imports."""
-        violations: list[str] = []
-        for py_file in _get_cloud_py_files():
-            source = py_file.read_text(encoding="utf-8")
-            imports = _extract_imports(source)
-            for imp in imports:
-                top_level = imp.split(".")[0]
-                if top_level in BANNED_TOP_LEVEL or imp in BANNED_MODULES:
-                    violations.append(f"{py_file.name}: imports {imp!r}")
-
-        assert not violations, (
-            "Cloud module must not import network libraries.\n"
-            "Violations:\n" + "\n".join(f"  - {v}" for v in violations)
+    def test_cloud_dir_does_not_exist(self) -> None:
+        assert not CLOUD_DIR.exists(), (
+            f"Cloud module should be removed — found {CLOUD_DIR}. "
+            "Interfaces live in docs/cloud-spec.md."
         )
 
-    @pytest.mark.parametrize(
-        "filename",
-        [
-            "__init__.py",
-            "auth.py",
-            "client.py",
-            "transport.py",
-            "protocol.py",
-            "registry.py",
-            "audit_stream.py",
-        ],
-    )
-    def test_individual_file_no_network_imports(self, filename: str) -> None:
-        """Per-file check: each cloud module file has zero network imports."""
-        path = CLOUD_DIR / filename
-        if not path.exists():
-            pytest.skip(f"{filename} does not exist yet")
-        source = path.read_text(encoding="utf-8")
-        imports = _extract_imports(source)
-        for imp in imports:
-            top_level = imp.split(".")[0]
-            assert top_level not in BANNED_TOP_LEVEL and imp not in BANNED_MODULES, (
-                f"{filename} imports banned module {imp!r}"
-            )
-
-    def test_no_subprocess_calls_in_cloud_module(self) -> None:
-        """Ensure no subprocess usage (potential remote exec vector)."""
-        for py_file in _get_cloud_py_files():
+    def test_no_production_code_imports_cloud(self) -> None:
+        """AST scan: no production .py file imports from atlasbridge.cloud."""
+        violations: list[str] = []
+        for py_file in SRC_ROOT.rglob("*.py"):
+            if "__pycache__" in str(py_file):
+                continue
             source = py_file.read_text(encoding="utf-8")
-            tree = ast.parse(source)
+            try:
+                tree = ast.parse(source, filename=str(py_file))
+            except SyntaxError:
+                continue
             for node in ast.walk(tree):
-                if isinstance(node, ast.ImportFrom) and node.module == "subprocess":
-                    pytest.fail(f"{py_file.name}: imports subprocess")
-                if isinstance(node, ast.Import):
+                if isinstance(node, ast.ImportFrom) and node.module:
+                    if node.module.startswith("atlasbridge.cloud"):
+                        rel = py_file.relative_to(SRC_ROOT)
+                        violations.append(f"{rel}:{node.lineno} imports {node.module}")
+                elif isinstance(node, ast.Import):
                     for alias in node.names:
-                        if alias.name == "subprocess":
-                            pytest.fail(f"{py_file.name}: imports subprocess")
+                        if alias.name.startswith("atlasbridge.cloud"):
+                            rel = py_file.relative_to(SRC_ROOT)
+                            violations.append(f"{rel}:{node.lineno} imports {alias.name}")
+
+        assert violations == [], (
+            "Production code still imports from atlasbridge.cloud:\n"
+            + "\n".join(f"  {v}" for v in violations)
+        )
