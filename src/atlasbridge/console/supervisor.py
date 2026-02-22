@@ -13,6 +13,7 @@ import socket
 import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from enum import Enum
 
 
 @dataclass
@@ -42,6 +43,44 @@ class ProcessInfo:
         hours = secs // 3600
         mins = (secs % 3600) // 60
         return f"{hours}h {mins}m"
+
+
+class SystemHealth(Enum):
+    """Aggregate system health state."""
+
+    GREEN = "green"  # All processes healthy, doctor checks pass
+    YELLOW = "yellow"  # Some processes stopped or doctor warnings
+    RED = "red"  # Critical failures
+
+
+def compute_health(
+    statuses: list[ProcessInfo],
+    doctor_checks: list[dict] | None = None,  # type: ignore[type-arg]
+) -> SystemHealth:
+    """Derive aggregate health from process statuses and doctor checks."""
+    # RED: any doctor check failed
+    if doctor_checks:
+        if any(c.get("status") == "fail" for c in doctor_checks):
+            return SystemHealth.RED
+
+    # Check process states
+    daemon = next((s for s in statuses if s.name == "daemon"), None)
+
+    # RED: daemon not running but something else IS running (fault)
+    if daemon and not daemon.running:
+        others_running = any(s.running for s in statuses if s.name != "daemon")
+        if others_running:
+            return SystemHealth.RED
+
+    # YELLOW: any doctor warning
+    if doctor_checks and any(c.get("status") == "warn" for c in doctor_checks):
+        return SystemHealth.YELLOW
+
+    # YELLOW: nothing running at all
+    if not any(s.running for s in statuses):
+        return SystemHealth.YELLOW
+
+    return SystemHealth.GREEN
 
 
 def _pid_alive(pid: int) -> bool:
