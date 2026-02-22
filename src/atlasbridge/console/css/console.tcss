@@ -1,0 +1,118 @@
+/* ============================================================
+   AtlasBridge Operator Console — stylesheet
+   ============================================================ */
+
+Screen {
+    background: $surface;
+}
+
+/* ── Console root layout ──────────────────────────────────── */
+
+#console-root {
+    width: 100%;
+    height: 1fr;
+    padding: 1 2;
+    overflow-y: auto;
+}
+
+/* ── Safety banner ─────────────────────────────────────────── */
+
+#safety-banner {
+    width: 100%;
+    height: auto;
+    padding: 0 1;
+    background: $warning 20%;
+    color: $warning;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+/* ── Status cards row ─────────────────────────────────────── */
+
+#console-cards {
+    layout: horizontal;
+    height: 7;
+    width: 100%;
+    margin-bottom: 1;
+}
+
+.console-card {
+    width: 1fr;
+    height: 5;
+    padding: 0 1;
+    border: tall $panel-lighten-1;
+    margin: 0 1;
+}
+
+.console-card .card-title {
+    color: $text-muted;
+    text-style: bold;
+}
+
+.console-card .card-value {
+    color: $accent;
+}
+
+/* ── Process table ────────────────────────────────────────── */
+
+#process-section {
+    height: auto;
+    max-height: 14;
+    margin-bottom: 1;
+}
+
+#process-title {
+    text-style: bold;
+    color: $accent;
+    margin-bottom: 0;
+}
+
+#process-table {
+    height: auto;
+    max-height: 10;
+}
+
+/* ── Doctor panel ─────────────────────────────────────────── */
+
+#doctor-section {
+    height: auto;
+    margin-bottom: 1;
+    padding: 0 1;
+    border: tall $panel-lighten-1;
+}
+
+#doctor-title {
+    text-style: bold;
+    color: $accent;
+}
+
+#doctor-results {
+    height: auto;
+}
+
+/* ── Audit log ────────────────────────────────────────────── */
+
+#audit-section {
+    height: 1fr;
+    min-height: 8;
+}
+
+#audit-title {
+    text-style: bold;
+    color: $accent;
+    margin-bottom: 0;
+}
+
+#audit-log {
+    height: 1fr;
+    border: tall $panel-lighten-1;
+}
+
+/* ── Footer keybindings ──────────────────────────────────── */
+
+#console-footer {
+    height: auto;
+    dock: bottom;
+    padding: 0 1;
+    color: $text-muted;
+}

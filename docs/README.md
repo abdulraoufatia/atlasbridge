@@ -83,6 +83,7 @@ This index helps you find the right document fast, whether you are a new user, a
 | [enterprise-dashboard-threat-model.md](enterprise-dashboard-threat-model.md) | Contributor | Phase C security: STRIDE analysis, trust boundaries, incident response | For Phase C security review | Design Only |
 | [api-stability-policy.md](api-stability-policy.md) | Contributor | Stability levels, deprecation rules, breaking change policy | Before modifying frozen APIs | Current |
 | [contract-surfaces.md](contract-surfaces.md) | Contributor | Formal spec of all 8 frozen contract surfaces | Before modifying any contract surface | Current |
+| [console.md](console.md) | Both | Operator console: process management, keybindings, status polling | When using `atlasbridge console` | Current |
 | [dashboard.md](dashboard.md) | Both | Dashboard deployment: SSH tunnel, reverse proxy, export, mobile access | When accessing dashboard remotely | Current |
 
 ---

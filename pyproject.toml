@@ -145,11 +145,13 @@ ignore = [
 "src/atlasbridge/channels/**/*.py" = ["ANN"]
 "src/atlasbridge/tui/**/*.py" = ["ANN", "E501"]
 "src/atlasbridge/ui/**/*.py" = ["ANN", "E501"]
+"src/atlasbridge/console/**/*.py" = ["ANN", "E501"]
 "src/atlasbridge/core/policy/**/*.py" = ["ANN", "E501", "UP042"]
 "src/atlasbridge/core/autopilot/**/*.py" = ["ANN", "UP042"]
 "src/atlasbridge/enterprise/**/*.py" = ["ANN"]
 "src/atlasbridge/cloud/**/*.py" = ["ANN"]
 "src/atlasbridge/dashboard/**/*.py" = ["ANN", "UP017"]
+"tests/console/**/*.py" = ["S101", "ANN", "E501"]
 "tests/policy/**/*.py" = ["S101", "ANN", "E501", "B017", "F841"]
 
 [tool.mypy]
@@ -173,6 +175,7 @@ module = [
     "atlasbridge.cli.*",
     "atlasbridge.tui.*",
     "atlasbridge.ui.*",
+    "atlasbridge.console.*",
     "atlasbridge.dashboard.*",
 ]
 ignore_errors = true
