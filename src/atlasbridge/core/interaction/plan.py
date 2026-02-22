@@ -113,6 +113,34 @@ def build_plan(interaction_class: InteractionClass) -> InteractionPlan:
                 button_layout="none",
             )
 
+        case InteractionClass.FOLDER_TRUST:
+            return InteractionPlan(
+                interaction_class=interaction_class,
+                append_cr=True,
+                max_retries=1,
+                verify_advance=True,
+                advance_timeout_s=3.0,
+                escalate_on_exhaustion=True,
+                display_template="Trust: {value} + Enter",
+                feedback_on_advance="Folder trust accepted",
+                feedback_on_stall='CLI did not respond to trust "{value}", retrying...',
+                button_layout="trust_folder",
+            )
+
+        case InteractionClass.RAW_TERMINAL:
+            return InteractionPlan(
+                interaction_class=interaction_class,
+                append_cr=False,
+                max_retries=0,
+                verify_advance=False,
+                advance_timeout_s=0.0,
+                escalate_on_exhaustion=True,
+                display_template="This prompt requires raw keyboard interaction (arrow keys).",
+                feedback_on_advance="",
+                feedback_on_stall="",
+                button_layout="none",
+            )
+
         case InteractionClass.CHAT_INPUT:
             return InteractionPlan(
                 interaction_class=interaction_class,

@@ -31,6 +31,8 @@ class InteractionClass(StrEnum):
     FREE_TEXT = "free_text"
     PASSWORD_INPUT = "password_input"  # noqa: S105
     CHAT_INPUT = "chat_input"
+    FOLDER_TRUST = "folder_trust"  # "Trust this folder?" special-case
+    RAW_TERMINAL = "raw_terminal"  # Arrow-key / cursor-based prompts
 
 
 # ---------------------------------------------------------------------------

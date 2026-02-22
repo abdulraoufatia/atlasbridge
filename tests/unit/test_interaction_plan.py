@@ -120,7 +120,16 @@ class TestAllPlansHaveDisplayTemplate:
 
 
 class TestAllPlansAppendCr:
-    @pytest.mark.parametrize("ic", list(InteractionClass))
+    @pytest.mark.parametrize(
+        "ic",
+        [ic for ic in InteractionClass if ic != InteractionClass.RAW_TERMINAL],
+    )
     def test_append_cr_true(self, ic: InteractionClass) -> None:
         plan = build_plan(ic)
         assert plan.append_cr is True
+
+    def test_raw_terminal_no_cr(self) -> None:
+        """RAW_TERMINAL never injects — it always escalates."""
+        plan = build_plan(InteractionClass.RAW_TERMINAL)
+        assert plan.append_cr is False
+        assert plan.escalate_on_exhaustion is True
