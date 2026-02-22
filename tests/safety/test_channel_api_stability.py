@@ -6,21 +6,24 @@ import inspect
 
 from atlasbridge.channels.base import BaseChannel, ChannelCircuitBreaker
 
-
 # Frozen abstract method set for v0.9.0
-FROZEN_ABSTRACT_METHODS = frozenset({
-    "start",
-    "close",
-    "send_prompt",
-    "notify",
-    "edit_prompt_message",
-    "receive_replies",
-    "is_allowed",
-})
+FROZEN_ABSTRACT_METHODS = frozenset(
+    {
+        "start",
+        "close",
+        "send_prompt",
+        "notify",
+        "edit_prompt_message",
+        "receive_replies",
+        "is_allowed",
+    }
+)
 
-FROZEN_OPTIONAL_METHODS = frozenset({
-    "healthcheck",
-})
+FROZEN_OPTIONAL_METHODS = frozenset(
+    {
+        "healthcheck",
+    }
+)
 
 
 def _get_abstract_methods(cls: type) -> set[str]:

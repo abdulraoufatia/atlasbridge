@@ -17,33 +17,35 @@ def _collect_commands(group: click.Group, prefix: str = "") -> set[str]:
 
 
 # Frozen top-level command and group names that must exist
-FROZEN_TOP_LEVEL = frozenset({
-    "ui",
-    "setup",
-    "start",
-    "stop",
-    "status",
-    "run",
-    "sessions",
-    "logs",
-    "doctor",
-    "version",
-    "debug",
-    "channel",
-    "adapter",
-    "adapters",
-    "config",
-    "policy",
-    "autopilot",
-    "edition",
-    "features",
-    "cloud",
-    "trace",
-    "lab",
-    "db",
-    "pause",
-    "resume",
-})
+FROZEN_TOP_LEVEL = frozenset(
+    {
+        "ui",
+        "setup",
+        "start",
+        "stop",
+        "status",
+        "run",
+        "sessions",
+        "logs",
+        "doctor",
+        "version",
+        "debug",
+        "channel",
+        "adapter",
+        "adapters",
+        "config",
+        "policy",
+        "autopilot",
+        "edition",
+        "features",
+        "cloud",
+        "trace",
+        "lab",
+        "db",
+        "pause",
+        "resume",
+    }
+)
 
 
 def test_top_level_commands_present():
@@ -53,8 +55,7 @@ def test_top_level_commands_present():
     actual = set(cli.commands.keys()) if hasattr(cli, "commands") else set()
     missing = FROZEN_TOP_LEVEL - actual
     assert not missing, (
-        f"CLI commands removed: {sorted(missing)}. "
-        f"Removing commands is a breaking change."
+        f"CLI commands removed: {sorted(missing)}. Removing commands is a breaking change."
     )
 
 

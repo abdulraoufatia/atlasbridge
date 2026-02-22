@@ -7,7 +7,6 @@ OFF modes never auto-inject.
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -15,8 +14,8 @@ import pytest
 
 from atlasbridge.core.autopilot.engine import AutopilotEngine, AutopilotState
 from atlasbridge.core.policy.model import (
-    AutoReplyAction,
     AutonomyMode,
+    AutoReplyAction,
     MatchCriteria,
     Policy,
     PolicyRule,
@@ -66,9 +65,10 @@ async def test_full_mode_evaluates_before_injecting(tmp_path):
     """In FULL mode, evaluate() must be called. If rule matches, inject_fn fires."""
     engine, inject_fn, route_fn, _ = _make_engine(tmp_path, AutonomyMode.FULL)
 
-    with patch("atlasbridge.core.autopilot.engine.evaluate", wraps=__import__(
-        "atlasbridge.core.policy.evaluator", fromlist=["evaluate"]
-    ).evaluate) as mock_eval:
+    with patch(
+        "atlasbridge.core.autopilot.engine.evaluate",
+        wraps=__import__("atlasbridge.core.policy.evaluator", fromlist=["evaluate"]).evaluate,
+    ) as mock_eval:
         result = await engine.handle_prompt(
             prompt_event=object(),
             prompt_id="p1",

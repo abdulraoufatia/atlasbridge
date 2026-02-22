@@ -10,7 +10,6 @@ import sqlite3
 from atlasbridge.core.audit.writer import AuditWriter
 from atlasbridge.core.store.database import Database
 
-
 # --- Table schema ---
 
 
@@ -28,9 +27,7 @@ def test_database_has_four_tables(tmp_path):
     expected = {"sessions", "prompts", "replies", "audit_events"}
     # schema_version table may also exist
     tables.discard("schema_version")
-    assert expected.issubset(tables), (
-        f"Missing tables: {expected - tables}. Got: {tables}"
-    )
+    assert expected.issubset(tables), f"Missing tables: {expected - tables}. Got: {tables}"
     db.close()
 
 
@@ -43,7 +40,16 @@ def test_audit_events_columns(tmp_path):
     columns = {row[1] for row in cursor.fetchall()}
     conn.close()
 
-    expected = {"id", "event_type", "session_id", "prompt_id", "payload", "timestamp", "prev_hash", "hash"}
+    expected = {
+        "id",
+        "event_type",
+        "session_id",
+        "prompt_id",
+        "payload",
+        "timestamp",
+        "prev_hash",
+        "hash",
+    }
     assert expected.issubset(columns), (
         f"audit_events columns changed. Missing: {expected - columns}. Got: {columns}"
     )
@@ -66,28 +72,31 @@ def test_audit_hash_chain_formula(tmp_path):
 
     # Verify the formula matches what the database would produce
     assert len(expected_hash) == 64
-    assert expected_hash == hashlib.sha256(
-        f"{prev_hash}{event_id}{event_type}{payload_str}".encode()
-    ).hexdigest()
+    assert (
+        expected_hash
+        == hashlib.sha256(f"{prev_hash}{event_id}{event_type}{payload_str}".encode()).hexdigest()
+    )
 
 
 # --- AuditWriter event methods ---
 
 
-FROZEN_EVENT_METHODS = frozenset({
-    "session_started",
-    "session_ended",
-    "prompt_detected",
-    "prompt_routed",
-    "reply_received",
-    "response_injected",
-    "prompt_expired",
-    "duplicate_callback",
-    "late_reply_rejected",
-    "invalid_callback",
-    "telegram_polling_failed",
-    "daemon_restarted",
-})
+FROZEN_EVENT_METHODS = frozenset(
+    {
+        "session_started",
+        "session_ended",
+        "prompt_detected",
+        "prompt_routed",
+        "reply_received",
+        "response_injected",
+        "prompt_expired",
+        "duplicate_callback",
+        "late_reply_rejected",
+        "invalid_callback",
+        "telegram_polling_failed",
+        "daemon_restarted",
+    }
+)
 
 
 def test_audit_writer_event_methods():

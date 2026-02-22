@@ -7,19 +7,20 @@ from pydantic import ValidationError
 
 from atlasbridge.core.config import AtlasBridgeConfig
 
-
 # --- Config model fields ---
 
 
-FROZEN_TOP_LEVEL_FIELDS = frozenset({
-    "config_version",
-    "telegram",
-    "slack",
-    "prompts",
-    "logging",
-    "database",
-    "adapters",
-})
+FROZEN_TOP_LEVEL_FIELDS = frozenset(
+    {
+        "config_version",
+        "telegram",
+        "slack",
+        "prompts",
+        "logging",
+        "database",
+        "adapters",
+    }
+)
 
 
 def test_config_has_frozen_fields():
@@ -62,16 +63,18 @@ def test_yes_no_safe_default_rejects_y():
 # --- Environment variable overlay ---
 
 
-FROZEN_ENV_VARS = frozenset({
-    "ATLASBRIDGE_TELEGRAM_BOT_TOKEN",
-    "ATLASBRIDGE_TELEGRAM_ALLOWED_USERS",
-    "ATLASBRIDGE_SLACK_BOT_TOKEN",
-    "ATLASBRIDGE_SLACK_APP_TOKEN",
-    "ATLASBRIDGE_SLACK_ALLOWED_USERS",
-    "ATLASBRIDGE_LOG_LEVEL",
-    "ATLASBRIDGE_DB_PATH",
-    "ATLASBRIDGE_APPROVAL_TIMEOUT_SECONDS",
-})
+FROZEN_ENV_VARS = frozenset(
+    {
+        "ATLASBRIDGE_TELEGRAM_BOT_TOKEN",
+        "ATLASBRIDGE_TELEGRAM_ALLOWED_USERS",
+        "ATLASBRIDGE_SLACK_BOT_TOKEN",
+        "ATLASBRIDGE_SLACK_APP_TOKEN",
+        "ATLASBRIDGE_SLACK_ALLOWED_USERS",
+        "ATLASBRIDGE_LOG_LEVEL",
+        "ATLASBRIDGE_DB_PATH",
+        "ATLASBRIDGE_APPROVAL_TIMEOUT_SECONDS",
+    }
+)
 
 
 def test_env_vars_documented_in_apply_env_overrides():

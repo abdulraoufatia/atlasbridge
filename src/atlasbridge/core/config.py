@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import warnings as _warnings
 from pathlib import Path
 from typing import Any
 
@@ -234,14 +235,12 @@ class AtlasBridgeConfig(BaseModel):
 
 
 # Backwards-compat alias — remove in v1.0
-import warnings as _warnings
 
 
-def __getattr__(name: str):  # noqa: N807
+def __getattr__(name: str) -> type:  # noqa: N807
     if name == "AegisConfig":
         _warnings.warn(
-            "AegisConfig is deprecated, use AtlasBridgeConfig instead. "
-            "Will be removed in v1.0.",
+            "AegisConfig is deprecated, use AtlasBridgeConfig instead. Will be removed in v1.0.",
             DeprecationWarning,
             stacklevel=2,
         )

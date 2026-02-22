@@ -6,8 +6,8 @@ import pytest
 from pydantic import ValidationError
 
 from atlasbridge.core.policy.model import (
-    AutoReplyAction,
     AutonomyMode,
+    AutoReplyAction,
     ConfidenceLevel,
     DenyAction,
     MatchCriteria,
@@ -18,7 +18,6 @@ from atlasbridge.core.policy.model import (
     PromptTypeFilter,
     RequireHumanAction,
 )
-
 
 # --- Enum stability ---
 

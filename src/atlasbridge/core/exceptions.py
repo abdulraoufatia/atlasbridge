@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import warnings as _warnings
+
 
 class AtlasBridgeError(Exception):
     """Base exception for all AtlasBridge errors."""
@@ -28,14 +30,12 @@ class SessionError(AtlasBridgeError):
 
 
 # Backwards-compat alias — remove in v1.0
-import warnings as _warnings
 
 
-def __getattr__(name: str):  # noqa: N807
+def __getattr__(name: str) -> type:  # noqa: N807
     if name == "AegisError":
         _warnings.warn(
-            "AegisError is deprecated, use AtlasBridgeError instead. "
-            "Will be removed in v1.0.",
+            "AegisError is deprecated, use AtlasBridgeError instead. Will be removed in v1.0.",
             DeprecationWarning,
             stacklevel=2,
         )

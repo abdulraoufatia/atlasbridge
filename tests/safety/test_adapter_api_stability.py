@@ -6,31 +6,36 @@ import inspect
 
 from atlasbridge.adapters.base import AdapterRegistry, BaseAdapter
 
-
 # Frozen abstract method set for v0.9.0
-FROZEN_ABSTRACT_METHODS = frozenset({
-    "start_session",
-    "terminate_session",
-    "read_stream",
-    "inject_reply",
-    "await_input_state",
-})
+FROZEN_ABSTRACT_METHODS = frozenset(
+    {
+        "start_session",
+        "terminate_session",
+        "read_stream",
+        "inject_reply",
+        "await_input_state",
+    }
+)
 
 # Frozen optional (non-abstract) methods with defaults
-FROZEN_OPTIONAL_METHODS = frozenset({
-    "snapshot_context",
-    "get_detector",
-    "healthcheck",
-})
+FROZEN_OPTIONAL_METHODS = frozenset(
+    {
+        "snapshot_context",
+        "get_detector",
+        "healthcheck",
+    }
+)
 
 # Frozen registered adapter names
-FROZEN_ADAPTER_NAMES = frozenset({
-    "claude",
-    "claude-code",
-    "openai",
-    "gemini",
-    "custom",
-})
+FROZEN_ADAPTER_NAMES = frozenset(
+    {
+        "claude",
+        "claude-code",
+        "openai",
+        "gemini",
+        "custom",
+    }
+)
 
 
 def _get_abstract_methods(cls: type) -> set[str]:
