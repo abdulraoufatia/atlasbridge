@@ -1,6 +1,6 @@
 # AtlasBridge Roadmap
 
-**Version:** 0.9.4
+**Version:** 0.9.7
 **Status:** Active
 **Last updated:** 2026-02-22
 
@@ -56,6 +56,22 @@ The positioning is settled: **policy-driven autonomous runtime for AI CLI agents
 | v0.9.2 | Phase C.2 — Dashboard Hardening (filtering, pagination, themes) | Released |
 | v0.9.3 | Phase C.3 — Remote-Ready Local UX (export, mobile, SSH/proxy docs) | Released |
 | v0.9.4 | Phase D — Platform Automation & Governance Hardening | Released |
+| v0.9.7 | Sprint S1 — Code Quality & Maintenance Debt Reduction | Released |
+
+### v0.9.7 — Sprint S1: Code Quality & Maintenance Debt (Released)
+
+**Theme:** Reduce technical debt, harden subsystems, improve type safety.
+
+**Delivered:**
+
+- **mypy strict compliance** — replaced blanket `ignore_errors = true` with targeted per-file overrides; removed 44 stale `# type: ignore` comments, fixed 12 real type errors; 0 mypy errors across 114 source files (#102, #69, PR #120)
+- **Audit log rotation** — `atlasbridge db archive` command archives events older than N days to separate SQLite files, preserving hash chain integrity; rotates up to 3 archive files (#72, PR #121)
+- **Circuit breaker activation** — `guarded_send()` on `BaseChannel` wires existing `ChannelCircuitBreaker` into channel send paths; structured logging on circuit open/reject; `healthcheck()` reports circuit state (#71, PR #122)
+- **Cloud module extraction** — 7 Phase B interface files (415 lines) moved from source to `docs/cloud-spec.md`; safety tests guard against re-introduction (#108, PR #123)
+- **TUI cleanup** — consolidated utilities, removed dead code, standardized imports (#104, PR #118)
+- **CLI split** — extracted adapter, db, version commands from monolithic `main.py` (#103, PR #119)
+- **DaemonManager types** — added type annotations to daemon orchestrator (#101, PR #118)
+- **CI hardening** — coverage floor 84%, Python 3.13 experimental matrix, README version sync test (#112, #114)
 
 ### v0.7.1 — Policy Engine Hardening (Released)
 

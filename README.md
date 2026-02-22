@@ -416,6 +416,7 @@ See [CHANGELOG.md](CHANGELOG.md) for full version history.
 | v0.9.4 | Released | Platform automation — CI hardening, release pipeline |
 | v0.9.5 | Released | Operator console — `atlasbridge console` process management TUI |
 | v0.9.6 | Released | GA hard freeze, release pipeline, project automation, 1336 tests |
+| v0.9.7 | Released | Sprint S1 — mypy strict, audit rotation, circuit breaker, cloud spec extraction |
 | v1.0.0 | Planned | GA — stable APIs, 2-week freeze window, then tag |
 
 ---
