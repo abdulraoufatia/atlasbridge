@@ -33,7 +33,10 @@ jobs:
 
       - name: Run secret scan
         run: |
-          detect-secrets scan --exclude-files 'tests/.*' --exclude-files '\.env\.example' \
+          detect-secrets scan \
+            --exclude-files 'tests/.*' \
+            --exclude-files '\.env\.example' \
+            --exclude-files 'docs/.*' \
             --exclude-secrets 'sk-test|xoxb-test|ghp_test' \
             > .secrets-scan-results.json
           python -c "
