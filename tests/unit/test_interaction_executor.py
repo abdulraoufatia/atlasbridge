@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from atlasbridge.core.interaction.classifier import InteractionClass
-from atlasbridge.core.interaction.executor import InteractionExecutor, InjectionResult
+from atlasbridge.core.interaction.executor import InteractionExecutor
 from atlasbridge.core.interaction.plan import build_plan
 from atlasbridge.core.prompt.models import Confidence, PromptEvent, PromptType
 
@@ -193,7 +193,6 @@ class TestRetry:
         mock_detector.last_output_time = initial_time
 
         call_count = 0
-        original_inject = mock_adapter.inject_reply
 
         async def _inject_side_effect(**kwargs: object) -> None:
             nonlocal call_count
@@ -224,7 +223,7 @@ class TestRetry:
         plan = plan.__class__(**{**plan.__dict__, "advance_timeout_s": 0.2})
         mock_detector.last_output_time = time.monotonic()
 
-        result = await executor.execute(plan, "text", "free_text")
+        await executor.execute(plan, "text", "free_text")
 
         assert mock_adapter.inject_reply.call_count == 1
 

@@ -12,7 +12,6 @@ from atlasbridge.core.interaction.output_forwarder import (
     BATCH_INTERVAL_S,
     MAX_MESSAGES_PER_MINUTE,
     MAX_OUTPUT_CHARS,
-    MIN_MEANINGFUL_CHARS,
     OutputForwarder,
 )
 

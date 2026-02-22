@@ -16,7 +16,7 @@ invariants from CLAUDE.md:
 from __future__ import annotations
 
 import time
-from unittest.mock import AsyncMock, MagicMock, PropertyMock, call
+from unittest.mock import AsyncMock, MagicMock, PropertyMock
 
 import pytest
 
@@ -46,7 +46,7 @@ class TestCRSemantics:
             notify_fn=AsyncMock(),
         )
 
-        result = await executor.execute_chat_input("hello world")
+        await executor.execute_chat_input("hello world")
 
         # Verify the bytes written to the TTY
         mock_tty.inject_reply.assert_called_once()
@@ -190,7 +190,6 @@ class TestAdvanceVerification:
             notify_fn=AsyncMock(),
         )
 
-        plan = build_plan(InteractionClass.CONFIRM_ENTER)
         # Override timeout to be very short for testing
         plan_fast = InteractionPlan(
             interaction_class=InteractionClass.CONFIRM_ENTER,

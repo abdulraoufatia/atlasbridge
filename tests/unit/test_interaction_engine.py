@@ -238,8 +238,8 @@ class TestFeedback:
         mock_detector.last_output_time = time.monotonic()
 
         # Patch plan to fast timeouts
-        from atlasbridge.core.interaction.plan import InteractionPlan
         from atlasbridge.core.interaction.classifier import InteractionClass
+        from atlasbridge.core.interaction.plan import InteractionPlan
 
         fast_plan = InteractionPlan(
             interaction_class=InteractionClass.YES_NO,
@@ -263,7 +263,7 @@ class TestFeedback:
 
         engine_mod.build_plan = _fast_build
         try:
-            result = await engine.handle_prompt_reply(event, reply)
+            await engine.handle_prompt_reply(event, reply)
         finally:
             engine_mod.build_plan = original_build
 

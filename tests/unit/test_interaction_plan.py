@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from atlasbridge.core.interaction.classifier import InteractionClass
-from atlasbridge.core.interaction.plan import InteractionPlan, build_plan
+from atlasbridge.core.interaction.plan import build_plan
 
 
 class TestBuildPlanYesNo:
