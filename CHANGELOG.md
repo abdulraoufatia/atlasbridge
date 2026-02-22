@@ -11,6 +11,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.9.1] — 2026-02-22
+
+### Added
+
+- **Phase C.1 — Local Dashboard MVP**: localhost-only, read-only web dashboard
+  - FastAPI app with 5 HTML routes + 1 JSON API endpoint (`/api/integrity/verify`)
+  - Read-only SQLite access (`file:...?mode=ro`) — no WAL contention with running daemon
+  - Content sanitization: ANSI stripping, token redaction (6 patterns), truncation
+  - Dark-themed server-rendered UI with stats cards, session detail, trace viewer, integrity check
+  - Prompt excerpts hidden by default (`<details>/<summary>` pattern)
+  - Banner on every page: "READ-ONLY GOVERNANCE VIEW — LOCAL EXECUTION ONLY"
+- CLI: `atlasbridge dashboard start` / `atlasbridge dashboard status`
+  - `--host` validated as loopback (rejects `0.0.0.0`, public IPs)
+  - `--port` (default 8787), `--no-browser` options
+  - Helpful error if `fastapi` not installed
+- Optional dependency group: `pip install 'atlasbridge[dashboard]'` (fastapi, uvicorn, jinja2)
+- 53 dashboard feature tests + 8 localhost-only safety tests (1166 total)
+
+---
+
 ## [0.9.0] — 2026-02-21
 
 ### Added
