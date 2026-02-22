@@ -71,6 +71,38 @@ class TestReadOnlyDatabaseGuard:
         ro_conn.close()
 
 
+class TestRiskFlagEnforcement:
+    """Non-loopback binding requires explicit --i-understand-risk flag."""
+
+    def test_default_binding_is_loopback(self):
+        """Default host must be 127.0.0.1 — no flag needed."""
+        from atlasbridge.cli._dashboard import dashboard_start
+
+        params = {p.name: p.default for p in dashboard_start.params}
+        assert params["host"] == "127.0.0.1"
+
+    def test_start_server_rejects_non_loopback_without_flag(self):
+        """start_server() must raise ValueError for non-loopback without allow_non_loopback."""
+        pytest.importorskip("fastapi")
+        from atlasbridge.dashboard.app import start_server
+
+        with pytest.raises(ValueError, match="loopback"):
+            start_server(host="0.0.0.0")
+
+    def test_start_server_allows_non_loopback_with_flag(self):
+        """start_server() must allow non-loopback when allow_non_loopback=True."""
+        pytest.importorskip("fastapi")
+        from unittest.mock import MagicMock, patch
+
+        # uvicorn is imported inside start_server, so patch at module level
+        mock_uvicorn = MagicMock()
+        with patch.dict("sys.modules", {"uvicorn": mock_uvicorn}):
+            from atlasbridge.dashboard.app import start_server
+
+            start_server(host="0.0.0.0", allow_non_loopback=True, open_browser=False)
+            mock_uvicorn.run.assert_called_once()
+
+
 class TestNoMutationRoutes:
     """Dashboard must not expose any mutation endpoints (PUT/DELETE/PATCH)."""
 

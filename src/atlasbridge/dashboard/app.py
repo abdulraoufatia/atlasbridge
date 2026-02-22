@@ -244,6 +244,15 @@ def create_app(
         total = repo.count_sessions(status=status, tool=tool, q=q)
         return JSONResponse({"sessions": sessions, "total": total})
 
+    @app.get("/api/sessions/{session_id}/export")
+    async def api_session_export(session_id: str):
+        from atlasbridge.dashboard.export import export_session_json
+
+        bundle = export_session_json(repo, session_id)
+        if bundle is None:
+            return JSONResponse({"error": "Session not found"}, status_code=404)
+        return JSONResponse(bundle)
+
     @app.post("/api/integrity/verify")
     async def api_verify_integrity():
         now = time.monotonic()
@@ -272,9 +281,11 @@ def start_server(
     open_browser: bool = True,
     db_path: Path | None = None,
     trace_path: Path | None = None,
+    *,
+    allow_non_loopback: bool = False,
 ) -> None:
     """Start the dashboard server (blocking)."""
-    if not is_loopback(host):
+    if not is_loopback(host) and not allow_non_loopback:
         raise ValueError(
             f"Dashboard must bind to a loopback address for safety. "
             f"Got: {host!r}. Use 127.0.0.1, ::1, or localhost."

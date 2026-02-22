@@ -53,6 +53,61 @@ class TestHostValidation:
         assert not is_loopback("192.168.1.1")
 
 
+class TestRiskFlag:
+    def test_rejects_non_loopback_without_risk_flag(self):
+        """Non-loopback host without --i-understand-risk must exit with error."""
+        from atlasbridge.cli.main import cli
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["dashboard", "start", "--host", "0.0.0.0"])
+        assert result.exit_code != 0
+        assert "--i-understand-risk" in result.output
+
+    def test_allows_non_loopback_with_risk_flag(self):
+        """Non-loopback host with --i-understand-risk should be allowed."""
+        import pytest
+
+        pytest.importorskip("fastapi")
+        from unittest.mock import patch
+
+        from atlasbridge.cli.main import cli
+
+        runner = CliRunner()
+        with patch("atlasbridge.dashboard.app.start_server") as mock_start:
+            result = runner.invoke(
+                cli,
+                ["dashboard", "start", "--host", "0.0.0.0", "--i-understand-risk"],
+            )
+            assert result.exit_code == 0
+            mock_start.assert_called_once()
+            call_kwargs = mock_start.call_args
+            assert call_kwargs.kwargs.get("allow_non_loopback") is True
+
+    def test_loopback_does_not_require_risk_flag(self):
+        """Loopback address should work without --i-understand-risk."""
+        import pytest
+
+        pytest.importorskip("fastapi")
+        from unittest.mock import patch
+
+        from atlasbridge.cli.main import cli
+
+        runner = CliRunner()
+        with patch("atlasbridge.dashboard.app.start_server") as mock_start:
+            result = runner.invoke(cli, ["dashboard", "start", "--host", "127.0.0.1"])
+            assert result.exit_code == 0
+            mock_start.assert_called_once()
+
+    def test_risk_flag_hidden_but_works(self):
+        """--i-understand-risk should be hidden in help but functional."""
+        from atlasbridge.cli.main import cli
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["dashboard", "start", "--help"])
+        # Hidden flag should not appear in help text
+        assert "--i-understand-risk" not in result.output
+
+
 class TestMissingDependency:
     def test_start_rejects_non_loopback(self):
         """CLI should reject non-loopback host before even trying to import fastapi."""

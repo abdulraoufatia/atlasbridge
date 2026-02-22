@@ -287,6 +287,20 @@ class TestNoRawTokensInOutput:
         assert "xoxb-" not in text
 
 
+class TestExportApiEndpoint:
+    def test_export_returns_session_bundle(self, client):
+        response = client.get("/api/sessions/sess-001/export")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["export_version"] == "1.0"
+        assert data["session"]["id"] == "sess-001"
+        assert len(data["prompts"]) == 4
+
+    def test_export_404_for_missing(self, client):
+        response = client.get("/api/sessions/nonexistent/export")
+        assert response.status_code == 404
+
+
 class TestEmptyStatesWithFilters:
     """Empty state messages should work when filters yield no results."""
 

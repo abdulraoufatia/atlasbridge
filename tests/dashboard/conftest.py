@@ -187,6 +187,21 @@ def _seed_data(conn: sqlite3.Connection) -> None:
             "2025-12-31T23:59:59",
         ),
     )
+    # Prompt with embedded tokens — used to verify export redaction
+    conn.execute(
+        "INSERT INTO prompts (id, session_id, prompt_type, confidence, excerpt, status, nonce, expires_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "prompt-005",
+            "sess-001",
+            "freeform",
+            "high",
+            "Use token sk-abcdefghijklmnopqrstuvwxyz1234567890 and xoxb-123-456-abcdefghij and ghp_abcdefghijklmnopqrstuvwxyz1234567890ab to authenticate",
+            "resolved",
+            "nonce-5",
+            "2025-12-31T23:59:59",
+        ),
+    )
 
     # Audit events with hash chain
     prev_hash = ""

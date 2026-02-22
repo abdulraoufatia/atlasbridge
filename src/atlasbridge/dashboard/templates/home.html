@@ -57,6 +57,7 @@
 </form>
 
 {% if sessions %}
+<div class="table-responsive">
 <table>
     <thead>
         <tr>
@@ -79,6 +80,7 @@
         {% endfor %}
     </tbody>
 </table>
+</div>
 {% else %}
 <p class="empty">No sessions found{% if filter_status or filter_tool or filter_q %} matching the current filters. <a href="/">Clear filters</a>{% endif %}.</p>
 {% endif %}

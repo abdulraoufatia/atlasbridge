@@ -313,6 +313,20 @@ class DashboardRepo:
         return len(errors) == 0, errors
 
     # ------------------------------------------------------------------
+    # Export
+    # ------------------------------------------------------------------
+
+    def export_session(self, session_id: str) -> dict[str, Any] | None:
+        """Return a full session bundle for export.
+
+        Returns None if the session does not exist.
+        Delegates to the export module for sanitization and bundling.
+        """
+        from atlasbridge.dashboard.export import export_session_json
+
+        return export_session_json(self, session_id)
+
+    # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 

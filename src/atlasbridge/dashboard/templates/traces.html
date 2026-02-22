@@ -36,6 +36,7 @@ atlasbridge run claude</pre>
 
 {% if entries %}
 <p class="result-count">Showing {{ entries|length }} of {{ total }} entries (page {{ page }}/{{ total_pages }})</p>
+<div class="table-responsive">
 <table>
     <thead>
         <tr>
@@ -64,6 +65,7 @@ atlasbridge run claude</pre>
         {% endfor %}
     </tbody>
 </table>
+</div>
 
 <div class="pagination">
     {% if page > 1 %}
