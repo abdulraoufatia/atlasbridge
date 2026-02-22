@@ -214,9 +214,7 @@ class TestLogsService:
 
     def test_read_recent_delegates_to_database(self, tmp_path: Path) -> None:
         fake_row = MagicMock()
-        fake_row.__iter__ = lambda s: iter(
-            [("ts", "2025-01-01"), ("event_type", "session_start")]
-        )
+        fake_row.__iter__ = lambda s: iter([("ts", "2025-01-01"), ("event_type", "session_start")])
         mock_db = MagicMock()
         mock_db.get_recent_audit_events.return_value = [fake_row]
 
