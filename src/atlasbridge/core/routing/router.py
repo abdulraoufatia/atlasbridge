@@ -22,6 +22,7 @@ One active prompt per session:
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 import structlog
@@ -47,11 +48,15 @@ class PromptRouter:
         channel: Any,  # BaseChannel — avoid circular import
         adapter_map: dict[str, Any],  # session_id → BaseAdapter
         store: Any,  # Database — for audit/idempotency
+        interaction_engine: Any = None,  # InteractionEngine — optional
+        chat_mode_handler: Callable[[Reply], Awaitable[Any]] | None = None,
     ) -> None:
         self._sessions = session_manager
         self._channel = channel
         self._adapter_map = adapter_map
         self._store = store
+        self._interaction_engine = interaction_engine
+        self._chat_mode_handler = chat_mode_handler
 
         # Active state machines: prompt_id → PromptStateMachine
         self._machines: dict[str, PromptStateMachine] = {}
@@ -135,6 +140,15 @@ class PromptRouter:
         if not reply.prompt_id:
             resolved = self._resolve_free_text_reply(reply)
             if resolved is None:
+                # No active prompt — route to chat mode if handler is set
+                if self._chat_mode_handler is not None:
+                    logger.info(
+                        "chat_mode_input",
+                        channel_identity=reply.channel_identity,
+                        value_length=len(reply.value),
+                    )
+                    await self._chat_mode_handler(reply)
+                    return
                 logger.debug("free_text_reply_dropped", reason="no_active_prompt")
                 return
             reply = resolved
@@ -182,31 +196,59 @@ class PromptRouter:
         try:
             sm.transition(PromptStatus.REPLY_RECEIVED, f"reply from {reply.channel_identity}")
 
-            adapter = self._adapter_map.get(sm.event.session_id)
-            if adapter is None:
-                raise RuntimeError(f"No adapter for session {sm.event.session_id}")
+            if self._interaction_engine is not None:
+                # Use the interaction engine (classify → plan → execute → feedback)
+                result = await self._interaction_engine.handle_prompt_reply(sm.event, reply)
 
-            await adapter.inject_reply(
-                session_id=sm.event.session_id,
-                value=reply.value,
-                prompt_type=sm.event.prompt_type,
-            )
+                if result.success:
+                    sm.transition(PromptStatus.INJECTED, "injected via interaction engine")
+                    sm.transition(PromptStatus.RESOLVED, "interaction engine confirmed")
+                elif result.escalated:
+                    sm.transition(PromptStatus.FAILED, "escalated: retries exhausted")
+                else:
+                    sm.transition(PromptStatus.INJECTED, "injected via interaction engine")
+                    sm.transition(PromptStatus.RESOLVED, "injection completed (stalled)")
 
-            sm.transition(PromptStatus.INJECTED, "injected into PTY")
-            sm.transition(PromptStatus.RESOLVED, "injection confirmed")
+                self._sessions.mark_reply_received(sm.event.session_id)
 
-            self._sessions.mark_reply_received(sm.event.session_id)
+                # Edit the channel message with structured feedback
+                feedback = result.feedback_message or f"✓ Answered: {result.injected_value!r}"
+                session = self._sessions.get_or_none(sm.event.session_id)
+                if session:
+                    msg_id = session.channel_message_ids.get(reply.prompt_id, "")
+                    if msg_id:
+                        await self._channel.edit_prompt_message(
+                            msg_id,
+                            feedback,
+                            session_id=sm.event.session_id,
+                        )
+            else:
+                # Direct injection path (no interaction engine)
+                adapter = self._adapter_map.get(sm.event.session_id)
+                if adapter is None:
+                    raise RuntimeError(f"No adapter for session {sm.event.session_id}")
 
-            # Edit the Telegram message to show resolution
-            session = self._sessions.get_or_none(sm.event.session_id)
-            if session:
-                msg_id = session.channel_message_ids.get(reply.prompt_id, "")
-                if msg_id:
-                    await self._channel.edit_prompt_message(
-                        msg_id,
-                        f"✓ Answered: {reply.value!r}",
-                        session_id=sm.event.session_id,
-                    )
+                await adapter.inject_reply(
+                    session_id=sm.event.session_id,
+                    value=reply.value,
+                    prompt_type=sm.event.prompt_type,
+                )
+
+                sm.transition(PromptStatus.INJECTED, "injected into PTY")
+                sm.transition(PromptStatus.RESOLVED, "injection confirmed")
+
+                self._sessions.mark_reply_received(sm.event.session_id)
+
+                # Edit the channel message to show resolution
+                session = self._sessions.get_or_none(sm.event.session_id)
+                if session:
+                    msg_id = session.channel_message_ids.get(reply.prompt_id, "")
+                    if msg_id:
+                        await self._channel.edit_prompt_message(
+                            msg_id,
+                            f"✓ Answered: {reply.value!r}",
+                            session_id=sm.event.session_id,
+                        )
 
             latency = sm.latency_ms
             log.info(

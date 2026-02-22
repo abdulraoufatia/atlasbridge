@@ -153,6 +153,20 @@ class BaseChannel(ABC):
         """
 
     @abstractmethod
+    async def send_output(self, text: str, session_id: str = "") -> None:
+        """
+        Send CLI output text as a conversational message (not a prompt).
+
+        Used by the OutputForwarder to stream CLI activity to the human.
+        Different from ``notify()`` in that it uses monospace/code formatting
+        and may be sent silently (no notification buzz).
+
+        Args:
+            text:       Cleaned CLI output text (ANSI-stripped).
+            session_id: Session context for routing.
+        """
+
+    @abstractmethod
     async def edit_prompt_message(
         self,
         message_id: str,

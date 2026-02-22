@@ -37,6 +37,9 @@ class _FailingChannel(BaseChannel):
     async def notify(self, message: str, session_id: str = "") -> None:
         pass
 
+    async def send_output(self, text: str, session_id: str = "") -> None:
+        pass
+
     async def edit_prompt_message(
         self, message_id: str, new_text: str, session_id: str = ""
     ) -> None:

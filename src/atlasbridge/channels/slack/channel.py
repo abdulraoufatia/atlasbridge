@@ -117,6 +117,18 @@ class SlackChannel(BaseChannel):
             if ch_id:
                 await self._api("chat.postMessage", {"channel": ch_id, "text": message})
 
+    async def send_output(self, text: str, session_id: str = "") -> None:
+        if len(text) > 3000:
+            text = text[:3000] + "\n...(truncated)"
+        formatted = f"```\n{text}\n```"
+        for uid in self._allowed:
+            ch_id = await self._get_dm_channel(uid)
+            if ch_id:
+                await self._api(
+                    "chat.postMessage",
+                    {"channel": ch_id, "text": formatted},
+                )
+
     async def edit_prompt_message(
         self,
         message_id: str,

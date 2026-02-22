@@ -210,6 +210,212 @@ class TestHandleReply:
 # ---------------------------------------------------------------------------
 
 
+class TestInteractionEngineIntegration:
+    """Tests for PromptRouter with interaction_engine set."""
+
+    @pytest.mark.asyncio
+    async def test_reply_uses_interaction_engine(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+    ) -> None:
+        session = _session()
+        session_manager.register(session)
+
+        mock_engine = AsyncMock()
+        mock_engine.handle_prompt_reply.return_value = MagicMock(
+            success=True,
+            escalated=False,
+            feedback_message="Sent: y + Enter\nCLI advanced",
+            injected_value="y",
+        )
+
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},
+            store=MagicMock(),
+            interaction_engine=mock_engine,
+        )
+
+        event = _event(session.session_id)
+        await router.route_event(event)
+        reply = _reply(event.prompt_id, session.session_id, value="y")
+        await router.handle_reply(reply)
+
+        mock_engine.handle_prompt_reply.assert_called_once()
+        sm = router._machines[event.prompt_id]
+        assert sm.status == PromptStatus.RESOLVED
+
+    @pytest.mark.asyncio
+    async def test_escalated_result_transitions_to_failed(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+    ) -> None:
+        session = _session()
+        session_manager.register(session)
+
+        mock_engine = AsyncMock()
+        mock_engine.handle_prompt_reply.return_value = MagicMock(
+            success=False,
+            escalated=True,
+            feedback_message="This prompt requires raw keyboard interaction.",
+            injected_value="y",
+        )
+
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},
+            store=MagicMock(),
+            interaction_engine=mock_engine,
+        )
+
+        event = _event(session.session_id)
+        await router.route_event(event)
+        reply = _reply(event.prompt_id, session.session_id)
+        await router.handle_reply(reply)
+
+        sm = router._machines[event.prompt_id]
+        assert sm.status == PromptStatus.FAILED
+
+    @pytest.mark.asyncio
+    async def test_feedback_message_sent_to_channel(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+    ) -> None:
+        session = _session()
+        session_manager.register(session)
+
+        mock_engine = AsyncMock()
+        mock_engine.handle_prompt_reply.return_value = MagicMock(
+            success=True,
+            escalated=False,
+            feedback_message="Sent: y + Enter",
+            injected_value="y",
+        )
+
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},
+            store=MagicMock(),
+            interaction_engine=mock_engine,
+        )
+
+        event = _event(session.session_id)
+        await router.route_event(event)
+        reply = _reply(event.prompt_id, session.session_id, value="y")
+        await router.handle_reply(reply)
+
+        # edit_prompt_message should be called with the feedback
+        mock_channel.edit_prompt_message.assert_called()
+        call_args = mock_channel.edit_prompt_message.call_args
+        assert "Sent: y + Enter" in call_args[0][1]
+
+
+class TestChatModeHandler:
+    """Tests for PromptRouter with chat_mode_handler set."""
+
+    @pytest.mark.asyncio
+    async def test_free_text_no_prompt_routes_to_chat(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+    ) -> None:
+        session = _session()
+        session_manager.register(session)
+
+        chat_handler = AsyncMock()
+
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},
+            store=MagicMock(),
+            chat_mode_handler=chat_handler,
+        )
+
+        # Send a free-text reply with no active prompt
+        from datetime import datetime
+
+        reply = Reply(
+            prompt_id="",
+            session_id=session.session_id,
+            value="check the logs",
+            nonce="nonce-1",
+            channel_identity="telegram:12345",
+            timestamp=datetime.now(UTC).isoformat(),
+        )
+        await router.handle_reply(reply)
+        chat_handler.assert_called_once_with(reply)
+
+    @pytest.mark.asyncio
+    async def test_free_text_with_active_prompt_resolves_normally(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+        mock_adapter: AsyncMock,
+    ) -> None:
+        session = _session()
+        session_manager.register(session)
+
+        chat_handler = AsyncMock()
+
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={session.session_id: mock_adapter},
+            store=MagicMock(),
+            chat_mode_handler=chat_handler,
+        )
+
+        # Create an active prompt
+        event = _event(session.session_id)
+        await router.route_event(event)
+
+        # Send a free-text reply (should resolve to the active prompt, not chat)
+        from datetime import datetime
+
+        reply = Reply(
+            prompt_id="",
+            session_id=session.session_id,
+            value="y",
+            nonce="nonce-2",
+            channel_identity="telegram:12345",
+            timestamp=datetime.now(UTC).isoformat(),
+        )
+        await router.handle_reply(reply)
+
+        # Chat handler should NOT be called — it went to the active prompt
+        chat_handler.assert_not_called()
+        mock_adapter.inject_reply.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_no_chat_handler_drops_free_text(
+        self,
+        router: PromptRouter,
+        session: Session,
+        mock_channel: AsyncMock,
+    ) -> None:
+        """Without chat_mode_handler, free-text with no prompt is silently dropped."""
+        from datetime import datetime
+
+        reply = Reply(
+            prompt_id="",
+            session_id=session.session_id,
+            value="hello",
+            nonce="nonce-3",
+            channel_identity="telegram:12345",
+            timestamp=datetime.now(UTC).isoformat(),
+        )
+        await router.handle_reply(reply)
+        # No error, just dropped
+        mock_channel.notify.assert_not_called()
+
+
 class TestExpireOverdue:
     @pytest.mark.asyncio
     async def test_overdue_prompt_expired(

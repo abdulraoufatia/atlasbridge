@@ -301,6 +301,33 @@ class DaemonManager:
         # Use intent router when available, fall back to prompt router
         router = self._intent_router or self._router
 
+        # Wire InteractionEngine and OutputForwarder for Conversation UX v2
+        output_forwarder = None
+        if self._channel is not None and self._session_manager is not None:
+            from atlasbridge.core.interaction.engine import InteractionEngine
+            from atlasbridge.core.interaction.output_forwarder import OutputForwarder
+
+            interaction_engine = InteractionEngine(
+                adapter=adapter,
+                session_id=session_id,
+                detector=detector,
+                channel=self._channel,
+                session_manager=self._session_manager,
+            )
+
+            output_forwarder = OutputForwarder(self._channel, session_id)
+
+            # Inject into the PromptRouter (works for both PromptRouter and IntentRouter)
+            prompt_router = self._router
+            if prompt_router is not None:
+                prompt_router._interaction_engine = interaction_engine
+                prompt_router._chat_mode_handler = interaction_engine.handle_chat_input
+
+            logger.info(
+                "interaction_engine_wired",
+                session_id=session_id[:8],
+            )
+
         async def _read_loop() -> None:
             try:
                 while True:
@@ -311,6 +338,9 @@ class DaemonManager:
                     ev = detector.analyse(chunk, tty_blocked=tty_blocked)
                     if ev is not None and router is not None:
                         await event_q.put(ev)
+                    # Feed output to forwarder for Chat Mode
+                    if output_forwarder is not None:
+                        output_forwarder.feed(chunk)
             finally:
                 eof_reached.set()
 
@@ -340,6 +370,8 @@ class DaemonManager:
                 tg.create_task(_read_loop(), name="pty_read")
                 tg.create_task(_route_events(), name="route_events")
                 tg.create_task(_silence_watchdog(), name="silence_watchdog")
+                if output_forwarder is not None:
+                    tg.create_task(output_forwarder.flush_loop(), name="output_forwarder")
         except* asyncio.CancelledError:
             pass
         finally:

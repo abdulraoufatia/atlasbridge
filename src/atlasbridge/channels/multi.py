@@ -95,6 +95,13 @@ class MultiChannel(BaseChannel):
             return_exceptions=True,
         )
 
+    async def send_output(self, text: str, session_id: str = "") -> None:
+        """Broadcast CLI output to all sub-channels."""
+        await asyncio.gather(
+            *[ch.send_output(text, session_id) for ch in self._channels],
+            return_exceptions=True,
+        )
+
     async def edit_prompt_message(
         self,
         message_id: str,

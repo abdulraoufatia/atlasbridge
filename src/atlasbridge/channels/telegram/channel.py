@@ -156,6 +156,21 @@ class TelegramChannel(BaseChannel):
         for uid in self._allowed:
             await self._api("sendMessage", {"chat_id": uid, "text": message})
 
+    async def send_output(self, text: str, session_id: str = "") -> None:
+        if len(text) > 3900:
+            text = text[:3900] + "\n...(truncated)"
+        formatted = f"<pre>{text}</pre>"
+        for uid in self._allowed:
+            await self._api(
+                "sendMessage",
+                {
+                    "chat_id": uid,
+                    "text": formatted,
+                    "parse_mode": "HTML",
+                    "disable_notification": True,
+                },
+            )
+
     async def edit_prompt_message(
         self,
         message_id: str,
