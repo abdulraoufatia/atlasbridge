@@ -13,6 +13,7 @@
 
 <h1>Session {{ session.id[:12] }}&hellip;</h1>
 
+<div class="table-responsive">
 <table class="detail-table">
     <tr><th>ID</th><td>{{ session.id }}</td></tr>
     <tr><th>Tool</th><td>{{ session.tool }}</td></tr>
@@ -24,10 +25,12 @@
     <tr><th>Exit Code</th><td>{{ session.exit_code if session.exit_code is not none else '&mdash;' }}</td></tr>
     <tr><th>Label</th><td>{{ session.label or '&mdash;' }}</td></tr>
 </table>
+</div>
 
 <h2>Prompts ({{ prompts|length }})</h2>
 
 {% if prompts %}
+<div class="table-responsive">
 <table>
     <thead>
         <tr>
@@ -57,12 +60,14 @@
         {% endfor %}
     </tbody>
 </table>
+</div>
 {% else %}
 <p class="empty">No prompts recorded for this session.</p>
 {% endif %}
 
 {% if traces %}
 <h2>Decision Trace Entries ({{ traces|length }})</h2>
+<div class="table-responsive">
 <table>
     <thead>
         <tr>
@@ -83,6 +88,7 @@
         {% endfor %}
     </tbody>
 </table>
+</div>
 {% endif %}
 
 <p><a href="/">&larr; Back to home</a></p>

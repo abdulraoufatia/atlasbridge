@@ -20,6 +20,7 @@ atlasbridge run claude</pre>
 
 <h1>Trace Entry #{{ index }}</h1>
 
+<div class="table-responsive">
 <table class="detail-table">
     {% for key, value in entry.items() %}
     <tr>
@@ -41,6 +42,7 @@ atlasbridge run claude</pre>
     </tr>
     {% endfor %}
 </table>
+</div>
 
 <p>
     {% if index > 0 %}

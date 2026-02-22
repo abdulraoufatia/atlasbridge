@@ -33,6 +33,15 @@
         themeBtn.addEventListener('click', toggleTheme);
     }
 
+    // ---- Mobile nav toggle ----
+    var navToggle = document.getElementById('nav-toggle');
+    var navLinks = document.getElementById('nav-links');
+    if (navToggle && navLinks) {
+        navToggle.addEventListener('click', function () {
+            navLinks.classList.toggle('open');
+        });
+    }
+
     // ---- Auto-refresh (home page only) ----
     var REFRESH_KEY = 'atlasbridge-autorefresh';
     var REFRESH_INTERVAL = 5000;
@@ -43,21 +52,21 @@
     if (!statSessions) { return; }
 
     // Create auto-refresh toggle in nav
-    var nav = document.querySelector('nav');
-    if (nav) {
+    var navContainer = document.getElementById('nav-links') || document.querySelector('nav');
+    if (navContainer) {
         var refreshBtn = document.createElement('button');
         refreshBtn.className = 'nav-btn';
         refreshBtn.id = 'auto-refresh-toggle';
         refreshBtn.title = 'Toggle auto-refresh';
         refreshBtn.textContent = 'Auto-refresh: OFF';
-        nav.appendChild(refreshBtn);
+        navContainer.appendChild(refreshBtn);
 
         var indicator = document.createElement('span');
         indicator.className = 'auto-refresh-indicator';
         indicator.id = 'refresh-indicator';
         indicator.style.display = 'none';
         indicator.innerHTML = '<span class="pulse"></span> Live';
-        nav.appendChild(indicator);
+        navContainer.appendChild(indicator);
 
         function startRefresh() {
             if (refreshTimer) { return; }
