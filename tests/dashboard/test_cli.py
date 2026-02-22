@@ -65,6 +65,9 @@ class TestRiskFlag:
 
     def test_allows_non_loopback_with_risk_flag(self):
         """Non-loopback host with --i-understand-risk should be allowed."""
+        import pytest
+
+        pytest.importorskip("fastapi")
         from unittest.mock import patch
 
         from atlasbridge.cli.main import cli
@@ -82,6 +85,9 @@ class TestRiskFlag:
 
     def test_loopback_does_not_require_risk_flag(self):
         """Loopback address should work without --i-understand-risk."""
+        import pytest
+
+        pytest.importorskip("fastapi")
         from unittest.mock import patch
 
         from atlasbridge.cli.main import cli

@@ -35,19 +35,8 @@ def dashboard_group() -> None:
 )
 def dashboard_start(host: str, port: int, no_browser: bool, i_understand_risk: bool) -> None:
     """Start the local dashboard server."""
-    # Guard: fastapi must be installed
-    try:
-        import fastapi  # noqa: F401
-    except ImportError as exc:
-        click.echo(
-            "Error: Dashboard dependencies not installed.\n"
-            "Install them with:\n\n"
-            "  pip install 'atlasbridge[dashboard]'\n",
-            err=True,
-        )
-        raise SystemExit(1) from exc
-
     # Guard: host must be loopback unless risk is explicitly acknowledged
+    # This check uses only stdlib (no fastapi needed) so it runs first.
     from atlasbridge.dashboard.sanitize import is_loopback
 
     if not is_loopback(host) and not i_understand_risk:
@@ -63,6 +52,18 @@ def dashboard_start(host: str, port: int, no_browser: bool, i_understand_risk: b
             err=True,
         )
         raise SystemExit(1)
+
+    # Guard: fastapi must be installed
+    try:
+        import fastapi  # noqa: F401
+    except ImportError as exc:
+        click.echo(
+            "Error: Dashboard dependencies not installed.\n"
+            "Install them with:\n\n"
+            "  pip install 'atlasbridge[dashboard]'\n",
+            err=True,
+        )
+        raise SystemExit(1) from exc
 
     from atlasbridge.dashboard.app import start_server
 
