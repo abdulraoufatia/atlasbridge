@@ -143,7 +143,8 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, A
 h1 {{ font-size: 1.4rem; margin-bottom: 1rem; color: #58a6ff; }}
 h2 {{ font-size: 1.1rem; margin: 1.5rem 0 0.75rem; color: #8b949e; }}
 table {{ width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }}
-th, td {{ padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid #30363d; font-size: 0.85rem; }}
+th, td {{ padding: 0.5rem 0.75rem; text-align: left;
+        border-bottom: 1px solid #30363d; font-size: 0.85rem; }}
 th {{ color: #8b949e; font-weight: 600; text-transform: uppercase; font-size: 0.75rem; }}
 code {{ font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.8rem;
         background: #161b22; padding: 0.1rem 0.3rem; border-radius: 3px; }}
@@ -165,33 +166,45 @@ details pre {{ background: #161b22; border: 1px solid #30363d; border-radius: 4p
 </head>
 <body>
 <div class="banner">EXPORTED SESSION — READ-ONLY SNAPSHOT</div>
-<h1>Session: {_esc(session.get('id'))}</h1>
+<h1>Session: {_esc(session.get("id"))}</h1>
 <div class="meta">
-<p><strong>Tool:</strong> {_esc(session.get('tool'))}</p>
-<p><strong>Status:</strong> {_esc(session.get('status'))}</p>
-<p><strong>Started:</strong> {_esc(session.get('started_at'))}</p>
-<p><strong>Ended:</strong> {_esc(session.get('ended_at', 'N/A'))}</p>
-<p><strong>CWD:</strong> <code>{_esc(session.get('cwd'))}</code></p>
-<p><strong>Exported:</strong> {_esc(bundle.get('exported_at'))}</p>
+<p><strong>Tool:</strong> {_esc(session.get("tool"))}</p>
+<p><strong>Status:</strong> {_esc(session.get("status"))}</p>
+<p><strong>Started:</strong> {_esc(session.get("started_at"))}</p>
+<p><strong>Ended:</strong> {_esc(session.get("ended_at", "N/A"))}</p>
+<p><strong>CWD:</strong> <code>{_esc(session.get("cwd"))}</code></p>
+<p><strong>Exported:</strong> {_esc(bundle.get("exported_at"))}</p>
 </div>
 
 <h2>Prompts ({len(prompts)})</h2>
-{"<p class='empty'>No prompts recorded.</p>" if not prompts else f'''<table>
+{
+        "<p class='empty'>No prompts recorded.</p>"
+        if not prompts
+        else f'''<table>
 <thead><tr><th>ID</th><th>Type</th><th>Confidence</th><th>Status</th><th>Excerpt</th><th>Created</th></tr></thead>
 <tbody>{prompt_rows}</tbody>
-</table>'''}
+</table>'''
+    }
 
 <h2>Decision Traces ({len(traces)})</h2>
-{"<p class='empty'>No trace entries.</p>" if not traces else f'''<table>
+{
+        "<p class='empty'>No trace entries.</p>"
+        if not traces
+        else f'''<table>
 <thead><tr><th>Action</th><th>Confidence</th><th>Rule</th><th>Timestamp</th></tr></thead>
 <tbody>{trace_rows}</tbody>
-</table>'''}
+</table>'''
+    }
 
 <h2>Audit Events ({len(audit_events)})</h2>
-{"<p class='empty'>No audit events.</p>" if not audit_events else f'''<table>
+{
+        "<p class='empty'>No audit events.</p>"
+        if not audit_events
+        else f'''<table>
 <thead><tr><th>ID</th><th>Type</th><th>Timestamp</th></tr></thead>
 <tbody>{audit_rows}</tbody>
-</table>'''}
+</table>'''
+    }
 
 <details>
 <summary>Raw JSON data</summary>

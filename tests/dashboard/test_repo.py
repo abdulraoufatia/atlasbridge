@@ -12,7 +12,7 @@ class TestDashboardRepoStats:
     def test_get_stats_with_data(self, repo):
         stats = repo.get_stats()
         assert stats["sessions"] == 4
-        assert stats["prompts"] == 4
+        assert stats["prompts"] == 5
         assert stats["audit_events"] == 5
         assert stats["active_sessions"] == 2
 
@@ -127,7 +127,7 @@ class TestDashboardRepoSessions:
 class TestDashboardRepoPrompts:
     def test_list_prompts_for_session(self, repo):
         prompts = repo.list_prompts_for_session("sess-001")
-        assert len(prompts) == 3
+        assert len(prompts) == 4  # 3 original + 1 token-containing
         assert prompts[0]["id"] == "prompt-001"
 
     def test_list_prompts_empty(self, repo):
@@ -140,12 +140,12 @@ class TestDashboardRepoPrompts:
 
     def test_list_prompts_filter_by_confidence(self, repo):
         prompts = repo.list_prompts_for_session("sess-001", confidence="high")
-        assert len(prompts) == 1
+        assert len(prompts) == 2  # prompt-001 + prompt-005
         assert prompts[0]["id"] == "prompt-001"
 
     def test_list_prompts_filter_by_status(self, repo):
         prompts = repo.list_prompts_for_session("sess-001", status="resolved")
-        assert len(prompts) == 1
+        assert len(prompts) == 2  # prompt-002 + prompt-005
         assert prompts[0]["id"] == "prompt-002"
 
 

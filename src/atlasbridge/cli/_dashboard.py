@@ -33,9 +33,7 @@ def dashboard_group() -> None:
     hidden=True,
     help="Allow binding to non-loopback addresses (DANGEROUS)",
 )
-def dashboard_start(
-    host: str, port: int, no_browser: bool, i_understand_risk: bool
-) -> None:
+def dashboard_start(host: str, port: int, no_browser: bool, i_understand_risk: bool) -> None:
     """Start the local dashboard server."""
     # Guard: fastapi must be installed
     try:
@@ -117,11 +115,9 @@ def dashboard_export(session_id: str, fmt: str, output_path: str | None) -> None
     """Export a session as JSON or self-contained HTML."""
     from pathlib import Path
 
-    from atlasbridge.dashboard.repo import DashboardRepo
-
-    # Resolve paths
     from atlasbridge.core.config import atlasbridge_dir
     from atlasbridge.core.constants import DB_FILENAME
+    from atlasbridge.dashboard.repo import DashboardRepo
 
     config_dir = atlasbridge_dir()
     db_path = config_dir / DB_FILENAME

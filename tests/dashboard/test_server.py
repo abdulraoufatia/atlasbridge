@@ -294,7 +294,7 @@ class TestExportApiEndpoint:
         data = response.json()
         assert data["export_version"] == "1.0"
         assert data["session"]["id"] == "sess-001"
-        assert len(data["prompts"]) == 3
+        assert len(data["prompts"]) == 4
 
     def test_export_404_for_missing(self, client):
         response = client.get("/api/sessions/nonexistent/export")

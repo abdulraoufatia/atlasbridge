@@ -24,7 +24,7 @@ class TestExportSessionJson:
 
         bundle = export_session_json(repo, "sess-001")
         assert bundle is not None
-        assert len(bundle["prompts"]) == 3
+        assert len(bundle["prompts"]) == 4  # 3 original + 1 token-containing
 
     def test_export_includes_traces(self, repo):
         from atlasbridge.dashboard.export import export_session_json
@@ -133,3 +133,82 @@ class TestRepoExportSession:
     def test_repo_export_nonexistent(self, repo):
         bundle = repo.export_session("nonexistent")
         assert bundle is None
+
+
+class TestExportNoSecretLeakage:
+    """Exported data must never contain raw tokens or secrets."""
+
+    _TOKEN_PATTERNS = ["sk-", "xoxb-", "ghp_"]
+
+    def test_json_export_redacts_tokens(self, repo):
+        """JSON export must redact all token patterns from prompt excerpts."""
+        from atlasbridge.dashboard.export import export_session_json
+
+        bundle = export_session_json(repo, "sess-001")
+        assert bundle is not None
+        json_str = json.dumps(bundle, default=str)
+        for pattern in self._TOKEN_PATTERNS:
+            assert pattern not in json_str, f"Raw token pattern {pattern!r} found in JSON export"
+
+    def test_html_export_redacts_tokens(self, repo):
+        """HTML export must redact all token patterns from prompt excerpts."""
+        from atlasbridge.dashboard.export import export_session_html
+
+        html = export_session_html(repo, "sess-001")
+        assert html is not None
+        for pattern in self._TOKEN_PATTERNS:
+            assert pattern not in html, f"Raw token pattern {pattern!r} found in HTML export"
+
+    def test_api_export_redacts_tokens(self, client):
+        """API export endpoint must redact all token patterns."""
+        response = client.get("/api/sessions/sess-001/export")
+        assert response.status_code == 200
+        text = response.text
+        for pattern in self._TOKEN_PATTERNS:
+            assert pattern not in text, f"Raw token pattern {pattern!r} found in API export"
+
+    def test_json_export_contains_redaction_labels(self, repo):
+        """Redacted tokens should be replaced with [REDACTED:*] labels."""
+        from atlasbridge.dashboard.export import export_session_json
+
+        bundle = export_session_json(repo, "sess-001")
+        assert bundle is not None
+        json_str = json.dumps(bundle, default=str)
+        assert "[REDACTED:" in json_str
+
+    def test_html_export_contains_redaction_labels(self, repo):
+        """Redacted tokens should appear as [REDACTED:*] in HTML export."""
+        from atlasbridge.dashboard.export import export_session_html
+
+        html = export_session_html(repo, "sess-001")
+        assert html is not None
+        # HTML-escaped version
+        assert "REDACTED" in html
+
+
+class TestExportCliIntegration:
+    """CLI export command integration tests."""
+
+    def test_cli_export_json_to_file(self, repo, tmp_path):
+        """CLI export --format json --output writes valid JSON to file."""
+        from atlasbridge.dashboard.export import export_session_json
+
+        bundle = export_session_json(repo, "sess-001")
+        assert bundle is not None
+        out_path = tmp_path / "export.json"
+        out_path.write_text(json.dumps(bundle, indent=2, default=str), encoding="utf-8")
+        # Verify the file contains valid JSON
+        loaded = json.loads(out_path.read_text(encoding="utf-8"))
+        assert loaded["session"]["id"] == "sess-001"
+
+    def test_cli_export_html_to_file(self, repo, tmp_path):
+        """CLI export --format html --output writes valid HTML to file."""
+        from atlasbridge.dashboard.export import export_session_html
+
+        html = export_session_html(repo, "sess-001")
+        assert html is not None
+        out_path = tmp_path / "export.html"
+        out_path.write_text(html, encoding="utf-8")
+        content = out_path.read_text(encoding="utf-8")
+        assert "<!DOCTYPE html>" in content
+        assert "sess-001" in content
