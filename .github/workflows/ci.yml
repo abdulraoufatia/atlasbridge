@@ -112,6 +112,9 @@ jobs:
       - name: atlasbridge resume --help
         run: atlasbridge resume --help
 
+      - name: atlasbridge console --help
+        run: atlasbridge console --help
+
   lint:
     name: Lint & Type Check
     runs-on: ubuntu-latest

@@ -73,7 +73,7 @@ def test_safety_test_suite_has_minimum_files():
     """Safety test suite must have at least 19 test files."""
     safety_dir = ROOT / "tests" / "safety"
     test_files = list(safety_dir.glob("test_*.py"))
-    assert len(test_files) >= 21, (
-        f"Safety test suite has {len(test_files)} files, expected >= 21. "
+    assert len(test_files) >= 22, (
+        f"Safety test suite has {len(test_files)} files, expected >= 22. "
         f"Files: {sorted(f.name for f in test_files)}"
     )

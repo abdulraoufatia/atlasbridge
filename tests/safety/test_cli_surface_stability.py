@@ -45,6 +45,7 @@ FROZEN_TOP_LEVEL = frozenset(
         "pause",
         "resume",
         "dashboard",
+        "console",
     }
 )
 
@@ -86,3 +87,73 @@ def test_policy_subcommands():
     actual = set(policy.commands.keys())
     missing = expected - actual
     assert not missing, f"Policy subcommands removed: {sorted(missing)}"
+
+
+def test_dashboard_subcommands():
+    """Dashboard group must have its frozen subcommands."""
+    from atlasbridge.cli.main import cli
+
+    dashboard = cli.commands.get("dashboard")
+    assert dashboard is not None, "dashboard group missing"
+    assert isinstance(dashboard, click.Group)
+
+    expected = {"start", "status", "export"}
+    actual = set(dashboard.commands.keys())
+    missing = expected - actual
+    assert not missing, f"Dashboard subcommands removed: {sorted(missing)}"
+
+
+def test_config_subcommands():
+    """Config group must have its frozen subcommands."""
+    from atlasbridge.cli.main import cli
+
+    config = cli.commands.get("config")
+    assert config is not None, "config group missing"
+    assert isinstance(config, click.Group)
+
+    expected = {"show", "validate", "migrate"}
+    actual = set(config.commands.keys())
+    missing = expected - actual
+    assert not missing, f"Config subcommands removed: {sorted(missing)}"
+
+
+def test_cloud_subcommands():
+    """Cloud group must have its frozen subcommands."""
+    from atlasbridge.cli.main import cli
+
+    cloud = cli.commands.get("cloud")
+    assert cloud is not None, "cloud group missing"
+    assert isinstance(cloud, click.Group)
+
+    expected = {"status"}
+    actual = set(cloud.commands.keys())
+    missing = expected - actual
+    assert not missing, f"Cloud subcommands removed: {sorted(missing)}"
+
+
+def test_db_subcommands():
+    """DB group must have its frozen subcommands."""
+    from atlasbridge.cli.main import cli
+
+    db = cli.commands.get("db")
+    assert db is not None, "db group missing"
+    assert isinstance(db, click.Group)
+
+    expected = {"migrate"}
+    actual = set(db.commands.keys())
+    missing = expected - actual
+    assert not missing, f"DB subcommands removed: {sorted(missing)}"
+
+
+def test_lab_subcommands():
+    """Lab group must have its frozen subcommands."""
+    from atlasbridge.cli.main import cli
+
+    lab = cli.commands.get("lab")
+    assert lab is not None, "lab group missing"
+    assert isinstance(lab, click.Group)
+
+    expected = {"list", "run"}
+    actual = set(lab.commands.keys())
+    missing = expected - actual
+    assert not missing, f"Lab subcommands removed: {sorted(missing)}"
