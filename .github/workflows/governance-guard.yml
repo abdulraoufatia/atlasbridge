@@ -1,0 +1,31 @@
+name: Governance Guard
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: governance-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    name: Check Governance Gates
+    if: vars.DISABLE_PROJECT_AUTOMATION != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check governance gates
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/automation/governance_check.py --pr-number ${{ github.event.pull_request.number }}

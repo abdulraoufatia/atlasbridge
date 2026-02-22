@@ -1,0 +1,61 @@
+name: PR Status Sync
+
+on:
+  pull_request:
+    types: [opened, closed, reopened, converted_to_draft, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: pr-sync-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    name: Sync Issue Status
+    if: vars.DISABLE_PROJECT_AUTOMATION != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Extract linked issue and sync status
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_AUTOMATION_TOKEN }}
+          PR_ACTION: ${{ github.event.action }}
+          PR_MERGED: ${{ github.event.pull_request.merged }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          # Extract linked issue number from PR body
+          ISSUE_NUM=$(gh pr view "$PR_NUMBER" --json body -q '.body' | grep -oP '[Cc]loses?\s+#\K\d+' | head -1)
+
+          if [ -z "$ISSUE_NUM" ]; then
+            echo "No linked issue found in PR #${PR_NUMBER}, skipping."
+            exit 0
+          fi
+
+          echo "PR #${PR_NUMBER} links to issue #${ISSUE_NUM}"
+
+          # Map PR event to status
+          if [ "$PR_ACTION" = "closed" ] && [ "$PR_MERGED" = "true" ]; then
+            STATUS="Done"
+          elif [ "$PR_ACTION" = "closed" ]; then
+            STATUS="Backlog"
+          else
+            STATUS="In Progress"
+          fi
+
+          echo "Setting issue #${ISSUE_NUM} status to: ${STATUS}"
+          python scripts/automation/triage.py --issue-number "$ISSUE_NUM" --set-status "$STATUS"
+
+      - name: Check sprint completion on merge
+        if: github.event.action == 'closed' && github.event.pull_request.merged == true
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_AUTOMATION_TOKEN }}
+        run: python scripts/automation/sprint_rotate.py --check --trigger-if-complete

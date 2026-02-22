@@ -1,0 +1,42 @@
+name: Sprint Rotation
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"  # Every Monday 9am UTC
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (no mutations)"
+        type: boolean
+        default: false
+      max_items:
+        description: "Max items to pull into next sprint"
+        type: number
+        default: 8
+
+permissions:
+  contents: read
+
+jobs:
+  rotate:
+    name: Rotate Sprint
+    if: vars.DISABLE_PROJECT_AUTOMATION != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Rotate sprint
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_AUTOMATION_TOKEN }}
+        run: |
+          FLAGS="--rotate"
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            FLAGS="--dry-run"
+          fi
+          MAX="${{ inputs.max_items }}"
+          python scripts/automation/sprint_rotate.py $FLAGS --max-items "${MAX:-8}"

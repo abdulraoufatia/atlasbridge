@@ -87,6 +87,7 @@ This index helps you find the right document fast, whether you are a new user, a
 | [dashboard.md](dashboard.md) | Both | Dashboard deployment: SSH tunnel, reverse proxy, export, mobile access | When accessing dashboard remotely | Current |
 | [invariants.md](invariants.md) | Both | Correctness invariants: relay, policy, audit, dashboard, console | Before modifying safety-critical code | Current |
 | [releasing.md](releasing.md) | Contributor | Release process: tag-only publishing, version bumping, CI gates | When cutting a release | Current |
+| [automation-architecture.md](automation-architecture.md) | Contributor | GitHub Actions automation: issue triage, PR status sync, sprint rotation, governance guard | When modifying or extending project automation | Current |
 
 ---
 

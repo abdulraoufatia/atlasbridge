@@ -1,0 +1,33 @@
+name: Issue Triage
+
+on:
+  issues:
+    types: [opened, edited, labeled]
+
+permissions:
+  contents: read
+  issues: read
+
+concurrency:
+  group: issue-triage-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  triage:
+    name: Classify & Add to Project
+    if: >-
+      !contains(github.event.issue.labels.*.name, 'automation:ignore')
+      && vars.DISABLE_PROJECT_AUTOMATION != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Classify issue
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_AUTOMATION_TOKEN }}
+        run: python scripts/automation/triage.py --issue-number ${{ github.event.issue.number }}
