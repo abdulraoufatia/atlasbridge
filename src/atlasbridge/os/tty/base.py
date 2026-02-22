@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import asyncio
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 
 
@@ -51,7 +51,7 @@ class BaseTTY(ABC):
         self.config = config
         self.session_id = session_id
         self._reply_queue: asyncio.Queue[bytes] = asyncio.Queue()
-        self._output_callbacks: list = []
+        self._output_callbacks: list[Callable[[bytes], None]] = []
         self._running = False
 
     # ------------------------------------------------------------------
@@ -79,13 +79,14 @@ class BaseTTY(ABC):
     # ------------------------------------------------------------------
 
     @abstractmethod
-    async def read_output(self) -> AsyncIterator[bytes]:
+    def read_output(self) -> AsyncIterator[bytes]:
         """
         Yield raw byte chunks from the PTY master fd.
 
         Caller is responsible for ANSI stripping and detection.
         The iterator exits when the child process terminates (EOF).
         """
+        ...
 
     @abstractmethod
     async def inject_reply(self, data: bytes) -> None:
@@ -100,7 +101,7 @@ class BaseTTY(ABC):
     # Output observation
     # ------------------------------------------------------------------
 
-    def register_output_callback(self, cb) -> None:  # type: ignore[type-arg]
+    def register_output_callback(self, cb: Callable[[bytes], None]) -> None:
         """Register a callback to be called with each output chunk (bytes)."""
         self._output_callbacks.append(cb)
 

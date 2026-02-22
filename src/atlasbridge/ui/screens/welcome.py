@@ -29,7 +29,7 @@ from textual.screen import Screen
 from textual.widgets import Footer, Header, Label, Static
 
 
-class WelcomeScreen(Screen):  # type: ignore[type-arg]
+class WelcomeScreen(Screen):
     """Welcome screen and quick-action hub."""
 
     BINDINGS = [

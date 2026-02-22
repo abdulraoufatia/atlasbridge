@@ -69,13 +69,13 @@ def poll_state() -> AppState:
 
         db_path = _default_data_dir() / "atlasbridge.db"
         if db_path.exists():
-            db = Database(str(db_path))
+            db = Database(db_path)
             db.connect()
             try:
                 rows = db.list_active_sessions()
                 session_count = len(rows)
                 pending_count = sum(
-                    1 for r in rows if r.get("status") in ("routed", "awaiting_reply")
+                    1 for r in rows if dict(r).get("status") in ("routed", "awaiting_reply")
                 )
             finally:
                 db.close()

@@ -29,7 +29,7 @@ class MacOSTTY(BaseTTY):
 
     async def start(self) -> None:
         try:
-            import ptyprocess  # type: ignore[import]
+            import ptyprocess
         except ImportError as exc:
             raise RuntimeError(
                 "ptyprocess is required for macOS PTY support. Install with: pip install ptyprocess"
@@ -78,8 +78,10 @@ class MacOSTTY(BaseTTY):
 
     def _read_chunk(self) -> bytes:
         """Blocking read — run in executor to avoid blocking event loop."""
+        if self._proc is None:
+            raise EOFError
         try:
-            return self._proc.read(self.config.max_buffer_bytes)  # type: ignore[union-attr]
+            return self._proc.read(self.config.max_buffer_bytes)
         except EOFError:
             raise
 
@@ -105,7 +107,7 @@ class MacOSTTY(BaseTTY):
                 chunk = await loop.run_in_executor(
                     None,
                     sys.stdin.buffer.read1,
-                    1024,  # type: ignore[attr-defined]
+                    1024,
                 )
                 if chunk:
                     await loop.run_in_executor(None, self._proc.write, chunk)

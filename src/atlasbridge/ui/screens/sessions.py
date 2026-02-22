@@ -22,7 +22,7 @@ from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Header, Label, Static
 
 
-class SessionsScreen(Screen):  # type: ignore[type-arg]
+class SessionsScreen(Screen):
     """Active and recent session list."""
 
     BINDINGS = [
@@ -34,7 +34,7 @@ class SessionsScreen(Screen):  # type: ignore[type-arg]
         yield Header(show_clock=True)
         with Static(id="sessions-root"):
             yield Label("Sessions", id="sessions-title")
-            tbl: DataTable = DataTable(id="sessions-table")  # type: ignore[type-arg]
+            tbl: DataTable = DataTable(id="sessions-table")
             tbl.add_columns("ID", "Tool", "Status", "Started")
             yield tbl
         yield Footer()

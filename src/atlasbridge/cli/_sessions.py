@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.table import Table
 
 
-def _open_db():  # type: ignore[no-untyped-def]
+def _open_db():
     """Open the AtlasBridge database if it exists, or return None."""
     from atlasbridge.core.config import load_config
     from atlasbridge.core.exceptions import ConfigError, ConfigNotFoundError
@@ -28,7 +28,7 @@ def _open_db():  # type: ignore[no-untyped-def]
         return None
 
 
-def _row_to_dict(row) -> dict:  # type: ignore[type-arg]
+def _row_to_dict(row) -> dict:
     """Convert a sqlite3.Row to a plain dict."""
     return dict(row) if row else {}
 

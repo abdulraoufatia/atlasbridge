@@ -105,20 +105,20 @@ def _config_to_dict(
     """Convert AtlasBridgeConfig + run params into the DaemonManager config dict."""
     from pathlib import Path
 
-    db_path = config.db_path  # type: ignore[union-attr]
+    db_path = config.db_path
     channels: dict[str, object] = {}
 
-    if config.telegram is not None:  # type: ignore[union-attr]
+    if config.telegram is not None:
         channels["telegram"] = {
-            "bot_token": config.telegram.bot_token.get_secret_value(),  # type: ignore[union-attr]
-            "allowed_user_ids": config.telegram.allowed_users,  # type: ignore[union-attr]
+            "bot_token": config.telegram.bot_token.get_secret_value(),
+            "allowed_user_ids": config.telegram.allowed_users,
         }
 
-    if config.slack is not None:  # type: ignore[union-attr]
+    if config.slack is not None:
         channels["slack"] = {
-            "bot_token": config.slack.bot_token.get_secret_value(),  # type: ignore[union-attr]
-            "app_token": config.slack.app_token.get_secret_value(),  # type: ignore[union-attr]
-            "allowed_user_ids": config.slack.allowed_users,  # type: ignore[union-attr]
+            "bot_token": config.slack.bot_token.get_secret_value(),
+            "app_token": config.slack.app_token.get_secret_value(),
+            "allowed_user_ids": config.slack.allowed_users,
         }
 
     result: dict = {
@@ -129,8 +129,8 @@ def _config_to_dict(
         "cwd": cwd or str(Path.cwd()),
         "channels": channels,
         "prompts": {
-            "timeout_seconds": config.prompts.timeout_seconds,  # type: ignore[union-attr]
-            "stuck_timeout_seconds": config.prompts.stuck_timeout_seconds,  # type: ignore[union-attr]
+            "timeout_seconds": config.prompts.timeout_seconds,
+            "stuck_timeout_seconds": config.prompts.stuck_timeout_seconds,
         },
     }
     if policy_file:

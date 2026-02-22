@@ -44,7 +44,7 @@ class ConfigService:
             return False
 
     @staticmethod
-    def save(config_data: dict) -> str:  # type: ignore[type-arg]
+    def save(config_data: dict) -> str:
         """Save config and return the path as a string."""
         from atlasbridge.core.config import save_config
 
@@ -56,7 +56,7 @@ class DoctorService:
     """Run environment health checks via the same functions used by `atlasbridge doctor`."""
 
     @staticmethod
-    def run_checks() -> list[dict]:  # type: ignore[type-arg]
+    def run_checks() -> list[dict]:
         from atlasbridge.cli._doctor import (
             _check_bot_token,
             _check_config,
@@ -106,7 +106,7 @@ class SessionService:
     """List recent AtlasBridge sessions from the SQLite store."""
 
     @staticmethod
-    def list_sessions(limit: int = 20) -> list[dict]:  # type: ignore[type-arg]
+    def list_sessions(limit: int = 20) -> list[dict]:
         try:
             from atlasbridge.core.config import atlasbridge_dir
             from atlasbridge.core.store.database import Database
@@ -114,11 +114,11 @@ class SessionService:
             db_path = atlasbridge_dir() / "atlasbridge.db"
             if not db_path.exists():
                 return []
-            db = Database(str(db_path))
+            db = Database(db_path)
             db.connect()
             rows = db.list_sessions(limit=limit)
             db.close()
-            return rows
+            return [dict(r) for r in rows]
         except Exception:  # noqa: BLE001
             return []
 
@@ -127,15 +127,20 @@ class LogsService:
     """Read recent audit log events from the hash-chained audit log."""
 
     @staticmethod
-    def read_recent(limit: int = 100) -> list[dict]:  # type: ignore[type-arg]
+    def read_recent(limit: int = 100) -> list[dict]:
         try:
-            from atlasbridge.core.audit.writer import AuditWriter
             from atlasbridge.core.config import atlasbridge_dir
+            from atlasbridge.core.store.database import Database
 
-            log_path = atlasbridge_dir() / "audit.log"
-            if not log_path.exists():
+            db_path = atlasbridge_dir() / "atlasbridge.db"
+            if not db_path.exists():
                 return []
-            writer = AuditWriter(str(log_path))
-            return writer.read_recent(limit)
+            db = Database(db_path)
+            db.connect()
+            try:
+                events = db.get_recent_audit_events(limit=limit)
+                return [dict(e) for e in events]
+            finally:
+                db.close()
         except Exception:  # noqa: BLE001
             return []

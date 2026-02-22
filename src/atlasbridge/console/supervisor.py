@@ -55,7 +55,7 @@ class SystemHealth(Enum):
 
 def compute_health(
     statuses: list[ProcessInfo],
-    doctor_checks: list[dict] | None = None,  # type: ignore[type-arg]
+    doctor_checks: list[dict] | None = None,
 ) -> SystemHealth:
     """Derive aggregate health from process statuses and doctor checks."""
     # RED: any doctor check failed

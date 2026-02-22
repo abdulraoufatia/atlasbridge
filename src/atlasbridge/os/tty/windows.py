@@ -55,7 +55,7 @@ class WindowsTTY(BaseTTY):
     def pid(self) -> int:
         raise NotImplementedError
 
-    async def read_output(self) -> AsyncIterator[bytes]:  # type: ignore[override]
+    async def read_output(self) -> AsyncIterator[bytes]:
         raise NotImplementedError
         yield  # make this a generator (unreachable)
 
