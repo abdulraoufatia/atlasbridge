@@ -114,9 +114,9 @@ def cmd_stop(console: Console) -> None:
 
 def _build_daemon_config(config: object) -> dict:
     """Convert AtlasBridgeConfig into DaemonManager config dict."""
-    bot_token = config.telegram.bot_token.get_secret_value()  # type: ignore[union-attr]
-    allowed_users = config.telegram.allowed_users  # type: ignore[union-attr]
-    db_path = config.db_path  # type: ignore[union-attr]
+    bot_token = config.telegram.bot_token.get_secret_value()
+    allowed_users = config.telegram.allowed_users
+    db_path = config.db_path
 
     return {
         "data_dir": str(db_path.parent),
@@ -127,7 +127,7 @@ def _build_daemon_config(config: object) -> dict:
             }
         },
         "prompts": {
-            "timeout_seconds": config.prompts.timeout_seconds,  # type: ignore[union-attr]
-            "stuck_timeout_seconds": config.prompts.stuck_timeout_seconds,  # type: ignore[union-attr]
+            "timeout_seconds": config.prompts.timeout_seconds,
+            "stuck_timeout_seconds": config.prompts.stuck_timeout_seconds,
         },
     }

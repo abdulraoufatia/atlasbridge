@@ -27,7 +27,7 @@ _CSS_TEXT: str = files("atlasbridge.console.css").joinpath("console.tcss").read_
 # ---------------------------------------------------------------------------
 
 
-class _ConsoleCard(Static):  # type: ignore[type-arg]
+class _ConsoleCard(Static):
     """Single status card for the console."""
 
     def __init__(self, title: str, value: str, card_id: str) -> None:
@@ -51,7 +51,7 @@ class _ConsoleCard(Static):  # type: ignore[type-arg]
 # ---------------------------------------------------------------------------
 
 
-class ConsoleScreen(Screen):  # type: ignore[type-arg]
+class ConsoleScreen(Screen):
     """Main operator console screen."""
 
     BINDINGS = [
@@ -76,7 +76,7 @@ class ConsoleScreen(Screen):  # type: ignore[type-arg]
         self._dashboard_port = dashboard_port
         self._last_poll_time: str = ""
         self._last_event_time: str = ""
-        self._doctor_results: list[dict] | None = None  # type: ignore[type-arg]
+        self._doctor_results: list[dict] | None = None
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -383,7 +383,7 @@ class ConsoleScreen(Screen):  # type: ignore[type-arg]
 # ---------------------------------------------------------------------------
 
 
-class ConsoleApp(App):  # type: ignore[type-arg]
+class ConsoleApp(App):
     """AtlasBridge Operator Console application."""
 
     TITLE = f"AtlasBridge Console {__version__}"

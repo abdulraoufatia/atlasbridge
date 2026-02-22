@@ -22,7 +22,7 @@ from textual.screen import Screen
 from textual.widgets import Footer, Header, Label, RichLog, Static
 
 
-class LogsScreen(Screen):  # type: ignore[type-arg]
+class LogsScreen(Screen):
     """Audit log tail view."""
 
     BINDINGS = [

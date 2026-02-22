@@ -16,7 +16,7 @@ from atlasbridge import __version__
 _CSS_TEXT: str = files("atlasbridge.ui.css").joinpath("atlasbridge.tcss").read_text("utf-8")
 
 
-class AtlasBridgeApp(App):  # type: ignore[type-arg]
+class AtlasBridgeApp(App):
     """AtlasBridge interactive terminal UI."""
 
     TITLE = f"AtlasBridge {__version__}"

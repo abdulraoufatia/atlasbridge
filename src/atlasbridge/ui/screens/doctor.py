@@ -22,7 +22,7 @@ from textual.screen import Screen
 from textual.widgets import Footer, Header, Label, Static
 
 
-class DoctorScreen(Screen):  # type: ignore[type-arg]
+class DoctorScreen(Screen):
     """Environment and configuration health check."""
 
     BINDINGS = [

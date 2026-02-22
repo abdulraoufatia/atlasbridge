@@ -72,7 +72,7 @@ _SLACK_HELP = (
 )
 
 
-class SetupWizardScreen(Screen):  # type: ignore[type-arg]
+class SetupWizardScreen(Screen):
     """Interactive 4-step setup wizard."""
 
     BINDINGS = [
@@ -286,11 +286,11 @@ class SetupWizardScreen(Screen):  # type: ignore[type-arg]
     # Event handlers
     # ------------------------------------------------------------------
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
+    async def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-next":
-            self.action_next_step()
+            await self.action_next_step()
         elif event.button.id == "btn-back":
-            self.action_prev_step()
+            await self.action_prev_step()
         elif event.button.id == "btn-finish":
             self._do_finish()
 
@@ -320,7 +320,7 @@ class SetupWizardScreen(Screen):  # type: ignore[type-arg]
     # Actions
     # ------------------------------------------------------------------
 
-    def action_next_step(self) -> None:
+    async def action_next_step(self) -> None:
         if self._wizard.is_last_step:
             self._do_finish()
             return
@@ -331,19 +331,19 @@ class SetupWizardScreen(Screen):  # type: ignore[type-arg]
             return
         self._clear_error()
         self._wizard = self._wizard.next()
-        self.recompose()
+        await self.recompose()
 
-    def action_prev_step(self) -> None:
+    async def action_prev_step(self) -> None:
         self._collect_inputs()
         self._clear_error()
         self._wizard = self._wizard.prev()
-        self.recompose()
+        await self.recompose()
 
-    def action_cancel(self) -> None:
+    async def action_cancel(self) -> None:
         if self._wizard.is_first_step:
             self.app.pop_screen()
         else:
-            self.action_prev_step()
+            await self.action_prev_step()
 
     def action_show_help(self) -> None:
         channel = self._wizard.channel

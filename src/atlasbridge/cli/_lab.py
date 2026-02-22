@@ -21,7 +21,7 @@ def _import_scenario_registry() -> object:
     """Import ScenarioRegistry, raising a user-friendly error if tests/ is not available."""
     _ensure_tests_importable()
     try:
-        from tests.prompt_lab.simulator import ScenarioRegistry  # type: ignore[import]
+        from tests.prompt_lab.simulator import ScenarioRegistry
 
         return ScenarioRegistry
     except ModuleNotFoundError as exc:
@@ -39,7 +39,7 @@ def cmd_lab_list(as_json: bool, console: Console) -> None:
     scenarios = registry.list_all()  # type: ignore[attr-defined]
 
     if as_json:
-        rows = [{"id": cls.scenario_id, "name": name} for name, cls in scenarios.items()]  # type: ignore[attr-defined]
+        rows = [{"id": cls.scenario_id, "name": name} for name, cls in scenarios.items()]
         print(json.dumps(rows, indent=2))
         return
 
@@ -51,7 +51,7 @@ def cmd_lab_list(as_json: bool, console: Console) -> None:
 
     console.print(f"  {'QA ID':<10} {'Name':<35} Status")
     console.print(f"  {'─' * 10} {'─' * 35} {'─' * 10}")
-    for name, cls in sorted(scenarios.items(), key=lambda x: x[1].scenario_id):  # type: ignore[attr-defined]
+    for name, cls in sorted(scenarios.items(), key=lambda x: x[1].scenario_id):
         console.print(f"  {cls.scenario_id:<10} {name:<35} [green]registered[/green]")
     console.print(f"\n{len(scenarios)} scenarios registered.")
 
@@ -68,7 +68,7 @@ def cmd_lab_run(
     import asyncio
 
     _ensure_tests_importable()
-    from tests.prompt_lab.simulator import Simulator  # type: ignore[import]
+    from tests.prompt_lab.simulator import Simulator
 
     registry.discover()  # type: ignore[attr-defined]
 

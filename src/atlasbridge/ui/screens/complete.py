@@ -20,7 +20,7 @@ from textual.screen import Screen
 from textual.widgets import Footer, Header, Static
 
 
-class SetupCompleteScreen(Screen):  # type: ignore[type-arg]
+class SetupCompleteScreen(Screen):
     """Confirmation screen shown after a successful wizard run."""
 
     BINDINGS = [

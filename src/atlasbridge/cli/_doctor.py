@@ -32,7 +32,7 @@ def _check_platform() -> dict:
 
 def _check_ptyprocess() -> dict:
     try:
-        import ptyprocess  # type: ignore[import]  # noqa: F401
+        import ptyprocess  # noqa: F401
 
         return {"name": "ptyprocess", "status": "pass", "detail": "installed"}
     except ImportError:

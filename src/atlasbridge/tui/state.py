@@ -181,7 +181,7 @@ class WizardState:
                 return "Slack user IDs must be like U1234567890."
         return ""
 
-    def build_config_data(self) -> dict:  # type: ignore[type-arg]
+    def build_config_data(self) -> dict:
         """Build the dict to pass to save_config()."""
         if self.channel == "telegram":
             users = [int(u.strip()) for u in self.users.split(",") if u.strip()]

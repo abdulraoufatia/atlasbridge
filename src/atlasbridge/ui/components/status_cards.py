@@ -18,7 +18,7 @@ from textual.widgets import Label, Static
 from atlasbridge.ui.state import AppState, ConfigStatus, DaemonStatus
 
 
-class _Card(Static):  # type: ignore[type-arg]
+class _Card(Static):
     """Single status card."""
 
     DEFAULT_CSS = """
