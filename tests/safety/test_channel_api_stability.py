@@ -13,6 +13,7 @@ FROZEN_ABSTRACT_METHODS = frozenset(
         "close",
         "send_prompt",
         "notify",
+        "send_output",
         "edit_prompt_message",
         "receive_replies",
         "is_allowed",

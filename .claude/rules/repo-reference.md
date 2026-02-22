@@ -12,6 +12,7 @@ src/atlasbridge/         ← installed package (where = ["src"])
     prompt/              — detector.py, state.py, models.py
     session/             — models.py, manager.py
     routing/             — router.py
+    interaction/         — classifier.py, plan.py, executor.py, engine.py, output_forwarder.py
     store/               — database.py (SQLite WAL)
     audit/               — writer.py (hash-chained audit log)
     daemon/              — manager.py (orchestrates everything)
@@ -55,6 +56,11 @@ docs/                    — all design documents
 | `src/atlasbridge/core/prompt/models.py` | PromptEvent, Reply, PromptType, Confidence |
 | `src/atlasbridge/core/prompt/state.py` | PromptStateMachine, VALID_TRANSITIONS |
 | `src/atlasbridge/core/routing/router.py` | PromptRouter (forward + return path) |
+| `src/atlasbridge/core/interaction/classifier.py` | InteractionClassifier — refines PromptType to InteractionClass |
+| `src/atlasbridge/core/interaction/plan.py` | InteractionPlan + build_plan() — execution strategy per class |
+| `src/atlasbridge/core/interaction/executor.py` | InteractionExecutor — injection, retry, advance verification |
+| `src/atlasbridge/core/interaction/engine.py` | InteractionEngine — per-session classify → plan → execute orchestrator |
+| `src/atlasbridge/core/interaction/output_forwarder.py` | OutputForwarder — batched PTY output → channel messages |
 | `src/atlasbridge/core/session/manager.py` | SessionManager (in-memory registry) |
 | `src/atlasbridge/core/store/database.py` | SQLite WAL store + decide_prompt() guard |
 | `src/atlasbridge/core/audit/writer.py` | Hash-chained audit event writer |

@@ -1,0 +1,181 @@
+# Conversation UX v2 — Interaction Pipeline
+
+**Status:** Current
+**Phase:** C.Y — Local UX improvement
+**Version:** v0.9.0+
+
+---
+
+## Overview
+
+Conversation UX v2 upgrades the human-operator experience from a raw terminal relay to a structured, conversational interface. The interaction pipeline classifies prompts, builds execution plans, handles injection with retry/verification, and provides structured feedback — while preserving all existing correctness invariants.
+
+### Key capabilities
+
+- **Structured prompt handling** — yes/no, confirm-enter, numbered-choice, free-text, and password prompts each get tailored button layouts and feedback
+- **Chat Mode** — operators can type naturally between prompts; CLI output is forwarded as monospace messages
+- **Retry and escalation** — if the CLI doesn't respond after injection, retry once then escalate
+- **Password redaction** — credentials are never shown in feedback messages or logs
+- **Operator feedback** — "Sent: y + Enter", "CLI advanced", "Sent: [REDACTED] + Enter"
+
+---
+
+## Architecture
+
+```
+PromptDetector
+  → PromptRouter._dispatch() → InteractionClassifier.classify()
+    → InteractionPlan via build_plan()
+      → Channel (structured buttons + feedback)
+  → User responds
+  → PromptRouter.handle_reply() → InteractionEngine.handle_prompt_reply()
+    → InteractionExecutor.execute()
+      → adapter.inject_reply() → verify advance → retry/escalate → feedback
+
+Chat Mode (no active prompt):
+  PTY output → OutputForwarder → Channel (code block messages)
+  User message → PromptRouter._chat_mode_handler
+    → InteractionEngine.handle_chat_input()
+      → PTY stdin
+```
+
+---
+
+## Components
+
+### InteractionClassifier (`core/interaction/classifier.py`)
+
+Refines `PromptType` into a finer-grained `InteractionClass`:
+
+| InteractionClass | Maps from | Description |
+|-----------------|-----------|-------------|
+| `YES_NO` | TYPE_YES_NO | Binary confirmation |
+| `CONFIRM_ENTER` | TYPE_CONFIRM_ENTER | Press Enter to continue |
+| `NUMBERED_CHOICE` | TYPE_MULTIPLE_CHOICE | Numbered menu selection |
+| `FREE_TEXT` | TYPE_FREE_TEXT | Generic text input |
+| `PASSWORD_INPUT` | TYPE_FREE_TEXT (refined) | Sensitive credential input |
+| `CHAT_INPUT` | N/A (no prompt) | Conversational mode |
+
+Password detection uses regex patterns matching common credential prompts (password, token, API key, secret, etc.).
+
+**Design:** `InteractionClass` does NOT replace `PromptType`. It is a refinement layer used only within the interaction engine.
+
+### InteractionPlan (`core/interaction/plan.py`)
+
+Frozen dataclass mapping each `InteractionClass` to an execution strategy:
+
+| Field | Purpose |
+|-------|---------|
+| `append_cr` | Append `\r` after value (always True) |
+| `suppress_value` | Redact value in logs/feedback (True for PASSWORD_INPUT) |
+| `max_retries` | Retry count if CLI stalls (0–1) |
+| `retry_delay_s` | Wait between retries (2s) |
+| `verify_advance` | Check if CLI produced new output |
+| `advance_timeout_s` | Timeout for advance check (5s) |
+| `escalate_on_exhaustion` | Escalate when retries exhausted |
+| `display_template` | Feedback template (e.g., "Sent: {value} + Enter") |
+| `button_layout` | Channel button layout hint |
+
+Plans are created via `build_plan(interaction_class)` — a pure function with no side effects.
+
+### InteractionExecutor (`core/interaction/executor.py`)
+
+Handles the actual injection and verification:
+
+1. Inject value via `adapter.inject_reply()` (uses existing `_normalise()` with `\r`)
+2. If `verify_advance`: poll `detector.last_output_time` at 200ms intervals
+3. If stalled + retries remain: notify, wait, re-inject
+4. If retries exhausted + escalation enabled: send escalation message
+
+Returns `InjectionResult` with success/failure, advance status, retry count, and feedback.
+
+### InteractionEngine (`core/interaction/engine.py`)
+
+Per-session orchestrator:
+
+- `handle_prompt_reply(event, reply)` — classify → plan → execute → return result
+- `handle_chat_input(reply)` — direct PTY stdin injection for conversational mode
+
+### OutputForwarder (`core/interaction/output_forwarder.py`)
+
+Batches PTY output and forwards to channel as monospace messages:
+
+| Setting | Value | Purpose |
+|---------|-------|---------|
+| `BATCH_INTERVAL_S` | 2.0 | Collect output for 2s before sending |
+| `MAX_OUTPUT_CHARS` | 2000 | Truncate long output |
+| `MAX_MESSAGES_PER_MINUTE` | 15 | Rate limit |
+| `MIN_MEANINGFUL_CHARS` | 10 | Skip tiny fragments |
+
+---
+
+## Operator Feedback Messages
+
+| Scenario | Message |
+|----------|---------|
+| Yes/No answered | `Sent: y + Enter` |
+| Choice selected | `Sent: option 2 + Enter` |
+| Enter pressed | `Sent: Enter` |
+| Free text sent | `Sent: "deploy staging" + Enter` |
+| Password sent | `Sent: [REDACTED] + Enter` |
+| CLI advanced | `CLI advanced` |
+| Stalled, retrying | `CLI did not respond to "y", retrying...` |
+| Retry exhausted | `This prompt requires raw keyboard interaction (arrow keys). Please run locally once.` |
+| Chat input | `Sent: "check the logs"` |
+
+---
+
+## Router Integration
+
+The PromptRouter accepts two optional parameters:
+
+- `interaction_engine` — when set, `handle_reply()` uses the interaction pipeline instead of direct `adapter.inject_reply()`
+- `chat_mode_handler` — when set and a free-text reply has no active prompt, routes to chat mode instead of dropping
+
+Both are backwards-compatible: without these params, the existing direct injection path is unchanged.
+
+---
+
+## Daemon Wiring
+
+In `DaemonManager._run_adapter_session()`:
+
+1. After the detector is obtained, `InteractionEngine` and `OutputForwarder` are created
+2. The engine is injected into `PromptRouter` via `_interaction_engine` and `_chat_mode_handler`
+3. `OutputForwarder.feed()` is called in the read loop for every PTY output chunk
+4. `OutputForwarder.flush_loop()` runs as a task in the session's `TaskGroup`
+
+---
+
+## Invariant Preservation
+
+All existing correctness invariants remain enforced:
+
+| Invariant | How preserved |
+|-----------|--------------|
+| No duplicate injection | Nonce guard in `decide_prompt()` — executor uses existing adapter path |
+| No expired injection | TTL checked in router before reaching executor |
+| No cross-session injection | Session binding checked in router before reaching executor |
+| No unauthorized injection | Allowlist checked in router before reaching executor |
+| No echo loops | `detector.mark_injected()` called after every injection |
+| No lost prompts | Pending prompt reload unchanged |
+| Bounded memory | Rolling 4096-byte buffer unchanged |
+| CR semantics | All PTY injection uses `\r` (never `\n`) |
+| Password safety | `suppress_value=True` prevents credentials in feedback/logs |
+
+---
+
+## Test Coverage
+
+| Test file | Count | What it tests |
+|-----------|-------|---------------|
+| `test_interaction_classifier.py` | 19 | Classification for all prompt types, password detection, chat input |
+| `test_interaction_plan.py` | 27 | Plan building, frozen immutability, button layouts, display templates |
+| `test_interaction_executor.py` | 14 | Injection, advance verification, retry, escalation, password redaction |
+| `test_interaction_engine.py` | 7 | Orchestration flow, chat input, feedback routing |
+| `test_output_forwarder.py` | 17 | ANSI stripping, batching, truncation, rate limiting, flush loop |
+| `test_router.py` | 15 | Forward/return path + interaction engine + chat mode integration |
+| `test_interaction_flow.py` | 6 | End-to-end pipeline: yes/no, confirm-enter, password, chat mode |
+| `test_interaction_safety.py` | 27 | CR semantics, password redaction, echo suppression, determinism |
+
+**Total:** 132 tests covering the interaction pipeline.
