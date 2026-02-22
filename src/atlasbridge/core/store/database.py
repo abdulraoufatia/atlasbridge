@@ -295,3 +295,75 @@ class Database:
         return self._db.execute(
             "SELECT * FROM audit_events ORDER BY timestamp DESC LIMIT ?", (limit,)
         ).fetchall()
+
+    def count_audit_events(self) -> int:
+        """Return the total number of audit events."""
+        row = self._db.execute("SELECT count(*) FROM audit_events").fetchone()
+        return row[0] if row else 0
+
+    def archive_audit_events(
+        self,
+        archive_path: Path,
+        before_date: str,
+    ) -> int:
+        """Move audit events older than *before_date* to *archive_path*.
+
+        The archived events are written to a new SQLite file with the
+        same ``audit_events`` schema, preserving hash chain order.
+        Events are then deleted from the main database.
+
+        Returns the number of events archived.
+        """
+        rows = self._db.execute(
+            "SELECT * FROM audit_events WHERE timestamp < ? ORDER BY timestamp ASC",
+            (before_date,),
+        ).fetchall()
+
+        if not rows:
+            return 0
+
+        # Create archive database with same schema
+        archive_db = sqlite3.connect(str(archive_path))
+        archive_db.execute("PRAGMA journal_mode=WAL")
+        archive_db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS audit_events (
+                id          TEXT PRIMARY KEY,
+                event_type  TEXT NOT NULL,
+                session_id  TEXT NOT NULL DEFAULT '',
+                prompt_id   TEXT NOT NULL DEFAULT '',
+                payload     TEXT NOT NULL DEFAULT '{}',
+                timestamp   TEXT NOT NULL,
+                prev_hash   TEXT NOT NULL DEFAULT '',
+                hash        TEXT NOT NULL DEFAULT ''
+            )
+            """
+        )
+        archive_db.execute("CREATE INDEX IF NOT EXISTS idx_archive_ts ON audit_events(timestamp)")
+
+        # Copy rows to archive
+        for row in rows:
+            archive_db.execute(
+                """INSERT OR IGNORE INTO audit_events
+                   (id, event_type, session_id, prompt_id, payload,
+                    timestamp, prev_hash, hash)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    row["id"],
+                    row["event_type"],
+                    row["session_id"],
+                    row["prompt_id"],
+                    row["payload"],
+                    row["timestamp"],
+                    row["prev_hash"],
+                    row["hash"],
+                ),
+            )
+        archive_db.commit()
+        archive_db.close()
+
+        # Delete archived events from main database
+        self._db.execute("DELETE FROM audit_events WHERE timestamp < ?", (before_date,))
+        self._db.commit()
+
+        return len(rows)

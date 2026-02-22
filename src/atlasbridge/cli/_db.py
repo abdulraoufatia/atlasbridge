@@ -162,3 +162,127 @@ def db_migrate(dry_run: bool, as_json: bool) -> None:
     finally:
         if conn is not None:
             conn.close()
+
+
+@db_group.command("archive")
+@click.option(
+    "--days",
+    default=90,
+    show_default=True,
+    help="Archive events older than this many days.",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Show what would be archived without making changes.",
+)
+@click.option("--json", "as_json", is_flag=True, default=False)
+def db_archive(days: int, dry_run: bool, as_json: bool) -> None:
+    """Archive old audit events to a separate database file."""
+    from datetime import UTC, datetime, timedelta
+
+    from atlasbridge.core.config import atlasbridge_dir
+    from atlasbridge.core.constants import AUDIT_MAX_ARCHIVES, DB_FILENAME
+    from atlasbridge.core.store.database import Database
+
+    db_path = atlasbridge_dir() / DB_FILENAME
+
+    if not db_path.exists():
+        if as_json:
+            import json as _json
+
+            click.echo(_json.dumps({"status": "no_database", "path": str(db_path)}))
+        else:
+            console.print(f"Database does not exist yet: {db_path}")
+        return
+
+    db = Database(db_path)
+    db.connect()
+    try:
+        total_events = db.count_audit_events()
+        cutoff = datetime.now(UTC) - timedelta(days=days)
+        cutoff_str = cutoff.isoformat()
+
+        if dry_run:
+            import sqlite3
+
+            conn = sqlite3.connect(str(db_path), check_same_thread=False)
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT count(*) as cnt FROM audit_events WHERE timestamp < ?",
+                (cutoff_str,),
+            ).fetchone()
+            conn.close()
+            archivable = row["cnt"] if row else 0
+
+            if as_json:
+                import json as _json
+
+                click.echo(
+                    _json.dumps(
+                        {
+                            "total_events": total_events,
+                            "archivable": archivable,
+                            "remaining": total_events - archivable,
+                            "cutoff_date": cutoff_str,
+                            "days": days,
+                            "dry_run": True,
+                        },
+                        indent=2,
+                    )
+                )
+            else:
+                console.print("[bold]Audit Log Archive Preview[/bold]")
+                console.print(f"Total events:     {total_events}")
+                console.print(f"Archivable:       {archivable} (older than {days} days)")
+                console.print(f"Would remain:     {total_events - archivable}")
+                console.print(f"Cutoff:           {cutoff_str[:10]}")
+                if archivable == 0:
+                    console.print("\n[green]Nothing to archive.[/green]")
+                else:
+                    console.print("\nRun without [cyan]--dry-run[/cyan] to archive.")
+            return
+
+        # Rotate existing archives: .2 → .3, .1 → .2 (keep max AUDIT_MAX_ARCHIVES)
+        archive_base = db_path.parent / "audit_archive"
+        for i in range(AUDIT_MAX_ARCHIVES - 1, 0, -1):
+            old = archive_base.with_suffix(f".{i}.db")
+            new = archive_base.with_suffix(f".{i + 1}.db")
+            if old.exists():
+                if i + 1 > AUDIT_MAX_ARCHIVES:
+                    old.unlink()
+                else:
+                    old.rename(new)
+
+        # Delete oldest if it exceeds max
+        overflow = archive_base.with_suffix(f".{AUDIT_MAX_ARCHIVES + 1}.db")
+        if overflow.exists():
+            overflow.unlink()
+
+        archive_path = archive_base.with_suffix(".1.db")
+        archived = db.archive_audit_events(archive_path, cutoff_str)
+
+        if as_json:
+            import json as _json
+
+            click.echo(
+                _json.dumps(
+                    {
+                        "archived": archived,
+                        "remaining": total_events - archived,
+                        "archive_path": str(archive_path),
+                        "cutoff_date": cutoff_str,
+                        "days": days,
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            if archived == 0:
+                console.print("[green]Nothing to archive.[/green] All events are recent.")
+            else:
+                console.print(f"[green]Archived {archived} events[/green] to {archive_path.name}")
+                console.print(f"Remaining events: {total_events - archived}")
+    finally:
+        db.close()

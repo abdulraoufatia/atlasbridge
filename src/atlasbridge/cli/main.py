@@ -12,6 +12,7 @@ Commands:
   atlasbridge sessions           — list active sessions
   atlasbridge logs               — stream or show recent audit log
   atlasbridge doctor [--fix]     — environment and configuration health check
+  atlasbridge db archive         — archive old audit events (retention policy)
   atlasbridge debug bundle       — create a redacted support bundle
   atlasbridge channel add <type> — add/reconfigure a notification channel
   atlasbridge adapter list       — show available tool adapters

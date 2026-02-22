@@ -67,6 +67,13 @@ ECHO_SUPPRESS_MS = 500  # ms to suppress detection after injection
 DEFAULT_DETECTION_THRESHOLD = 0.65  # confidence threshold for routing
 
 # ---------------------------------------------------------------------------
+# Audit log rotation
+# ---------------------------------------------------------------------------
+
+AUDIT_RETENTION_DAYS = 90  # default: archive events older than 90 days
+AUDIT_MAX_ARCHIVES = 3  # keep at most 3 archive files
+
+# ---------------------------------------------------------------------------
 # Network
 # ---------------------------------------------------------------------------
 
