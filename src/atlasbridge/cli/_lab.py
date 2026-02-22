@@ -6,7 +6,40 @@ import json
 import sys
 from pathlib import Path
 
+import click
 from rich.console import Console
+
+_console = Console()
+
+
+@click.group("lab")
+def lab_group() -> None:
+    """Prompt Lab — deterministic QA scenario runner (dev/CI)."""
+
+
+@lab_group.command("list")
+@click.option("--json", "as_json", is_flag=True, default=False)
+def lab_list_cmd(as_json: bool) -> None:
+    """List all registered Prompt Lab scenarios."""
+    cmd_lab_list(as_json=as_json, console=_console)
+
+
+@lab_group.command("run")
+@click.argument("scenario", default="")
+@click.option("--all", "run_all", is_flag=True, default=False, help="Run all scenarios")
+@click.option("--filter", "pattern", default="", help="Run scenarios matching pattern")
+@click.option("--verbose", "-v", is_flag=True, default=False)
+@click.option("--json", "as_json", is_flag=True, default=False)
+def lab_run_cmd(scenario: str, run_all: bool, pattern: str, verbose: bool, as_json: bool) -> None:
+    """Run one or more Prompt Lab QA scenarios."""
+    cmd_lab_run(
+        scenario=scenario,
+        run_all=run_all,
+        pattern=pattern,
+        verbose=verbose,
+        as_json=as_json,
+        console=_console,
+    )
 
 
 def _ensure_tests_importable() -> None:

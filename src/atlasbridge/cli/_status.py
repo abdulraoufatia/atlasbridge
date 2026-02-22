@@ -6,8 +6,18 @@ import json
 import os
 from pathlib import Path
 
+import click
 from rich.console import Console
 from rich.table import Table
+
+_console = Console()
+
+
+@click.command("status")
+@click.option("--json", "as_json", is_flag=True, default=False)
+def status_cmd(as_json: bool) -> None:
+    """Show daemon and session status."""
+    cmd_status(as_json=as_json, console=_console)
 
 
 def _pid_file_path() -> Path:

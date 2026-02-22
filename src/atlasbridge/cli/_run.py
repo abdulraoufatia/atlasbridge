@@ -5,7 +5,36 @@ from __future__ import annotations
 import asyncio
 import sys
 
+import click
 from rich.console import Console
+
+_console = Console()
+
+
+@click.command("run", context_settings={"ignore_unknown_options": True, "allow_extra_args": True})
+@click.argument("tool", default="claude")
+@click.argument("tool_args", nargs=-1, type=click.UNPROCESSED)
+@click.option("--session-label", default="", help="Human-readable label for this session")
+@click.option("--cwd", default="", help="Working directory for the tool")
+@click.option(
+    "--policy",
+    "policy_file",
+    default="",
+    help="Path to a policy YAML file (v0 or v1) for this session.",
+)
+def run_cmd(
+    tool: str, tool_args: tuple[str, ...], session_label: str, cwd: str, policy_file: str
+) -> None:
+    """Launch a CLI tool under AtlasBridge supervision."""
+    command = [tool] + list(tool_args)
+    cmd_run(
+        tool=tool,
+        command=command,
+        label=session_label,
+        cwd=cwd,
+        policy_file=policy_file,
+        console=_console,
+    )
 
 
 def cmd_run(

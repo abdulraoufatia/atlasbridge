@@ -11,7 +11,27 @@ import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
+import click
 from rich.console import Console
+
+_console = Console()
+
+
+@click.group("debug")
+def debug_group() -> None:
+    """Debugging utilities."""
+
+
+@debug_group.command("bundle")
+@click.option("--output", default="", help="Output path for the bundle")
+@click.option("--include-logs", default=500, help="Number of log lines to include")
+@click.option("--no-redact", is_flag=True, default=False, help="Include secrets unredacted")
+def debug_bundle_cmd(output: str, include_logs: int, no_redact: bool) -> None:
+    """Create a redacted support bundle."""
+    cmd_debug_bundle(
+        output=output, include_logs=include_logs, redact=not no_redact, console=_console
+    )
+
 
 # Patterns for secrets to redact
 _TOKEN_PATTERNS = [

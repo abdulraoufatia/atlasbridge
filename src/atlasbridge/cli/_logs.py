@@ -5,8 +5,21 @@ from __future__ import annotations
 import json
 import time
 
+import click
 from rich.console import Console
 from rich.table import Table
+
+_console = Console()
+
+
+@click.command("logs")
+@click.option("--session", "session_id", default="", help="Filter by session ID prefix")
+@click.option("--tail", is_flag=True, default=False, help="Follow log output")
+@click.option("--limit", default=50, help="Number of recent events to show")
+@click.option("--json", "as_json", is_flag=True, default=False)
+def logs_cmd(session_id: str, tail: bool, limit: int, as_json: bool) -> None:
+    """Show recent audit log events."""
+    cmd_logs(session_id=session_id, tail=tail, limit=limit, as_json=as_json, console=_console)
 
 
 def cmd_logs(session_id: str, tail: bool, limit: int, as_json: bool, console: Console) -> None:

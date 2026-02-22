@@ -7,8 +7,32 @@ import re
 import shutil
 import sys
 
+import click
 from rich.console import Console
 from rich.prompt import Confirm, Prompt
+
+_console = Console()
+
+
+@click.command("setup")
+@click.option("--channel", type=click.Choice(["telegram", "slack"]), default="telegram")
+@click.option("--non-interactive", is_flag=True, default=False, help="Read from env vars only")
+@click.option(
+    "--from-env", is_flag=True, default=False, help="Build config from ATLASBRIDGE_* env vars"
+)
+@click.option("--token", default="", help="Telegram bot token (non-interactive mode)")
+@click.option("--users", default="", help="Comma-separated allowed Telegram user IDs")
+def setup_cmd(channel: str, non_interactive: bool, from_env: bool, token: str, users: str) -> None:
+    """Interactive first-time configuration wizard."""
+    run_setup(
+        channel=channel,
+        non_interactive=non_interactive,
+        console=_console,
+        token=token,
+        users=users,
+        from_env=from_env,
+    )
+
 
 _TELEGRAM_TOKEN_RE = re.compile(r"\d{8,12}:[A-Za-z0-9_\-]{35,}")
 _SLACK_BOT_TOKEN_RE = re.compile(r"xoxb-[A-Za-z0-9\-]+")

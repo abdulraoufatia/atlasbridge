@@ -7,7 +7,25 @@ import signal
 import sys
 from pathlib import Path
 
+import click
 from rich.console import Console
+
+_console = Console()
+
+
+@click.command("start")
+@click.option(
+    "--foreground", "-f", is_flag=True, default=False, help="Run in foreground (do not daemonise)"
+)
+def start_cmd(foreground: bool) -> None:
+    """Start the AtlasBridge daemon."""
+    cmd_start(foreground=foreground, console=_console)
+
+
+@click.command("stop")
+def stop_cmd() -> None:
+    """Stop the running AtlasBridge daemon."""
+    cmd_stop(console=_console)
 
 
 def _pid_file_path() -> Path:

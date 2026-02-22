@@ -5,8 +5,36 @@ from __future__ import annotations
 import json
 import sys
 
+import click
 from rich.console import Console
 from rich.table import Table
+
+_console = Console()
+
+
+@click.group("sessions", invoke_without_command=True)
+@click.pass_context
+def sessions_group(ctx: click.Context) -> None:
+    """Session lifecycle commands."""
+    if ctx.invoked_subcommand is None:
+        ctx.invoke(sessions_list_cmd)
+
+
+@sessions_group.command("list")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON")
+@click.option("--all", "show_all", is_flag=True, default=False, help="Include completed sessions")
+@click.option("--limit", default=50, show_default=True, help="Max sessions to show")
+def sessions_list_cmd(as_json: bool = False, show_all: bool = False, limit: int = 50) -> None:
+    """List active and recent sessions."""
+    cmd_sessions_list(as_json=as_json, show_all=show_all, limit=limit, console=_console)
+
+
+@sessions_group.command("show")
+@click.argument("session_id")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON")
+def sessions_show_cmd(session_id: str, as_json: bool = False) -> None:
+    """Show details for a specific session."""
+    cmd_sessions_show(session_id=session_id, as_json=as_json, console=_console)
 
 
 def _open_db():

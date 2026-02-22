@@ -7,7 +7,18 @@ import shutil
 import sys
 from pathlib import Path
 
+import click
 from rich.console import Console
+
+_console = Console()
+
+
+@click.command("doctor")
+@click.option("--fix", is_flag=True, default=False, help="Auto-repair fixable issues")
+@click.option("--json", "as_json", is_flag=True, default=False)
+def doctor_cmd(fix: bool, as_json: bool) -> None:
+    """Environment and configuration health check."""
+    cmd_doctor(fix=fix, as_json=as_json, console=_console)
 
 
 def _check_python_version() -> dict:

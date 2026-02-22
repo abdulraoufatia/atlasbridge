@@ -4,7 +4,24 @@ from __future__ import annotations
 
 import sys
 
+import click
 from rich.console import Console
+
+_console = Console()
+
+
+@click.group("channel")
+def channel_group() -> None:
+    """Notification channel management."""
+
+
+@channel_group.command("add")
+@click.argument("channel_type", metavar="TYPE", type=click.Choice(["telegram", "slack"]))
+@click.option("--token", default="", help="Bot token")
+@click.option("--users", default="", help="Comma-separated user IDs")
+def channel_add_cmd(channel_type: str, token: str, users: str) -> None:
+    """Add or reconfigure a notification channel."""
+    cmd_channel_add(channel_type=channel_type, token=token, users=users, console=_console)
 
 
 def cmd_channel_add(channel_type: str, token: str, users: str, console: Console) -> None:
