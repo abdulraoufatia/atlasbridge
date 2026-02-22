@@ -183,6 +183,23 @@ class BaseChannel(ABC):
         """
 
     # ------------------------------------------------------------------
+    # Agent prose — rich formatted text (non-monospace)
+    # ------------------------------------------------------------------
+
+    async def send_agent_message(self, text: str, session_id: str = "") -> None:
+        """
+        Send agent prose as a rich-formatted message (not monospace).
+
+        Default delegates to ``notify()``.  Channels may override for
+        richer formatting (HTML on Telegram, mrkdwn on Slack).
+
+        Args:
+            text:       Agent-generated prose text (may contain markdown).
+            session_id: Session context for routing.
+        """
+        await self.notify(text, session_id=session_id)
+
+    # ------------------------------------------------------------------
     # Return path — receive replies from the human
     # ------------------------------------------------------------------
 

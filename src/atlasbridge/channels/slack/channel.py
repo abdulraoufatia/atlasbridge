@@ -129,6 +129,18 @@ class SlackChannel(BaseChannel):
                     {"channel": ch_id, "text": formatted},
                 )
 
+    async def send_agent_message(self, text: str, session_id: str = "") -> None:
+        """Send agent prose with mrkdwn formatting (not code block)."""
+        if len(text) > 3500:
+            text = text[:3500] + "\n...(truncated)"
+        for uid in self._allowed:
+            ch_id = await self._get_dm_channel(uid)
+            if ch_id:
+                await self._api(
+                    "chat.postMessage",
+                    {"channel": ch_id, "text": text, "mrkdwn": True},
+                )
+
     async def edit_prompt_message(
         self,
         message_id: str,

@@ -23,6 +23,7 @@ FROZEN_ABSTRACT_METHODS = frozenset(
 FROZEN_OPTIONAL_METHODS = frozenset(
     {
         "healthcheck",
+        "send_agent_message",
     }
 )
 

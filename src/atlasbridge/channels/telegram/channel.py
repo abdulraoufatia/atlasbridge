@@ -171,6 +171,20 @@ class TelegramChannel(BaseChannel):
                 },
             )
 
+    async def send_agent_message(self, text: str, session_id: str = "") -> None:
+        """Send agent prose with HTML formatting (not <pre> monospace)."""
+        if len(text) > 4000:
+            text = text[:4000] + "\n...(truncated)"
+        for uid in self._allowed:
+            await self._api(
+                "sendMessage",
+                {
+                    "chat_id": uid,
+                    "text": text,
+                    "parse_mode": "HTML",
+                },
+            )
+
     async def edit_prompt_message(
         self,
         message_id: str,

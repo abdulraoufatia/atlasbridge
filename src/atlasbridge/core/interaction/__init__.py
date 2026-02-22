@@ -9,6 +9,7 @@ from atlasbridge.core.interaction.ml_classifier import (
     NullMLClassifier,
 )
 from atlasbridge.core.interaction.output_forwarder import OutputForwarder
+from atlasbridge.core.interaction.output_router import OutputKind, OutputRouter
 from atlasbridge.core.interaction.plan import InteractionPlan, build_plan
 
 __all__ = [
@@ -22,5 +23,7 @@ __all__ = [
     "MLClassifier",
     "NullMLClassifier",
     "OutputForwarder",
+    "OutputKind",
+    "OutputRouter",
     "build_plan",
 ]

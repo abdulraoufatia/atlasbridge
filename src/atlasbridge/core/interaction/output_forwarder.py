@@ -22,6 +22,7 @@ from atlasbridge.core.prompt.sanitize import is_meaningful, strip_ansi
 
 if TYPE_CHECKING:
     from atlasbridge.channels.base import BaseChannel
+    from atlasbridge.core.interaction.output_router import OutputRouter
 
 logger = structlog.get_logger()
 
@@ -52,9 +53,15 @@ class OutputForwarder:
         await forwarder.flush_loop()
     """
 
-    def __init__(self, channel: BaseChannel, session_id: str) -> None:
+    def __init__(
+        self,
+        channel: BaseChannel,
+        session_id: str,
+        output_router: OutputRouter | None = None,
+    ) -> None:
         self._channel = channel
         self._session_id = session_id
+        self._output_router = output_router
         self._buffer: list[str] = []
         self._buffer_chars = 0
         self._lock = asyncio.Lock()
@@ -123,7 +130,7 @@ class OutputForwarder:
             return
 
         try:
-            await self._channel.send_output(stripped, session_id=self._session_id)
+            await self._send_classified(stripped)
             self._record_send()
         except Exception as exc:  # noqa: BLE001
             logger.warning(
@@ -131,6 +138,22 @@ class OutputForwarder:
                 session_id=self._session_id[:8],
                 error=str(exc),
             )
+
+    async def _send_classified(self, text: str) -> None:
+        """Route text through OutputRouter or send as CLI output."""
+        if self._output_router is None:
+            await self._channel.send_output(text, session_id=self._session_id)
+            return
+
+        from atlasbridge.core.interaction.output_router import OutputKind
+
+        kind = self._output_router.classify(text)
+        if kind == OutputKind.NOISE:
+            return
+        if kind == OutputKind.AGENT_MESSAGE:
+            await self._channel.send_agent_message(text, session_id=self._session_id)
+        else:
+            await self._channel.send_output(text, session_id=self._session_id)
 
     def _can_send(self) -> bool:
         """Return True if we haven't exceeded MAX_MESSAGES_PER_MINUTE."""
