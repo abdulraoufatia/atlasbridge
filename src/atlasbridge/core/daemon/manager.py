@@ -278,6 +278,14 @@ class DaemonManager:
         self._adapters[session_id] = adapter
 
         logger.info("session_starting", tool=tool, session_id=session_id[:8])
+
+        # Session lifecycle: notify channel of session start
+        if self._channel is not None:
+            await self._channel.notify(
+                f"Session started: {tool} ({session_id[:8]})",
+                session_id=session_id,
+            )
+
         await adapter.start_session(session_id=session_id, command=list(command))
 
         # Mark the session as running once the child PID is known
@@ -377,6 +385,17 @@ class DaemonManager:
         finally:
             logger.info("session_ended", session_id=session_id[:8])
             self._session_manager.mark_ended(session_id)
+
+            # Session lifecycle: notify channel of session end
+            if self._channel is not None:
+                try:
+                    await self._channel.notify(
+                        f"Session ended: {tool} ({session_id[:8]})",
+                        session_id=session_id,
+                    )
+                except Exception:  # noqa: BLE001
+                    pass  # Best-effort; channel may already be closed
+
             await adapter.terminate_session(session_id)
             await self.stop()
 

@@ -285,6 +285,9 @@ class TelegramChannel(BaseChannel):
         except ValueError:
             return
 
+        # Extract chat_id for thread binding
+        cb_chat_id = cb.get("message", {}).get("chat", {}).get("id")
+
         reply = Reply(
             prompt_id=prompt_id,
             session_id=session_id,
@@ -292,6 +295,7 @@ class TelegramChannel(BaseChannel):
             nonce=nonce,
             channel_identity=f"telegram:{user_id}",
             timestamp=_utcnow(),
+            thread_id=str(cb_chat_id) if cb_chat_id else "",
         )
         await self._reply_queue.put(reply)
 
@@ -333,6 +337,7 @@ class TelegramChannel(BaseChannel):
             channel_identity=f"telegram:{user_id}",
             timestamp=_utcnow(),
             newline_policy="append",
+            thread_id=str(chat_id) if chat_id else "",
         )
         await self._reply_queue.put(reply)
 
