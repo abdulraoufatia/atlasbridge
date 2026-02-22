@@ -68,6 +68,7 @@ src/atlasbridge/         ← installed package (where = ["src"])
   ui/                    — app.py, state.py, polling.py, css/atlasbridge.tcss
                            components/status_cards.py
                            screens/: welcome, wizard, complete, sessions, logs, doctor
+  dashboard/             — app.py, repo.py, sanitize.py, templates/, static/
   cli/                   — main.py + _setup/_daemon/_run/_status/etc.
 tests/
   unit/                  — pure unit tests (no I/O)
@@ -110,6 +111,10 @@ docs/                    — all design documents
 | `src/atlasbridge/channels/telegram/channel.py` | TelegramChannel (httpx, long-poll) |
 | `src/atlasbridge/channels/slack/channel.py` | SlackChannel (Socket Mode + Block Kit) |
 | `src/atlasbridge/channels/multi.py` | MultiChannel fan-out |
+| `src/atlasbridge/dashboard/app.py` | FastAPI dashboard app factory + routes + `start_server()` |
+| `src/atlasbridge/dashboard/repo.py` | DashboardRepo — read-only SQLite + JSONL access |
+| `src/atlasbridge/dashboard/sanitize.py` | `strip_ansi()`, `redact_tokens()`, `sanitize_for_display()` |
+| `src/atlasbridge/cli/_dashboard.py` | `dashboard start/status` CLI commands |
 | `tests/prompt_lab/simulator.py` | Simulator, TelegramStub, PTYSimulator |
 
 ---

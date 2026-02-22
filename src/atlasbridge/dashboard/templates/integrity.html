@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Integrity &mdash; AtlasBridge{% endblock %}
+
+{% block content %}
+<h1>Integrity Verification</h1>
+
+{% if not db_available and not trace_available %}
+<div class="notice">
+    <h3>No data yet</h3>
+    <p>Neither the database nor the decision trace file exist. Run a supervised session to start collecting data:</p>
+    <pre>atlasbridge run claude</pre>
+</div>
+{% else %}
+
+<div class="stats-grid">
+    <div class="stat-card {% if trace_valid %}card-ok{% else %}card-error{% endif %}">
+        <div class="stat-value">{{ 'VALID' if trace_valid else 'INVALID' }}</div>
+        <div class="stat-label">Decision Trace Chain</div>
+    </div>
+    <div class="stat-card {% if audit_valid %}card-ok{% else %}card-error{% endif %}">
+        <div class="stat-value">{{ 'VALID' if audit_valid else 'INVALID' }}</div>
+        <div class="stat-label">Audit Event Chain</div>
+    </div>
+</div>
+
+<div class="verify-action">
+    <button id="re-verify" onclick="reVerify()">Re-verify Integrity</button>
+    <span id="verify-result"></span>
+</div>
+
+{% if trace_errors %}
+<h2>Trace Integrity Errors</h2>
+<ul class="error-list">
+    {% for err in trace_errors %}
+    <li>{{ err }}</li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+{% if audit_errors %}
+<h2>Audit Integrity Errors</h2>
+<ul class="error-list">
+    {% for err in audit_errors %}
+    <li>{{ err }}</li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+{% if audit_events %}
+<h2>Recent Audit Events</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Timestamp</th>
+            <th>Event Type</th>
+            <th>Session</th>
+            <th>Payload</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for e in audit_events %}
+        <tr>
+            <td>{{ e.timestamp }}</td>
+            <td>{{ e.event_type }}</td>
+            <td>
+                {% if e.session_id %}
+                <a href="/sessions/{{ e.session_id }}">{{ e.session_id[:12] }}&hellip;</a>
+                {% else %}
+                &mdash;
+                {% endif %}
+            </td>
+            <td>
+                <details>
+                    <summary>Show payload</summary>
+                    <pre>{{ e.payload }}</pre>
+                </details>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+{% endif %}
+
+<script>
+function reVerify() {
+    var btn = document.getElementById('re-verify');
+    var result = document.getElementById('verify-result');
+    btn.disabled = true;
+    result.textContent = 'Verifying...';
+    fetch('/api/integrity/verify', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var ok = data.trace.valid && data.audit.valid;
+            result.textContent = ok ? 'All chains valid' : 'Integrity errors found';
+            result.className = ok ? 'verify-ok' : 'verify-error';
+            btn.disabled = false;
+        })
+        .catch(function() {
+            result.textContent = 'Verification failed';
+            result.className = 'verify-error';
+            btn.disabled = false;
+        });
+}
+</script>
+{% endblock %}

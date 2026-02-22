@@ -60,6 +60,11 @@ slack = [
 keyring = [
     "keyring>=25",
 ]
+dashboard = [
+    "fastapi>=0.104",
+    "uvicorn[standard]>=0.24",
+    "jinja2>=3.1",
+]
 dev = [
     # Testing
     "pytest>=8.2",
@@ -98,7 +103,7 @@ Security = "https://github.com/abdulraoufatia/atlasbridge/blob/main/SECURITY.md"
 where = ["src"]
 
 [tool.setuptools.package-data]
-atlasbridge = ["**/*.tcss"]
+atlasbridge = ["**/*.tcss", "dashboard/templates/*.html", "dashboard/static/*.css"]
 
 [tool.ruff]
 target-version = "py311"
@@ -130,7 +135,8 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101", "ANN", "S105", "S106", "S108"]
+"tests/**/*.py" = ["S101", "ANN", "S105", "S106", "S108", "S104"]
+"tests/dashboard/**/*.py" = ["S101", "ANN", "E501", "S104", "F401", "I"]
 "tests/prompt_lab/**/*.py" = ["S101", "ANN", "F401", "E501", "UP", "I", "B"]
 "src/atlasbridge/cli/*.py" = ["ANN", "E501", "E402"]
 "src/atlasbridge/core/daemon/*.py" = ["ANN"]
@@ -143,6 +149,7 @@ ignore = [
 "src/atlasbridge/core/autopilot/**/*.py" = ["ANN", "UP042"]
 "src/atlasbridge/enterprise/**/*.py" = ["ANN"]
 "src/atlasbridge/cloud/**/*.py" = ["ANN"]
+"src/atlasbridge/dashboard/**/*.py" = ["ANN"]
 "tests/policy/**/*.py" = ["S101", "ANN", "E501", "B017", "F841"]
 
 [tool.mypy]
@@ -157,7 +164,7 @@ disallow_any_generics = false
 no_implicit_optional = true
 
 [[tool.mypy.overrides]]
-module = ["ptyprocess.*", "detect_secrets.*", "textual.*", "slack_sdk.*"]
+module = ["ptyprocess.*", "detect_secrets.*", "textual.*", "slack_sdk.*", "fastapi.*", "uvicorn.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -166,6 +173,7 @@ module = [
     "atlasbridge.cli.*",
     "atlasbridge.tui.*",
     "atlasbridge.ui.*",
+    "atlasbridge.dashboard.*",
 ]
 ignore_errors = true
 

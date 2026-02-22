@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Session {{ session.id[:12] if session else 'Not Found' }} &mdash; AtlasBridge{% endblock %}
+
+{% block content %}
+{% if not session %}
+<div class="notice">
+    <h3>Session not found</h3>
+    <p>The requested session does not exist in the database.</p>
+    <p><a href="/">&larr; Back to home</a></p>
+</div>
+{% else %}
+
+<h1>Session {{ session.id[:12] }}&hellip;</h1>
+
+<table class="detail-table">
+    <tr><th>ID</th><td>{{ session.id }}</td></tr>
+    <tr><th>Tool</th><td>{{ session.tool }}</td></tr>
+    <tr><th>Command</th><td>{{ session.command }}</td></tr>
+    <tr><th>CWD</th><td>{{ session.cwd }}</td></tr>
+    <tr><th>Status</th><td><span class="status-{{ session.status }}">{{ session.status }}</span></td></tr>
+    <tr><th>Started</th><td>{{ session.started_at }}</td></tr>
+    <tr><th>Ended</th><td>{{ session.ended_at or '&mdash;' }}</td></tr>
+    <tr><th>Exit Code</th><td>{{ session.exit_code if session.exit_code is not none else '&mdash;' }}</td></tr>
+    <tr><th>Label</th><td>{{ session.label or '&mdash;' }}</td></tr>
+</table>
+
+<h2>Prompts ({{ prompts|length }})</h2>
+
+{% if prompts %}
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Type</th>
+            <th>Confidence</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Excerpt</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for p in prompts %}
+        <tr>
+            <td>{{ p.id[:12] }}&hellip;</td>
+            <td>{{ p.prompt_type }}</td>
+            <td>{{ p.confidence }}</td>
+            <td><span class="status-{{ p.status }}">{{ p.status }}</span></td>
+            <td>{{ p.created_at }}</td>
+            <td>
+                <details>
+                    <summary>Show excerpt</summary>
+                    <pre>{{ p.excerpt }}</pre>
+                </details>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="empty">No prompts recorded for this session.</p>
+{% endif %}
+
+{% if traces %}
+<h2>Decision Trace Entries ({{ traces|length }})</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Timestamp</th>
+            <th>Action</th>
+            <th>Rule ID</th>
+            <th>Confidence</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for t in traces %}
+        <tr>
+            <td>{{ t.get('timestamp', '&mdash;') }}</td>
+            <td>{{ t.get('action_type', '&mdash;') }}</td>
+            <td>{{ t.get('rule_id', '&mdash;') }}</td>
+            <td>{{ t.get('confidence', '&mdash;') }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+<p><a href="/">&larr; Back to home</a></p>
+
+{% endif %}
+{% endblock %}

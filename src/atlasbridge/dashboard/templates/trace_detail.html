@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Trace Entry #{{ index }} &mdash; AtlasBridge{% endblock %}
+
+{% block content %}
+{% if not trace_available %}
+<div class="notice">
+    <h3>No trace data</h3>
+    <p>The decision trace file does not exist yet. Enable autopilot and run a session to generate trace data:</p>
+    <pre>atlasbridge autopilot enable
+atlasbridge run claude</pre>
+</div>
+{% elif not entry %}
+<div class="notice">
+    <h3>Trace entry not found</h3>
+    <p>Entry #{{ index }} does not exist in the current trace file.</p>
+    <p><a href="/integrity">&larr; Back to integrity</a></p>
+</div>
+{% else %}
+
+<h1>Trace Entry #{{ index }}</h1>
+
+<table class="detail-table">
+    {% for key, value in entry.items() %}
+    <tr>
+        <th>{{ key }}</th>
+        <td>
+            {% if key in ('hash', 'prev_hash') %}
+            <code>{{ value }}</code>
+            {% elif key == 'excerpt' %}
+            <details>
+                <summary>Show content</summary>
+                <pre>{{ value }}</pre>
+            </details>
+            {% else %}
+            {{ value }}
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+
+<p>
+    {% if index > 0 %}
+    <a href="/traces/{{ index - 1 }}">&larr; Previous</a> &middot;
+    {% endif %}
+    <a href="/traces/{{ index + 1 }}">Next &rarr;</a> &middot;
+    <a href="/integrity">Integrity</a>
+</p>
+
+{% endif %}
+{% endblock %}

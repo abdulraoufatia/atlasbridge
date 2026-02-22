@@ -747,6 +747,15 @@ def lab_run(scenario: str, run_all: bool, pattern: str, verbose: bool, as_json: 
 
 
 # ---------------------------------------------------------------------------
+# dashboard
+# ---------------------------------------------------------------------------
+
+from atlasbridge.cli._dashboard import dashboard_group  # noqa: E402
+
+cli.add_command(dashboard_group)
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 

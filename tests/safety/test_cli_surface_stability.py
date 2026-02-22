@@ -44,6 +44,7 @@ FROZEN_TOP_LEVEL = frozenset(
         "db",
         "pause",
         "resume",
+        "dashboard",
     }
 )
 

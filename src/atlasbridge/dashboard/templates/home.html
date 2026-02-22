@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}AtlasBridge Dashboard &mdash; Home{% endblock %}
+
+{% block content %}
+<h1>Dashboard</h1>
+
+{% if not db_available %}
+<div class="notice">
+    <h3>No data yet</h3>
+    <p>The AtlasBridge database has not been created. Run a supervised session to start collecting data:</p>
+    <pre>atlasbridge run claude</pre>
+</div>
+{% else %}
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.sessions }}</div>
+        <div class="stat-label">Total Sessions</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.active_sessions }}</div>
+        <div class="stat-label">Active Sessions</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.prompts }}</div>
+        <div class="stat-label">Prompts</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.audit_events }}</div>
+        <div class="stat-label">Audit Events</div>
+    </div>
+</div>
+
+<h2>Recent Sessions</h2>
+
+{% if sessions %}
+<table>
+    <thead>
+        <tr>
+            <th>Session ID</th>
+            <th>Tool</th>
+            <th>Status</th>
+            <th>Started</th>
+            <th>Label</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for s in sessions %}
+        <tr>
+            <td><a href="/sessions/{{ s.id }}">{{ s.id[:12] }}&hellip;</a></td>
+            <td>{{ s.tool }}</td>
+            <td><span class="status-{{ s.status }}">{{ s.status }}</span></td>
+            <td>{{ s.started_at }}</td>
+            <td>{{ s.label or '&mdash;' }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="empty">No sessions recorded yet.</p>
+{% endif %}
+
+{% endif %}
+{% endblock %}
