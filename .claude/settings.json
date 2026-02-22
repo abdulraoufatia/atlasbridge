@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c '\n# AtlasBridge Stop Hook — Memory Capture Reminder\n# Checks if the session likely produced learnings worth capturing.\n\nSTRONG_PATTERNS=\"refactor|architecture|decision|migration|breaking change|new subsystem|phase milestone\"\nWEAK_PATTERNS=\"fixed|resolved|root cause|workaround|coverage|CI|test strategy\"\n\n# Read the last assistant message from transcript (if available)\nTRANSCRIPT=\"$CLAUDE_TRANSCRIPT\"\nif [ -z \"$TRANSCRIPT\" ]; then\n  exit 0\nfi\n\n# Check for strong learning signals\nif echo \"$TRANSCRIPT\" | grep -qiE \"$STRONG_PATTERNS\"; then\n  echo \"[memory] Strong learning signal detected. Consider running /reflect to capture decisions.\"\n  exit 0\nfi\n\n# Check for weak learning signals\nif echo \"$TRANSCRIPT\" | grep -qiE \"$WEAK_PATTERNS\"; then\n  echo \"[memory] Session may contain learnings. Consider updating memory files.\"\n  exit 0\nfi\n\nexit 0\n'"
+          }
+        ]
+      }
+    ]
+  }
+}
