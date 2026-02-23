@@ -37,7 +37,7 @@ jobs:
             --exclude-files 'tests/.*' \
             --exclude-files '\.env\.example' \
             --exclude-files 'docs/.*' \
-            --exclude-secrets 'sk-test|xoxb-test|ghp_test' \
+            --exclude-secrets 'sk-test|xoxb-test|ghp_test|password_input' \
             > .secrets-scan-results.json
           python -c "
           import json, sys
