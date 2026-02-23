@@ -253,7 +253,8 @@ class TestEscalation:
 
         assert result.escalated is True
         assert result.success is False
-        assert "arrow keys" in result.feedback_message
+        assert "did not respond" in result.feedback_message
+        assert "arrow keys" not in result.feedback_message
 
 
 # ---------------------------------------------------------------------------
@@ -330,6 +331,45 @@ class TestChatInput:
         injected_bytes = tty.inject_reply.call_args[0][0]
         assert injected_bytes.endswith(b"\r")
         assert b"\n" not in injected_bytes
+
+
+# ---------------------------------------------------------------------------
+# Escalation messages
+# ---------------------------------------------------------------------------
+
+
+class TestEscalationMessages:
+    @pytest.mark.asyncio
+    async def test_escalation_uses_plan_template(
+        self,
+        executor: InteractionExecutor,
+        mock_detector: MagicMock,
+    ) -> None:
+        """Escalation message is derived from plan.escalation_template."""
+        plan = build_plan(InteractionClass.CONFIRM_ENTER)
+        plan = plan.__class__(
+            **{
+                **plan.__dict__,
+                "advance_timeout_s": 0.2,
+                "retry_delay_s": 0.1,
+                "max_retries": 1,
+                "escalate_on_exhaustion": True,
+            }
+        )
+        mock_detector.last_output_time = time.monotonic()
+
+        result = await executor.execute(plan, "", "confirm_enter")
+
+        assert result.escalated is True
+        assert "pressing Enter" in result.feedback_message
+        assert "arrow keys" not in result.feedback_message
+
+    @pytest.mark.parametrize("ic", list(InteractionClass))
+    def test_no_arrow_keys_in_any_escalation(self, ic: InteractionClass) -> None:
+        """No interaction plan should reference 'arrow keys' in escalation."""
+        plan = build_plan(ic)
+        assert "arrow keys" not in plan.escalation_template
+        assert "arrow keys" not in plan.display_template
 
 
 # ---------------------------------------------------------------------------

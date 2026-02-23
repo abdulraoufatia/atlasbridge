@@ -246,3 +246,61 @@ class TestEchoSuppression:
         event = detector.analyse(b"Proceed? [y/N]")
         assert event is not None
         assert event.session_id == SESSION
+
+
+# ---------------------------------------------------------------------------
+# Folder trust detection
+# ---------------------------------------------------------------------------
+
+
+class TestFolderTrustDetection:
+    """Folder trust prompts from Claude Code should be detected as MULTIPLE_CHOICE."""
+
+    def test_folder_trust_single_chunk(self, detector: PromptDetector) -> None:
+        """Full folder trust menu in a single PTY chunk → MULTIPLE_CHOICE."""
+        text = (
+            b"Do you trust the files in this folder?\n"
+            b"1. Yes, trust this folder\n"
+            b"2. Yes, but only for this session\n"
+            b"3. No, don't trust this folder\n"
+        )
+        event = detector.analyse(text)
+        assert event is not None
+        assert event.prompt_type == PromptType.TYPE_MULTIPLE_CHOICE
+        assert event.confidence == Confidence.HIGH
+
+    def test_folder_trust_split_chunks(self) -> None:
+        """Folder trust question + items arrive in separate PTY chunks."""
+        d = PromptDetector(session_id="split-test")
+        # Chunk 1: just the question
+        event1 = d.analyse(b"Do you trust the files in this folder?")
+        # Question alone shouldn't match multiple choice
+        assert event1 is None or event1.prompt_type != PromptType.TYPE_MULTIPLE_CHOICE
+
+        # Chunk 2: the numbered items
+        event2 = d.analyse(
+            b"1. Yes, trust this folder\n"
+            b"2. Yes, but only for this session\n"
+            b"3. No, don't trust this folder\n"
+        )
+        # Combined buffer should now match
+        assert event2 is not None
+        assert event2.prompt_type == PromptType.TYPE_MULTIPLE_CHOICE
+
+    def test_folder_trust_with_ansi(self, detector: PromptDetector) -> None:
+        """Folder trust prompt with ANSI formatting still detected."""
+        text = (
+            b"\x1b[1mDo you trust the files in this folder?\x1b[0m\n"
+            b"1. Yes, trust this folder\n"
+            b"2. No, don't trust\n"
+        )
+        event = detector.analyse(text)
+        assert event is not None
+        assert event.prompt_type == PromptType.TYPE_MULTIPLE_CHOICE
+
+    def test_folder_trust_dot_format(self, detector: PromptDetector) -> None:
+        """Claude Code uses '1.' not '1)' — ensure dot format is matched."""
+        text = b"Trust this folder?\n1. Trust\n2. Security guide\n"
+        event = detector.analyse(text)
+        assert event is not None
+        assert event.prompt_type == PromptType.TYPE_MULTIPLE_CHOICE

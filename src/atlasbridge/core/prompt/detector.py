@@ -67,6 +67,11 @@ _MULTIPLE_CHOICE_PATTERNS: list[Pattern[str]] = [
     ),
     re.compile(r"(?:^|\n)\s*1[\)\.]\s+\S.+\n\s*2[\)\.]\s+\S", re.DOTALL),
     re.compile(r"(?:^|\n)\s*\[A\].+\[B\]", re.DOTALL | re.IGNORECASE),
+    # Folder trust prompt — "trust ... folder" followed by numbered items
+    re.compile(
+        r"trust.{0,80}folder.{0,200}?\n\s*1[\)\.]\s+",
+        re.DOTALL | re.IGNORECASE,
+    ),
 ]
 
 # FREE TEXT patterns
@@ -207,16 +212,23 @@ class PromptDetector:
                     excerpt=text[-200:],
                     choices=["\n"],
                 )
+        # For MULTIPLE_CHOICE, also try combined buffer (handles multi-chunk menus
+        # like folder trust prompts where the question and items arrive separately).
+        combined = (self._state.stable_excerpt + "\n" + text)[-2000:]
         for pat in _MULTIPLE_CHOICE_PATTERNS:
-            if pat.search(text):
-                choices = extract_choices(text)
-                return PromptEvent.create(
-                    session_id=self.session_id,
-                    prompt_type=PromptType.TYPE_MULTIPLE_CHOICE,
-                    confidence=Confidence.HIGH,
-                    excerpt=text[-200:],
-                    choices=choices,
-                )
+            matched_text = text
+            if not pat.search(text) and not pat.search(combined):
+                continue
+            if not pat.search(text):
+                matched_text = combined
+            choices = extract_choices(matched_text)
+            return PromptEvent.create(
+                session_id=self.session_id,
+                prompt_type=PromptType.TYPE_MULTIPLE_CHOICE,
+                confidence=Confidence.HIGH,
+                excerpt=matched_text[-200:],
+                choices=choices,
+            )
         for pat in _FREE_TEXT_PATTERNS:
             if pat.search(text):
                 return PromptEvent.create(

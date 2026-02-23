@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.9.9] — 2026-02-23
+
+### Fixed
+
+- **Escalation message no longer says "raw keyboard interaction"** (Phase C.Y3)
+  - Escalation messages are now per-plan and contextual (e.g., `CLI did not respond to "y" after retries`)
+  - Added `escalation_template` field to `InteractionPlan`
+  - `InteractionExecutor` uses `plan.escalation_template` instead of hardcoded message
+  - Removed all "arrow keys" and "run locally once" language from user-facing messages
+
+- **Folder trust prompt detection** — Claude Code's "Do you trust the files in this folder?" menu now detected as MULTIPLE_CHOICE
+  - Added combined-buffer pattern matching for multi-line numbered lists across PTY chunks
+  - Folder trust prompt correctly classified as NUMBERED_CHOICE; injection of "1" works
+  - Dedicated folder trust pattern added to detector
+
+### Changed
+
+- `RAW_TERMINAL` display_template updated to generic "could not be handled remotely" language
+- `RAW_TERMINAL`/`FOLDER_TRUST` comments cleaned up (removed "arrow-key" references)
+
+---
+
 ## [0.9.8] — 2026-02-23
 
 ### Added
@@ -31,7 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `Reply.thread_id` field for channel thread binding
   - Thread ID extraction in Telegram (chat_id) and Slack (channel:message_ts)
   - Session start/stop lifecycle notifications via channel
-  - New `InteractionClass` values: FOLDER_TRUST (trust-folder special case), RAW_TERMINAL (arrow-key prompts, always escalates)
+  - New `InteractionClass` values: FOLDER_TRUST (trust-folder special case), RAW_TERMINAL (unparsable interactive prompts, always escalates)
   - Full daemon wiring: ConversationRegistry, ClassificationFuser, OutputRouter injected per session
 
 ### Changed

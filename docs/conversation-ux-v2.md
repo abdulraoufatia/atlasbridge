@@ -2,7 +2,7 @@
 
 **Status:** Current
 **Phase:** C.Y + C.Y2 — Local UX improvement
-**Version:** v0.9.7+
+**Version:** v0.9.9
 
 ---
 
@@ -56,7 +56,7 @@ Refines `PromptType` into a finer-grained `InteractionClass`:
 | `PASSWORD_INPUT` | TYPE_FREE_TEXT (refined) | Sensitive credential input |
 | `CHAT_INPUT` | N/A (no prompt) | Conversational mode |
 | `FOLDER_TRUST` | ML-only | "Trust this folder?" special case |
-| `RAW_TERMINAL` | ML-only | Arrow-key / cursor-based prompts (always escalates) |
+| `RAW_TERMINAL` | ML-only | Unparsable interactive prompts (always escalates) |
 
 Password detection uses regex patterns matching common credential prompts (password, token, API key, secret, etc.).
 
@@ -76,6 +76,7 @@ Frozen dataclass mapping each `InteractionClass` to an execution strategy:
 | `advance_timeout_s` | Timeout for advance check (5s) |
 | `escalate_on_exhaustion` | Escalate when retries exhausted |
 | `display_template` | Feedback template (e.g., "Sent: {value} + Enter") |
+| `escalation_template` | Per-plan escalation message (no more generic "arrow keys" message) |
 | `button_layout` | Channel button layout hint |
 
 Plans are created via `build_plan(interaction_class)` — a pure function with no side effects.
@@ -175,7 +176,7 @@ Non-abstract default method that delegates to `notify()`. Channels override for 
 | Password sent | `Sent: [REDACTED] + Enter` |
 | CLI advanced | `CLI advanced` |
 | Stalled, retrying | `CLI did not respond to "y", retrying...` |
-| Retry exhausted | `This prompt requires raw keyboard interaction (arrow keys). Please run locally once.` |
+| Retry exhausted | Per-plan contextual message (e.g., `CLI did not respond to "y" after retries. Please respond locally.`) |
 | Chat input | `Sent: "check the logs"` |
 
 ---

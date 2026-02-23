@@ -260,7 +260,7 @@ class TestInteractionEngineIntegration:
         mock_engine.handle_prompt_reply.return_value = MagicMock(
             success=False,
             escalated=True,
-            feedback_message="This prompt requires raw keyboard interaction.",
+            feedback_message="CLI did not respond after retries. Please respond locally.",
             injected_value="y",
         )
 

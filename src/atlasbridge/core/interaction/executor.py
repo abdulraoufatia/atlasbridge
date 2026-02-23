@@ -150,9 +150,9 @@ class InteractionExecutor:
             else:
                 # Retries exhausted
                 if plan.escalate_on_exhaustion:
-                    escalation_msg = (
-                        "This prompt requires raw keyboard interaction "
-                        "(arrow keys). Please run locally once."
+                    escalation_msg = plan.escalation_template.format(
+                        value=display_value,
+                        retries=retries_used,
                     )
                     log.warning("injection_escalating", attempts=attempt + 1)
                     await self._notify_fn(escalation_msg)
