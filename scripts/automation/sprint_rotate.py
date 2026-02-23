@@ -26,6 +26,7 @@ sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent))
 from project_fields import (
     SPRINT_FIELD_ID,
     STATUS,
+    GraphQLError,
     get_project_items,
     set_single_select_field,
     set_text_field,
@@ -154,11 +155,15 @@ def rotate_sprint(
         prio = item.get("priority", "?")
         print(f"  [{prio}] {title}")
 
-        # Set Sprint = next_sprint
-        set_text_field(item["id"], SPRINT_FIELD_ID, next_sprint, dry_run=dry_run)
+        try:
+            # Set Sprint = next_sprint
+            set_text_field(item["id"], SPRINT_FIELD_ID, next_sprint, dry_run=dry_run)
 
-        # Set Status = Planned
-        set_single_select_field(item["id"], STATUS, "Planned", dry_run=dry_run)
+            # Set Status = Planned
+            set_single_select_field(item["id"], STATUS, "Planned", dry_run=dry_run)
+        except GraphQLError as exc:
+            print(f"  ERROR: failed to update item: {exc}", file=sys.stderr)
+            sys.exit(1)
 
     return {
         "action": "rotated",

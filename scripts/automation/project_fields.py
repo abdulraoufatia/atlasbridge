@@ -180,6 +180,10 @@ def redact_for_logging(text: str) -> str:
 _RATE_LIMIT_DELAY = 1.0  # seconds between mutations
 
 
+class GraphQLError(Exception):
+    """Raised when a GraphQL mutation fails after retries."""
+
+
 def graphql_query(query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
     """Execute a read-only GraphQL query via `gh api graphql`."""
     cmd = ["gh", "api", "graphql", "-f", f"query={query}"]
@@ -201,11 +205,12 @@ def graphql_mutation(
     variables: dict[str, Any] | None = None,
     *,
     dry_run: bool = False,
+    retries: int = 2,
 ) -> dict[str, Any] | None:
     """Execute a GraphQL mutation via `gh api graphql`.
 
     With dry_run=True, prints the mutation but does not execute.
-    Rate-limits to 1 mutation per second.
+    Rate-limits to 1 mutation per second. Retries transient failures.
     """
     if dry_run:
         safe_query = redact_for_logging(query)
@@ -220,15 +225,22 @@ def graphql_mutation(
         for key, value in variables.items():
             cmd.extend(["-f", f"{key}={value}"])
 
-    time.sleep(_RATE_LIMIT_DELAY)
+    last_error = ""
+    for attempt in range(1, retries + 2):  # retries + 1 total attempts
+        time.sleep(_RATE_LIMIT_DELAY)
 
-    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    if result.returncode != 0:
-        stderr = redact_for_logging(result.stderr)
-        print(f"GraphQL mutation failed: {stderr}", file=sys.stderr)
-        sys.exit(1)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if result.returncode == 0:
+            return json.loads(result.stdout)
 
-    return json.loads(result.stdout)
+        last_error = redact_for_logging(result.stderr)
+        if attempt <= retries:
+            delay = _RATE_LIMIT_DELAY * attempt
+            msg = f"  GraphQL mutation attempt {attempt} failed, retrying in {delay}s..."
+            print(msg, file=sys.stderr)
+            time.sleep(delay)
+
+    raise GraphQLError(f"GraphQL mutation failed after {retries + 1} attempts: {last_error}")
 
 
 def get_issue_node_id(issue_number: int | str) -> str:
@@ -246,7 +258,10 @@ def get_issue_node_id(issue_number: int | str) -> str:
 
 
 def add_item_to_project(content_id: str, *, dry_run: bool = False) -> str | None:
-    """Add an issue/PR to the project. Returns the project item ID."""
+    """Add an issue/PR to the project. Returns the project item ID.
+
+    Raises GraphQLError if the mutation fails after retries.
+    """
     query = """
     mutation($projectId: ID!, $contentId: ID!) {
       addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {

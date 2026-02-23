@@ -73,7 +73,11 @@ jobs:
 
       - name: Run pip-audit
         run: |
-          pip-audit --strict --desc on 2>&1 || {
+          # Generate a requirements file from installed deps, excluding the
+          # local atlasbridge package which isn't on PyPI during PR builds.
+          pip freeze --exclude-editable > /tmp/deps.txt
+
+          pip-audit --strict --desc on -r /tmp/deps.txt 2>&1 || {
             echo ""
             echo "================================================="
             echo "  WARNING: Dependency vulnerabilities detected."
