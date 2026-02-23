@@ -5,7 +5,7 @@ for the "AtlasBridge — Master Roadmap" project (number 17).
 
 Usage:
     from project_fields import (
-        PROJECT_ID, STATUS, PHASE, PRIORITY,
+        PROJECT_ID, STATUS, PHASE, PRIORITY, EDITION,
         graphql_query, graphql_mutation, add_item_to_project, set_field_value,
     )
 """
@@ -39,6 +39,8 @@ EFFORT_FIELD_ID = "PVTSSF_lAHOBHKkbc4BP12zzg-IjrU"
 IMPACT_FIELD_ID = "PVTSSF_lAHOBHKkbc4BP12zzg-Ijto"
 SPRINT_FIELD_ID = "PVTF_lAHOBHKkbc4BP12zzg-IjpY"
 BLOCKED_BY_FIELD_ID = "PVTF_lAHOBHKkbc4BP12zzg-IjvA"
+TARGET_DATE_FIELD_ID = "PVTF_lAHOBHKkbc4BP12zzg-MsT4"
+EDITION_FIELD_ID = "PVTSSF_lAHOBHKkbc4BP12zzg-MsV4"
 
 
 # ---------------------------------------------------------------------------
@@ -74,13 +76,14 @@ STATUS = FieldOptions(
 PHASE = FieldOptions(
     field_id=PHASE_FIELD_ID,
     options={
-        "A": "0aeeb321",
-        "B": "7bf45c09",
-        "C": "31c54a35",
-        "D": "4851eef8",
-        "E": "df977a10",
-        "F": "bd7be5ac",
-        "G": "5f39f602",
+        "A": "59450c8c",
+        "B": "da43e009",
+        "C": "2aae8075",
+        "D": "c73593c0",
+        "E": "8cfab998",
+        "F": "04c26123",
+        "G": "ce46bb70",
+        "H": "d8741409",
     },
 )
 
@@ -110,19 +113,21 @@ CATEGORY = FieldOptions(
 RISK_LEVEL = FieldOptions(
     field_id=RISK_LEVEL_FIELD_ID,
     options={
-        "Low": "9504cfba",
-        "Medium": "c7d62b11",
-        "High": "658d107b",
+        "Low": "c9903d13",
+        "Medium": "c8f63fc9",
+        "High": "b7677831",
+        "Critical": "47cc58df",
     },
 )
 
 EFFORT = FieldOptions(
     field_id=EFFORT_FIELD_ID,
     options={
-        "XS": "b8ffea37",
-        "S": "9bac8313",
-        "M": "3026fd98",
-        "L": "bf3f084d",
+        "XS": "d6668cba",
+        "S": "700963a8",
+        "M": "83f5274d",
+        "L": "106e9496",
+        "XL": "6f6d240e",
     },
 )
 
@@ -134,6 +139,15 @@ IMPACT = FieldOptions(
         "Governance": "5038bbba",
         "Revenue Path": "3403edf6",
         "Risk Reduction": "6f53b253",
+    },
+)
+
+EDITION = FieldOptions(
+    field_id=EDITION_FIELD_ID,
+    options={
+        "Community": "ea9177c5",
+        "Pro": "9edb2417",
+        "Enterprise": "c2cd6c57",
     },
 )
 
