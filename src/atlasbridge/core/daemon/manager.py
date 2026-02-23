@@ -278,6 +278,7 @@ class DaemonManager:
             return
 
         adapter = adapter_cls()
+        adapter.experimental = self._config.get("experimental", False)  # type: ignore[attr-defined]
         session_id = str(uuid.uuid4())
 
         session = Session(session_id=session_id, tool=tool, command=list(command))

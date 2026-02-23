@@ -150,6 +150,54 @@ Choose **Y** to keep your existing tokens and settings.
 
 ---
 
+## Windows Support
+
+### Windows ConPTY is experimental
+
+Windows support uses the ConPTY API via `pywinpty` and is gated behind the `--experimental` flag:
+
+```bash
+atlasbridge run claude --experimental
+```
+
+**Requirements:**
+- Windows 10 1809+ (build 17763) or Windows 11
+- `pywinpty` package: `pip install atlasbridge[windows]`
+
+**Recommended path:** Use WSL2 for the most reliable experience. AtlasBridge runs natively on Linux inside WSL2 with full PTY support.
+
+**Known limitations:**
+- ConPTY has behavioural differences across Windows builds
+- CRLF line ending normalisation may affect some prompts
+- The `atlasbridge doctor` command shows "experimental" status on Windows
+- CI runs Windows tests as non-blocking (`continue-on-error: true`)
+
+### "pywinpty is required for Windows ConPTY support"
+
+**Cause:** The `pywinpty` package is not installed.
+
+**Fix:**
+```bash
+pip install atlasbridge[windows]
+```
+
+### "Windows ConPTY requires build 17763+"
+
+**Cause:** Your Windows version is too old for the ConPTY API.
+
+**Fix:** Update to Windows 10 version 1809 or later, or use WSL2.
+
+### "Windows ConPTY support is experimental"
+
+**Cause:** You ran `atlasbridge run` without the `--experimental` flag on Windows.
+
+**Fix:**
+```bash
+atlasbridge run claude --experimental
+```
+
+---
+
 ## General Debugging
 
 ### View logs

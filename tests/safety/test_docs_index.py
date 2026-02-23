@@ -1,12 +1,33 @@
-"""Safety guard: every docs/*.md file must appear in docs/README.md."""
+"""Safety guard: every tracked docs/*.md file must appear in docs/README.md."""
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 DOCS_DIR = ROOT / "docs"
 DOCS_INDEX = DOCS_DIR / "README.md"
+
+
+def _tracked_doc_files() -> list[Path]:
+    """Return top-level docs/*.md files that are tracked in git (ignores local drafts)."""
+    result = subprocess.run(
+        ["git", "ls-files", "docs/*.md"],
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+        check=False,
+    )
+    if result.returncode != 0:
+        # Fallback to filesystem scan if not in a git repo
+        return sorted(DOCS_DIR.glob("*.md"))
+    # Only include files directly in docs/, not subdirectories
+    return [
+        ROOT / f
+        for f in result.stdout.strip().split("\n")
+        if f and "/" not in f.removeprefix("docs/")
+    ]
 
 
 def test_docs_index_exists() -> None:
@@ -15,9 +36,9 @@ def test_docs_index_exists() -> None:
 
 
 def test_all_docs_linked_in_index() -> None:
-    """Every .md file in docs/ must be referenced in docs/README.md."""
+    """Every tracked .md file in docs/ must be referenced in docs/README.md."""
     index_text = DOCS_INDEX.read_text(encoding="utf-8")
-    doc_files = sorted(DOCS_DIR.glob("*.md"))
+    doc_files = _tracked_doc_files()
 
     unlinked = []
     for doc in doc_files:

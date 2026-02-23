@@ -58,6 +58,7 @@ class ClaudeCodeAdapter(BaseAdapter):
         self._supervisors: dict[str, Any] = {}  # session_id → BaseTTY
         self._detectors: dict[str, PromptDetector] = {}
         self._output_buffers: dict[str, bytearray] = {}
+        self.experimental: bool = False  # set by DaemonManager from config
 
     async def start_session(
         self,
@@ -73,7 +74,7 @@ class ClaudeCodeAdapter(BaseAdapter):
             env=env or {},
             cwd=cwd,
         )
-        tty_class = get_tty_class()
+        tty_class = get_tty_class(experimental=self.experimental)
         tty = tty_class(cfg, session_id)
         self._supervisors[session_id] = tty
         self._detectors[session_id] = self._make_detector(session_id)

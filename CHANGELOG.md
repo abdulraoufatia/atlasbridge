@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Windows ConPTY experimental adapter (#60)** — full `WindowsTTY` implementation using `pywinpty`, gated behind `--experimental` flag on `atlasbridge run`, with CRLF normalisation, Windows build validation (10 1809+), 19 unit tests, and non-blocking Windows CI matrix entry
+- **Windows documentation (#106)** — troubleshooting guide for Windows ConPTY, `--experimental` flag docs, WSL2 recommendation, `pywinpty` optional dependency
 - **Local-only execution boundary (Epic #145)** — 19 safety tests enforcing injection path restriction, gate evaluation ordering, cloud isolation, phone-first interaction, docs-lint, boundary message completeness, and SaaS program gate (#146, #147, #148, #149, #150)
 - **Phone-first interaction docs** — `docs/phone-first-interaction.md` with text-only operation guide, synonym tables, boundary messages, and Enter/newline semantics (#147)
 - **SaaS program gate** — `docs/decisions/001-saas-program-gate.md` decision record defining what must be true before any SaaS code merges, with decision record template (#150)

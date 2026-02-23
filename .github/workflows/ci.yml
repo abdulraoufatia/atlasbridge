@@ -157,6 +157,10 @@ jobs:
           - os: ubuntu-latest
             python-version: "3.13"
             experimental: true
+          # Windows ConPTY experimental (non-blocking)
+          - os: windows-latest
+            python-version: "3.12"
+            experimental: true
 
     steps:
       - uses: actions/checkout@v6

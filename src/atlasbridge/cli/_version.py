@@ -27,12 +27,13 @@ def version_cmd(as_json: bool, verbose: bool, experimental: bool) -> None:
     import sys as _sys
 
     flags = {
-        "conpty_backend": False,
+        "conpty_backend": _sys.platform == "win32",
         "slack_channel": False,
         "whatsapp_channel": False,
     }
     if experimental:
         flags["windows_conpty"] = _sys.platform == "win32"
+        flags["conpty_backend"] = _sys.platform == "win32"
 
     # Resolve install path (location of the atlasbridge package)
     spec = importlib.util.find_spec("atlasbridge")
