@@ -242,6 +242,34 @@ class TestAllInteractionClassesValid:
             plan.max_retries = 99  # type: ignore[misc]
 
 
+class TestEscalationTemplates:
+    """Invariant: no plan references 'arrow keys' in user-facing messages."""
+
+    @pytest.mark.parametrize("ic", list(InteractionClass))
+    def test_all_plans_have_escalation_template(self, ic: InteractionClass) -> None:
+        """Every plan must have a non-empty escalation_template."""
+        plan = build_plan(ic)
+        assert plan.escalation_template, f"{ic} must have an escalation_template"
+
+    @pytest.mark.parametrize("ic", list(InteractionClass))
+    def test_no_arrow_key_language(self, ic: InteractionClass) -> None:
+        """No plan should contain 'arrow keys' in any user-facing template."""
+        plan = build_plan(ic)
+        for field in ("escalation_template", "display_template", "feedback_on_stall"):
+            value = getattr(plan, field)
+            assert "arrow keys" not in value, f"{ic}.{field} contains 'arrow keys': {value}"
+
+    @pytest.mark.parametrize("ic", list(InteractionClass))
+    def test_no_run_locally_once(self, ic: InteractionClass) -> None:
+        """No plan should tell users to 'run locally once'."""
+        plan = build_plan(ic)
+        for field in ("escalation_template", "display_template"):
+            value = getattr(plan, field)
+            assert "run locally once" not in value.lower(), (
+                f"{ic}.{field} contains 'run locally once': {value}"
+            )
+
+
 class TestClassifierDeterminism:
     """Invariant: classifier is deterministic (same input → same output)."""
 
