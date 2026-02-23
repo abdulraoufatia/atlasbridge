@@ -20,6 +20,7 @@ Echo suppression:
 
 from __future__ import annotations
 
+import hashlib
 import re
 import time
 from dataclasses import dataclass, field
@@ -84,6 +85,7 @@ _FREE_TEXT_PATTERNS: list[Pattern[str]] = [
 ]
 
 ECHO_SUPPRESS_MS = 500  # ms to suppress detection after injection
+CONTENT_DEDUP_WINDOW_S = 30.0  # suppress duplicate events with same content within this window
 
 
 @dataclass
@@ -94,6 +96,10 @@ class DetectorState:
     injection_time: float = 0.0  # monotonic timestamp of last injection
     stable_excerpt: str = ""  # Last stable text before ANSI redraws
     silence_threshold_s: float = 3.0  # Signal 3 threshold
+
+    # Content dedup — suppresses re-detection of same prompt text
+    last_emitted_hash: str = ""
+    last_emitted_at: float = 0.0
 
 
 class PromptDetector:
@@ -142,16 +148,17 @@ class PromptDetector:
         # Signal 1 — pattern match
         event = self._pattern_match(text)
         if event:
-            return event
+            return self._dedup_event(event)
 
         # Signal 2 — TTY blocked-on-read
         if tty_blocked:
-            return PromptEvent.create(
+            event = PromptEvent.create(
                 session_id=self.session_id,
                 prompt_type=PromptType.TYPE_FREE_TEXT,
                 confidence=Confidence.MED,
                 excerpt=self._state.stable_excerpt[-200:],
             )
+            return self._dedup_event(event)
 
         return None
 
@@ -168,12 +175,13 @@ class PromptDetector:
             # Guard: don't fire Signal 3 if stable_excerpt is empty or not meaningful
             if not excerpt or not is_meaningful(excerpt):
                 return None
-            return PromptEvent.create(
+            event = PromptEvent.create(
                 session_id=self.session_id,
                 prompt_type=PromptType.TYPE_FREE_TEXT,
                 confidence=Confidence.LOW,
                 excerpt=excerpt,
             )
+            return self._dedup_event(event)
         return None
 
     @property
@@ -182,8 +190,14 @@ class PromptDetector:
         return self._state.last_output_time
 
     def mark_injected(self) -> None:
-        """Call immediately after injecting a reply — starts echo suppression window."""
+        """Call immediately after injecting a reply — starts echo suppression window.
+
+        Also clears stable_excerpt and dedup hash so a genuinely new prompt
+        (even with the same text) can be detected after the echo window.
+        """
         self._state.injection_time = time.monotonic()
+        self._state.stable_excerpt = ""
+        self._state.last_emitted_hash = ""
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -192,6 +206,19 @@ class PromptDetector:
     def _in_echo_suppress_window(self) -> bool:
         elapsed_ms = (time.monotonic() - self._state.injection_time) * 1000
         return elapsed_ms < ECHO_SUPPRESS_MS
+
+    def _dedup_event(self, event: PromptEvent) -> PromptEvent | None:
+        """Suppress duplicate events with the same content within the dedup window."""
+        content_hash = hashlib.sha256(event.excerpt.encode()).hexdigest()[:16]
+        now = time.monotonic()
+        if (
+            content_hash == self._state.last_emitted_hash
+            and (now - self._state.last_emitted_at) < CONTENT_DEDUP_WINDOW_S
+        ):
+            return None
+        self._state.last_emitted_hash = content_hash
+        self._state.last_emitted_at = now
+        return event
 
     def _pattern_match(self, text: str) -> PromptEvent | None:
         for pat in _YES_NO_PATTERNS:

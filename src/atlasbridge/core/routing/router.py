@@ -24,6 +24,7 @@ Channel message gating:
 from __future__ import annotations
 
 import hashlib
+import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
@@ -38,6 +39,10 @@ from atlasbridge.core.prompt.state import PromptStateMachine
 from atlasbridge.core.session.manager import SessionManager
 
 logger = structlog.get_logger()
+
+# Spam prevention constants
+_FAILSAFE_WINDOW_S = 60.0  # Rolling window for failsafe counter
+_FAILSAFE_MAX_DISPATCHES = 5  # Max dispatches per session in the window
 
 
 class PromptRouter:
@@ -71,6 +76,9 @@ class PromptRouter:
         # Active state machines: prompt_id → PromptStateMachine
         self._machines: dict[str, PromptStateMachine] = {}
 
+        # Spam prevention: session_id → (window_start, dispatch_count)
+        self._session_dispatch_counts: dict[str, list[float]] = {}
+
     # ------------------------------------------------------------------
     # Forward path
     # ------------------------------------------------------------------
@@ -88,6 +96,28 @@ class PromptRouter:
         if session is None:
             log.warning("event_dropped_unknown_session")
             return
+
+        # --- Content-based dedup: skip if same content already awaiting reply ---
+        content_hash = hashlib.sha256(event.excerpt.encode()).hexdigest()[:16]
+        if session.active_prompt_id:
+            active_sm = self._machines.get(session.active_prompt_id)
+            if active_sm and not active_sm.is_terminal:
+                active_hash = hashlib.sha256(active_sm.event.excerpt.encode()).hexdigest()[:16]
+                if active_hash == content_hash:
+                    log.debug("prompt_deduplicated", active_prompt=session.active_prompt_id[:8])
+                    return
+
+        # --- Failsafe: pause routing if too many dispatches in window ---
+        now = time.monotonic()
+        timestamps = self._session_dispatch_counts.get(event.session_id, [])
+        # Prune old entries outside the failsafe window
+        timestamps = [t for t in timestamps if (now - t) < _FAILSAFE_WINDOW_S]
+        if len(timestamps) >= _FAILSAFE_MAX_DISPATCHES:
+            log.warning("failsafe_routing_paused", dispatches_in_window=len(timestamps))
+            self._session_dispatch_counts[event.session_id] = timestamps
+            return
+        timestamps.append(now)
+        self._session_dispatch_counts[event.session_id] = timestamps
 
         # New prompts supersede old ones — no queueing
         if session.active_prompt_id:
@@ -285,6 +315,9 @@ class PromptRouter:
                             f"\u2713 Answered: {reply.value!r}",
                             session_id=sm.event.session_id,
                         )
+
+            # Reset failsafe counter — successful reply means the prompt cycle completed
+            self._session_dispatch_counts.pop(sm.event.session_id, None)
 
             latency = sm.latency_ms
             log.info(

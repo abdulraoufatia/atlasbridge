@@ -6,7 +6,11 @@ import time
 
 import pytest
 
-from atlasbridge.core.prompt.detector import ECHO_SUPPRESS_MS, PromptDetector
+from atlasbridge.core.prompt.detector import (
+    CONTENT_DEDUP_WINDOW_S,
+    ECHO_SUPPRESS_MS,
+    PromptDetector,
+)
 from atlasbridge.core.prompt.models import Confidence, PromptType
 
 SESSION = "test-session-abc123"
@@ -304,3 +308,90 @@ class TestFolderTrustDetection:
         event = detector.analyse(text)
         assert event is not None
         assert event.prompt_type == PromptType.TYPE_MULTIPLE_CHOICE
+
+
+# ---------------------------------------------------------------------------
+# Content dedup — prevents prompt notification spam
+# ---------------------------------------------------------------------------
+
+
+class TestContentDedup:
+    """Verifies that identical prompt text within the dedup window is suppressed."""
+
+    def test_same_prompt_suppressed_on_second_analyse(self) -> None:
+        d = PromptDetector(session_id="dedup-test")
+        text = b"Delete all files? [y/N]"
+        e1 = d.analyse(text)
+        assert e1 is not None
+        e2 = d.analyse(text)
+        assert e2 is None  # duplicate within 30s window
+
+    def test_different_prompt_not_suppressed(self) -> None:
+        d = PromptDetector(session_id="dedup-diff")
+        e1 = d.analyse(b"Delete all files? [y/N]")
+        assert e1 is not None
+        e2 = d.analyse(b"Overwrite config? [y/N]")
+        assert e2 is not None  # different content — allowed
+
+    def test_dedup_window_expires(self) -> None:
+        d = PromptDetector(session_id="dedup-expire")
+        e1 = d.analyse(b"Delete all? [y/N]")
+        assert e1 is not None
+        # Simulate window expiry
+        d._state.last_emitted_at = time.monotonic() - CONTENT_DEDUP_WINDOW_S - 1.0
+        e2 = d.analyse(b"Delete all? [y/N]")
+        assert e2 is not None  # window expired — new event emitted
+
+    def test_dedup_resets_after_injection(self) -> None:
+        d = PromptDetector(session_id="dedup-inject")
+        text = b"Proceed? (yes/no)"
+        e1 = d.analyse(text)
+        assert e1 is not None
+
+        d.mark_injected()
+        # Wait for echo suppression to pass
+        d._state.injection_time = time.monotonic() - (ECHO_SUPPRESS_MS / 1000.0) - 0.1
+
+        # Same text re-appears (agent re-asked) — should detect again
+        e2 = d.analyse(text)
+        assert e2 is not None
+
+    def test_folder_trust_spam_suppressed(self) -> None:
+        """Reproduces the P0 bug: folder trust prompt re-detected on every PTY chunk."""
+        d = PromptDetector(session_id="trust-spam")
+        trust_text = (
+            b"Do you trust the files in this folder?\n"
+            b"1. Yes, trust this folder\n"
+            b"2. Yes, but only for this session\n"
+            b"3. No, don't trust this folder\n"
+        )
+        e1 = d.analyse(trust_text)
+        assert e1 is not None
+        assert e1.prompt_type == PromptType.TYPE_MULTIPLE_CHOICE
+
+        # Simulate PTY redraw — same text arrives again
+        for _ in range(10):
+            e = d.analyse(trust_text)
+            assert e is None  # all suppressed
+
+    def test_silence_watchdog_dedup(self) -> None:
+        """Signal 3 (silence) should also be deduped with same excerpt."""
+        d = PromptDetector(session_id="silence-dedup", silence_threshold_s=0.01)
+        d.analyse(b"Waiting for input...")
+        d._state.last_output_time = time.monotonic() - 1.0
+        e1 = d.check_silence(process_running=True)
+        assert e1 is not None
+        assert e1.confidence == Confidence.LOW
+
+        # Second check with same stable_excerpt — should be deduped
+        d._state.last_output_time = time.monotonic() - 1.0
+        e2 = d.check_silence(process_running=True)
+        assert e2 is None
+
+    def test_injection_clears_stable_excerpt(self) -> None:
+        """mark_injected() should clear stable_excerpt to prevent combined buffer re-match."""
+        d = PromptDetector(session_id="clear-excerpt")
+        d.analyse(b"Do you trust the files in this folder?")
+        assert d._state.stable_excerpt != ""
+        d.mark_injected()
+        assert d._state.stable_excerpt == ""

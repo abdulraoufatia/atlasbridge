@@ -68,12 +68,12 @@ def router(
     )
 
 
-def _event(session_id: str) -> PromptEvent:
+def _event(session_id: str, excerpt: str = "Continue? [y/N]") -> PromptEvent:
     return PromptEvent.create(
         session_id=session_id,
         prompt_type=PromptType.TYPE_YES_NO,
         confidence=Confidence.HIGH,
-        excerpt="Continue? [y/N]",
+        excerpt=excerpt,
     )
 
 
@@ -127,8 +127,8 @@ class TestRouterWithRealSQLite:
         mock_adapter: AsyncMock,
     ) -> None:
         """New prompts supersede old ones — both dispatched immediately."""
-        e1 = _event(session.session_id)
-        e2 = _event(session.session_id)
+        e1 = _event(session.session_id, excerpt="Continue? [y/N]")
+        e2 = _event(session.session_id, excerpt="Overwrite file? [y/N]")
 
         await router.route_event(e1)  # dispatched
         await router.route_event(e2)  # supersedes — also dispatched

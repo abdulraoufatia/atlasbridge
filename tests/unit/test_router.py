@@ -18,12 +18,16 @@ def _session(tool: str = "claude") -> Session:
     return Session(session_id=str(uuid.uuid4()), tool=tool)
 
 
-def _event(session_id: str, confidence: Confidence = Confidence.HIGH) -> PromptEvent:
+def _event(
+    session_id: str,
+    confidence: Confidence = Confidence.HIGH,
+    excerpt: str = "Continue? [y/N]",
+) -> PromptEvent:
     return PromptEvent.create(
         session_id=session_id,
         prompt_type=PromptType.TYPE_YES_NO,
         confidence=confidence,
-        excerpt="Continue? [y/N]",
+        excerpt=excerpt,
     )
 
 
@@ -136,11 +140,11 @@ class TestRouteEvent:
         session: Session,
         mock_channel: AsyncMock,
     ) -> None:
-        e1 = _event(session.session_id)
-        e2 = _event(session.session_id)
+        e1 = _event(session.session_id, excerpt="Continue? [y/N]")
+        e2 = _event(session.session_id, excerpt="Overwrite file? [y/N]")
         await router.route_event(e1)  # dispatched
-        await router.route_event(e2)  # supersedes — dispatched immediately
-        # Both prompts are dispatched (no queueing)
+        await router.route_event(e2)  # supersedes — different content, dispatched
+        # Both prompts are dispatched (different content, no dedup)
         assert mock_channel.send_prompt.call_count == 2
         # Both have state machines registered
         assert e1.prompt_id in router._machines
@@ -529,3 +533,127 @@ class TestPlanResponse:
         await router.handle_reply(reply)
         mock_channel.notify.assert_called_once()
         assert "accepted" in mock_channel.notify.call_args[0][0].lower()
+
+
+# ---------------------------------------------------------------------------
+# Spam prevention — content dedup + failsafe
+# ---------------------------------------------------------------------------
+
+
+class TestSpamPrevention:
+    """Tests for prompt deduplication and failsafe rate limiting in the router."""
+
+    @pytest.mark.asyncio
+    async def test_same_content_deduplicated(
+        self,
+        router: PromptRouter,
+        session: Session,
+        mock_channel: AsyncMock,
+    ) -> None:
+        """Same excerpt content while first prompt is still active → suppressed."""
+        e1 = _event(session.session_id, excerpt="Continue? [y/N]")
+        e2 = _event(session.session_id, excerpt="Continue? [y/N]")
+        await router.route_event(e1)
+        await router.route_event(e2)
+        # Only the first should be dispatched
+        assert mock_channel.send_prompt.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_different_content_not_deduplicated(
+        self,
+        router: PromptRouter,
+        session: Session,
+        mock_channel: AsyncMock,
+    ) -> None:
+        """Different excerpt content → both dispatched."""
+        e1 = _event(session.session_id, excerpt="Continue? [y/N]")
+        e2 = _event(session.session_id, excerpt="Overwrite? [y/N]")
+        await router.route_event(e1)
+        await router.route_event(e2)
+        assert mock_channel.send_prompt.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_failsafe_pauses_after_max_dispatches(
+        self,
+        router: PromptRouter,
+        session: Session,
+        mock_channel: AsyncMock,
+    ) -> None:
+        """More than 5 dispatches in 60s window → failsafe pauses routing."""
+        from atlasbridge.core.routing.router import _FAILSAFE_MAX_DISPATCHES
+
+        for i in range(_FAILSAFE_MAX_DISPATCHES):
+            e = _event(session.session_id, excerpt=f"Prompt {i}? [y/N]")
+            await router.route_event(e)
+
+        assert mock_channel.send_prompt.call_count == _FAILSAFE_MAX_DISPATCHES
+
+        # One more should be blocked by failsafe
+        extra = _event(session.session_id, excerpt="One more? [y/N]")
+        await router.route_event(extra)
+        assert mock_channel.send_prompt.call_count == _FAILSAFE_MAX_DISPATCHES  # unchanged
+
+    @pytest.mark.asyncio
+    async def test_failsafe_resets_after_reply(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+        mock_adapter: AsyncMock,
+    ) -> None:
+        """Successful reply resets the failsafe counter."""
+        s = _session()
+        session_manager.register(s)
+
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={s.session_id: mock_adapter},
+            store=MagicMock(),
+        )
+
+        # Dispatch 3 events
+        for i in range(3):
+            e = _event(s.session_id, excerpt=f"Q{i}? [y/N]")
+            await router.route_event(e)
+
+        assert mock_channel.send_prompt.call_count == 3
+
+        # Reply to last prompt — resets counter
+        last_event = list(router._machines.values())[-1].event
+        reply = _reply(last_event.prompt_id, s.session_id, value="y")
+        await router.handle_reply(reply)
+
+        # Counter should be reset — can dispatch more
+        assert s.session_id not in router._session_dispatch_counts
+
+    @pytest.mark.asyncio
+    async def test_dedup_allows_after_resolution(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+        mock_adapter: AsyncMock,
+    ) -> None:
+        """After a prompt is resolved, same content can be dispatched again."""
+        s = _session()
+        session_manager.register(s)
+
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={s.session_id: mock_adapter},
+            store=MagicMock(),
+        )
+
+        # First event
+        e1 = _event(s.session_id, excerpt="Continue? [y/N]")
+        await router.route_event(e1)
+        assert mock_channel.send_prompt.call_count == 1
+
+        # Reply resolves it
+        reply = _reply(e1.prompt_id, s.session_id, value="y")
+        await router.handle_reply(reply)
+
+        # Same content again — should dispatch (prompt was resolved)
+        e2 = _event(s.session_id, excerpt="Continue? [y/N]")
+        await router.route_event(e2)
+        assert mock_channel.send_prompt.call_count == 2
