@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] — Phase E: GA Preparation
+
+### Added
+
+- **Prompt Lab CI gate** — all 23 QA scenarios now run on both macOS and Linux as a required CI job (#61, PR #193)
+- **doctor --fix: database auto-init** — creates DB and runs schema migrations (#65, PR #192)
+- **doctor --fix: stale PID cleanup** — removes daemon PID files for dead processes (#65)
+- **doctor --fix: permission repair** — tightens config file/dir to 0600/0700 (#65)
+- **Stale PID check** — `atlasbridge doctor` now warns about stale daemon PID files (#65)
+- **Config permissions check** — `atlasbridge doctor` now warns about overly permissive config (#65)
+- **ADAPTER_API_VERSION = 1.0.0** — frozen adapter contract version constant (#62, PR #189)
+- **CHANNEL_API_VERSION = 1.0.0** — frozen channel contract version constant (#63, PR #190)
+- **28 policy completeness tests** — all presets, examples, fixtures, unknown field rejection, v0 backward compat (#64, PR #191)
+- **18 doctor tests** — database, PID, permissions fixes + idempotency + safety (#65)
+
+### Changed
+
+- **CI matrix expanded** — macOS + Python 3.12 now runs (was excluded), all 4/4 cells green (#66, PR #188)
+- **docs/adapters.md** promoted from v0.3.0 to v1.0.0 (Frozen GA) (#62)
+- **docs/channels.md** promoted from v0.3.0 to v1.0.0 (Frozen GA), fixed notify() signature discrepancy (#63)
+- **docs/policy-dsl-v1.md** — added field reference table, edge cases, anti-patterns, validation rules (#64)
+
+### Fixed
+
+- **escalation-only.yaml** — quoted `autonomy_mode: "off"` so YAML doesn't parse as boolean (#64)
+- **example_v1.yaml** — changed unsafe auto_reply to require_human for free_text prompts (#64)
+- **PyPI publish workflow** — idempotent (skips if version exists), tag/manual only (#164)
+
+---
+
 ## [0.10.0] — 2026-02-23
 
 ### Added
