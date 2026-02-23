@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.1] — 2026-02-23
+
+### Fixed
+
+- **Prompt spam dedup (#296)** — prevent repeated "Input Required" notifications for the same prompt (e.g., Claude folder trust). Two-layer dedup: content hash in PromptDetector (30s window) and active prompt comparison + failsafe rate limiter (5/60s) in PromptRouter
+
+---
+
 ## [1.0.0] — 2026-02-23 — GA Release
 
 ### Highlights
