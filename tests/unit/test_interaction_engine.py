@@ -269,6 +269,137 @@ class TestFeedback:
         assert mock_channel.notify.call_count >= 1
 
 
+class TestTrustFolderPromptFlow:
+    """End-to-end: trust folder prompt → normalize → inject → advance."""
+
+    TRUST_PROMPT = (
+        "Do you trust the files in this folder?\n"
+        "1. Yes, I trust this folder\n"
+        "2. No, exit\n"
+        "Enter to confirm"
+    )
+
+    @pytest.mark.asyncio
+    async def test_yes_reply_normalizes_and_injects(
+        self,
+        engine: InteractionEngine,
+        mock_adapter: AsyncMock,
+        mock_detector: MagicMock,
+    ) -> None:
+        event = _event(
+            prompt_type=PromptType.TYPE_MULTIPLE_CHOICE,
+            excerpt=self.TRUST_PROMPT,
+        )
+        reply = _reply("yes")
+
+        initial = mock_detector.last_output_time
+
+        async def _advance(**kwargs: object) -> None:
+            mock_detector.last_output_time = initial + 2.0
+
+        mock_adapter.inject_reply = AsyncMock(side_effect=_advance)
+
+        result = await engine.handle_prompt_reply(event, reply)
+
+        assert result.success is True
+        # Adapter should have received "1" (normalized), not "yes"
+        call_kwargs = mock_adapter.inject_reply.call_args
+        assert call_kwargs.kwargs.get("value") == "1" or call_kwargs[1].get("value") == "1"
+
+    @pytest.mark.asyncio
+    async def test_trust_reply_normalizes_to_1(
+        self,
+        engine: InteractionEngine,
+        mock_adapter: AsyncMock,
+        mock_detector: MagicMock,
+    ) -> None:
+        event = _event(
+            prompt_type=PromptType.TYPE_MULTIPLE_CHOICE,
+            excerpt=self.TRUST_PROMPT,
+        )
+        reply = _reply("trust")
+
+        initial = mock_detector.last_output_time
+
+        async def _advance(**kwargs: object) -> None:
+            mock_detector.last_output_time = initial + 2.0
+
+        mock_adapter.inject_reply = AsyncMock(side_effect=_advance)
+
+        result = await engine.handle_prompt_reply(event, reply)
+        assert result.success is True
+        call_kwargs = mock_adapter.inject_reply.call_args
+        assert call_kwargs.kwargs.get("value") == "1" or call_kwargs[1].get("value") == "1"
+
+    @pytest.mark.asyncio
+    async def test_no_reply_normalizes_to_2(
+        self,
+        engine: InteractionEngine,
+        mock_adapter: AsyncMock,
+        mock_detector: MagicMock,
+    ) -> None:
+        event = _event(
+            prompt_type=PromptType.TYPE_MULTIPLE_CHOICE,
+            excerpt=self.TRUST_PROMPT,
+        )
+        reply = _reply("no")
+
+        initial = mock_detector.last_output_time
+
+        async def _advance(**kwargs: object) -> None:
+            mock_detector.last_output_time = initial + 2.0
+
+        mock_adapter.inject_reply = AsyncMock(side_effect=_advance)
+
+        result = await engine.handle_prompt_reply(event, reply)
+        assert result.success is True
+        call_kwargs = mock_adapter.inject_reply.call_args
+        assert call_kwargs.kwargs.get("value") == "2" or call_kwargs[1].get("value") == "2"
+
+    @pytest.mark.asyncio
+    async def test_digit_1_passes_through(
+        self,
+        engine: InteractionEngine,
+        mock_adapter: AsyncMock,
+        mock_detector: MagicMock,
+    ) -> None:
+        event = _event(
+            prompt_type=PromptType.TYPE_MULTIPLE_CHOICE,
+            excerpt=self.TRUST_PROMPT,
+        )
+        reply = _reply("1")
+
+        initial = mock_detector.last_output_time
+
+        async def _advance(**kwargs: object) -> None:
+            mock_detector.last_output_time = initial + 2.0
+
+        mock_adapter.inject_reply = AsyncMock(side_effect=_advance)
+
+        result = await engine.handle_prompt_reply(event, reply)
+        assert result.success is True
+
+    @pytest.mark.asyncio
+    async def test_ambiguous_reply_asks_for_clarification(
+        self,
+        engine: InteractionEngine,
+        mock_adapter: AsyncMock,
+        mock_detector: MagicMock,
+        mock_channel: AsyncMock,
+    ) -> None:
+        event = _event(
+            prompt_type=PromptType.TYPE_MULTIPLE_CHOICE,
+            excerpt=self.TRUST_PROMPT,
+        )
+        reply = _reply("maybe")
+
+        result = await engine.handle_prompt_reply(event, reply)
+
+        assert result.success is False
+        assert "1" in result.feedback_message and "2" in result.feedback_message
+        mock_adapter.inject_reply.assert_not_called()
+
+
 class TestFuserIntegration:
     """Engine uses fuser when provided, falls back to classifier when not."""
 

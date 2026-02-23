@@ -362,9 +362,7 @@ class PromptRouter:
 
         return evaluate_gate(ctx)
 
-    def _audit_gate_decision(
-        self, reply: Reply, decision: GateDecision, session_id: str
-    ) -> None:
+    def _audit_gate_decision(self, reply: Reply, decision: GateDecision, session_id: str) -> None:
         """Write an audit event for a gate decision."""
         if self._audit_writer is None:
             return
@@ -378,12 +376,8 @@ class PromptRouter:
             if binding is not None:
                 state = binding.state.value
 
-        is_password = (
-            decision.reason_code == GateRejectReason.REJECT_UNSAFE_INPUT_TYPE
-        )
-        is_rate_limited = (
-            decision.reason_code == GateRejectReason.REJECT_RATE_LIMITED
-        )
+        is_password = decision.reason_code == GateRejectReason.REJECT_UNSAFE_INPUT_TYPE
+        is_rate_limited = decision.reason_code == GateRejectReason.REJECT_RATE_LIMITED
 
         if decision.action == "accept":
             self._audit_writer.channel_message_accepted(

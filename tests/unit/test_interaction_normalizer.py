@@ -159,6 +159,56 @@ class TestNormalizeReply:
         assert normalize_reply(menu, "no") == "b"
 
 
+class TestTrustFolderPrompt:
+    """End-to-end tests for Claude Code's trust folder prompt pattern."""
+
+    TRUST_PROMPT = (
+        "Do you trust the files in this folder?\n"
+        "1. Yes, I trust this folder\n"
+        "2. No, exit\n"
+        "Enter to confirm"
+    )
+
+    TRUST_PROMPT_ALT = "Security note:\n1. Trust this folder\n2. No, exit"
+
+    def test_trust_prompt_detected_as_binary_menu(self):
+        menu = detect_binary_menu(self.TRUST_PROMPT)
+        assert menu is not None
+        assert menu.yes_option == "1"
+        assert menu.no_option == "2"
+
+    def test_trust_prompt_alt_detected(self):
+        menu = detect_binary_menu(self.TRUST_PROMPT_ALT)
+        assert menu is not None
+        assert menu.yes_option == "1"
+
+    @pytest.mark.parametrize("reply", ["yes", "y", "trust", "ok", "allow", "1"])
+    def test_yes_replies_map_to_option_1(self, reply):
+        menu = detect_binary_menu(self.TRUST_PROMPT)
+        assert menu is not None
+        result = normalize_reply(menu, reply)
+        assert result == "1"
+
+    @pytest.mark.parametrize("reply", ["no", "n", "exit", "cancel", "2"])
+    def test_no_replies_map_to_option_2(self, reply):
+        menu = detect_binary_menu(self.TRUST_PROMPT)
+        assert menu is not None
+        result = normalize_reply(menu, reply)
+        assert result == "2"
+
+    def test_ambiguous_reply_returns_none(self):
+        menu = detect_binary_menu(self.TRUST_PROMPT)
+        assert menu is not None
+        assert normalize_reply(menu, "maybe") is None
+        assert normalize_reply(menu, "3") is None
+
+    def test_trust_synonym_present(self):
+        assert "trust" in YES_SYNONYMS
+
+    def test_exit_synonym_present(self):
+        assert "exit" in NO_SYNONYMS
+
+
 class TestSynonymSets:
     """Verify synonym set properties."""
 
