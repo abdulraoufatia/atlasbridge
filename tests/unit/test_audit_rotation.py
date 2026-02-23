@@ -181,3 +181,86 @@ class TestAuditArchiveSafety:
         remaining = db.get_recent_audit_events(limit=100)
         assert len(remaining) == 1
         assert remaining[0]["event_type"] == "should_keep"
+
+
+class TestSizeBasedRotation:
+    """Tests for size-based (row count) audit rotation."""
+
+    def test_rotation_triggers_at_size_threshold(self, db: Database, tmp_path: Path) -> None:
+        """When row count exceeds max_rows, oldest events are archived."""
+        for i in range(10):
+            ts = (datetime.now(UTC) - timedelta(hours=10 - i)).isoformat()
+            _insert_event_at(db, ts, f"event_{i}")
+
+        assert db.count_audit_events() == 10
+
+        archive_path = tmp_path / "audit_archive.1.db"
+        archived = db.archive_oldest_audit_events(archive_path, keep_count=5)
+
+        assert archived == 5
+        assert db.count_audit_events() == 5
+
+        # Verify the 5 newest events were kept
+        remaining = db.get_recent_audit_events(limit=100)
+        types = {r["event_type"] for r in remaining}
+        for i in range(5, 10):
+            assert f"event_{i}" in types
+
+    def test_no_rotation_when_under_threshold(self, db: Database, tmp_path: Path) -> None:
+        """No archival when row count is at or below max_rows."""
+        for i in range(5):
+            _insert_event_at(db, datetime.now(UTC).isoformat(), f"event_{i}")
+
+        archive_path = tmp_path / "audit_archive.1.db"
+        archived = db.archive_oldest_audit_events(archive_path, keep_count=5)
+
+        assert archived == 0
+        assert not archive_path.exists()
+        assert db.count_audit_events() == 5
+
+    def test_size_rotation_preserves_hash_chain(self, db: Database, tmp_path: Path) -> None:
+        """Archived events maintain hash chain integrity."""
+        for i in range(6):
+            ts = (datetime.now(UTC) - timedelta(hours=6 - i)).isoformat()
+            _insert_event_at(db, ts, f"event_{i}")
+
+        archive_path = tmp_path / "audit_archive.1.db"
+        archived = db.archive_oldest_audit_events(archive_path, keep_count=2)
+
+        assert archived == 4
+
+        conn = sqlite3.connect(str(archive_path))
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT * FROM audit_events ORDER BY timestamp ASC").fetchall()
+        conn.close()
+        assert len(rows) == 4
+        # Hash chain links should be preserved
+        for j in range(1, len(rows)):
+            assert rows[j]["prev_hash"] == rows[j - 1]["hash"]
+
+    def test_size_and_age_combined_archives_more(self, db: Database, tmp_path: Path) -> None:
+        """When both thresholds apply, the larger set is archived."""
+        # 3 old events (age-archivable) + 7 recent events = 10 total
+        for i in range(3):
+            ts = (datetime.now(UTC) - timedelta(days=100 + i)).isoformat()
+            _insert_event_at(db, ts, f"old_{i}")
+        for i in range(7):
+            ts = (datetime.now(UTC) - timedelta(hours=i + 1)).isoformat()
+            _insert_event_at(db, ts, f"recent_{i}")
+
+        assert db.count_audit_events() == 10
+
+        # Age threshold: 3 events older than 90 days
+        cutoff = (datetime.now(UTC) - timedelta(days=90)).isoformat()
+        archive_age = tmp_path / "age.db"
+        # Size threshold: keep 5, archive 5 (> 3 from age)
+        archive_size = tmp_path / "size.db"
+
+        age_count = db.archive_audit_events(archive_age, cutoff)
+        assert age_count == 3
+        assert db.count_audit_events() == 7
+
+        # Now apply size threshold on the remaining 7
+        size_count = db.archive_oldest_audit_events(archive_size, keep_count=5)
+        assert size_count == 2
+        assert db.count_audit_events() == 5

@@ -172,14 +172,24 @@ def db_migrate(dry_run: bool, as_json: bool) -> None:
     help="Archive events older than this many days.",
 )
 @click.option(
+    "--max-rows",
+    default=0,
+    show_default=True,
+    help="Archive oldest events when total exceeds this count (0 = disabled).",
+)
+@click.option(
     "--dry-run",
     is_flag=True,
     default=False,
     help="Show what would be archived without making changes.",
 )
 @click.option("--json", "as_json", is_flag=True, default=False)
-def db_archive(days: int, dry_run: bool, as_json: bool) -> None:
-    """Archive old audit events to a separate database file."""
+def db_archive(days: int, max_rows: int, dry_run: bool, as_json: bool) -> None:
+    """Archive old audit events to a separate database file.
+
+    Supports age-based (--days) and size-based (--max-rows) thresholds.
+    When both are specified, events matching EITHER condition are archived.
+    """
     from datetime import UTC, datetime, timedelta
 
     from atlasbridge.core.config import atlasbridge_dir
@@ -204,38 +214,35 @@ def db_archive(days: int, dry_run: bool, as_json: bool) -> None:
         cutoff = datetime.now(UTC) - timedelta(days=days)
         cutoff_str = cutoff.isoformat()
 
+        # Calculate how many events each threshold wants to archive
+        age_archivable = _count_before(db_path, cutoff_str)
+        size_archivable = max(0, total_events - max_rows) if max_rows > 0 else 0
+        # Union: archive the larger of the two sets
+        archivable = max(age_archivable, size_archivable)
+
         if dry_run:
-            import sqlite3
-
-            conn = sqlite3.connect(str(db_path), check_same_thread=False)
-            conn.row_factory = sqlite3.Row
-            row = conn.execute(
-                "SELECT count(*) as cnt FROM audit_events WHERE timestamp < ?",
-                (cutoff_str,),
-            ).fetchone()
-            conn.close()
-            archivable = row["cnt"] if row else 0
-
             if as_json:
                 import json as _json
 
-                click.echo(
-                    _json.dumps(
-                        {
-                            "total_events": total_events,
-                            "archivable": archivable,
-                            "remaining": total_events - archivable,
-                            "cutoff_date": cutoff_str,
-                            "days": days,
-                            "dry_run": True,
-                        },
-                        indent=2,
-                    )
-                )
+                data: dict = {
+                    "total_events": total_events,
+                    "archivable": archivable,
+                    "remaining": total_events - archivable,
+                    "cutoff_date": cutoff_str,
+                    "days": days,
+                    "dry_run": True,
+                }
+                if max_rows > 0:
+                    data["max_rows"] = max_rows
+                    data["size_archivable"] = size_archivable
+                click.echo(_json.dumps(data, indent=2))
             else:
                 console.print("[bold]Audit Log Archive Preview[/bold]")
                 console.print(f"Total events:     {total_events}")
-                console.print(f"Archivable:       {archivable} (older than {days} days)")
+                console.print(f"Age-archivable:   {age_archivable} (older than {days} days)")
+                if max_rows > 0:
+                    console.print(f"Size-archivable:  {size_archivable} (over {max_rows} max rows)")
+                console.print(f"Will archive:     {archivable}")
                 console.print(f"Would remain:     {total_events - archivable}")
                 console.print(f"Cutoff:           {cutoff_str[:10]}")
                 if archivable == 0:
@@ -261,28 +268,47 @@ def db_archive(days: int, dry_run: bool, as_json: bool) -> None:
             overflow.unlink()
 
         archive_path = archive_base.with_suffix(".1.db")
-        archived = db.archive_audit_events(archive_path, cutoff_str)
+
+        # Use whichever threshold archives more events
+        if size_archivable > age_archivable and max_rows > 0:
+            archived = db.archive_oldest_audit_events(archive_path, max_rows)
+        else:
+            archived = db.archive_audit_events(archive_path, cutoff_str)
+
+        remaining = db.count_audit_events()
 
         if as_json:
             import json as _json
 
-            click.echo(
-                _json.dumps(
-                    {
-                        "archived": archived,
-                        "remaining": total_events - archived,
-                        "archive_path": str(archive_path),
-                        "cutoff_date": cutoff_str,
-                        "days": days,
-                    },
-                    indent=2,
-                )
-            )
+            data = {
+                "archived": archived,
+                "remaining": remaining,
+                "archive_path": str(archive_path),
+                "cutoff_date": cutoff_str,
+                "days": days,
+            }
+            if max_rows > 0:
+                data["max_rows"] = max_rows
+            click.echo(_json.dumps(data, indent=2))
         else:
             if archived == 0:
                 console.print("[green]Nothing to archive.[/green] All events are recent.")
             else:
                 console.print(f"[green]Archived {archived} events[/green] to {archive_path.name}")
-                console.print(f"Remaining events: {total_events - archived}")
+                console.print(f"Remaining events: {remaining}")
     finally:
         db.close()
+
+
+def _count_before(db_path: object, cutoff_str: str) -> int:
+    """Count audit events older than cutoff without opening a second Database."""
+    import sqlite3
+
+    conn = sqlite3.connect(str(db_path), check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        "SELECT count(*) as cnt FROM audit_events WHERE timestamp < ?",
+        (cutoff_str,),
+    ).fetchone()
+    conn.close()
+    return row["cnt"] if row else 0

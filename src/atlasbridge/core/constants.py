@@ -72,6 +72,7 @@ DEFAULT_DETECTION_THRESHOLD = 0.65  # confidence threshold for routing
 
 AUDIT_RETENTION_DAYS = 90  # default: archive events older than 90 days
 AUDIT_MAX_ARCHIVES = 3  # keep at most 3 archive files
+AUDIT_MAX_ROWS = 10_000  # default: archive when row count exceeds this
 
 # ---------------------------------------------------------------------------
 # Network

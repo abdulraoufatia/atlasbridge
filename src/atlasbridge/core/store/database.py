@@ -367,3 +367,73 @@ class Database:
         self._db.commit()
 
         return len(rows)
+
+    def archive_oldest_audit_events(
+        self,
+        archive_path: Path,
+        keep_count: int,
+    ) -> int:
+        """Archive the oldest events, keeping only the newest *keep_count*.
+
+        Returns the number of events archived.
+        """
+        total = self.count_audit_events()
+        if total <= keep_count:
+            return 0
+
+        # Select oldest events to archive (everything except the newest keep_count)
+        rows = self._db.execute(
+            """SELECT * FROM audit_events
+               ORDER BY timestamp ASC
+               LIMIT ?""",
+            (total - keep_count,),
+        ).fetchall()
+
+        if not rows:
+            return 0
+
+        archive_db = sqlite3.connect(str(archive_path))
+        archive_db.execute("PRAGMA journal_mode=WAL")
+        archive_db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS audit_events (
+                id          TEXT PRIMARY KEY,
+                event_type  TEXT NOT NULL,
+                session_id  TEXT NOT NULL DEFAULT '',
+                prompt_id   TEXT NOT NULL DEFAULT '',
+                payload     TEXT NOT NULL DEFAULT '{}',
+                timestamp   TEXT NOT NULL,
+                prev_hash   TEXT NOT NULL DEFAULT '',
+                hash        TEXT NOT NULL DEFAULT ''
+            )
+            """
+        )
+        archive_db.execute("CREATE INDEX IF NOT EXISTS idx_archive_ts ON audit_events(timestamp)")
+
+        for row in rows:
+            archive_db.execute(
+                """INSERT OR IGNORE INTO audit_events
+                   (id, event_type, session_id, prompt_id, payload,
+                    timestamp, prev_hash, hash)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    row["id"],
+                    row["event_type"],
+                    row["session_id"],
+                    row["prompt_id"],
+                    row["payload"],
+                    row["timestamp"],
+                    row["prev_hash"],
+                    row["hash"],
+                ),
+            )
+        archive_db.commit()
+        archive_db.close()
+
+        # Delete archived events by their IDs
+        ids = [row["id"] for row in rows]
+        placeholders = ",".join("?" for _ in ids)
+        self._db.execute(f"DELETE FROM audit_events WHERE id IN ({placeholders})", ids)
+        self._db.commit()
+
+        return len(rows)
