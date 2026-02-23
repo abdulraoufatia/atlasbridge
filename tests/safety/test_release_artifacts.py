@@ -36,19 +36,22 @@ def test_pyproject_has_project_urls():
     assert urls, "pyproject.toml missing [project.urls] section"
 
 
-def test_pyproject_classifier_is_pre_alpha():
-    """Before v1.0, PyPI classifier must be Pre-Alpha or Alpha."""
+def test_pyproject_classifier_matches_version():
+    """Development Status classifier must match the version."""
     with (ROOT / "pyproject.toml").open("rb") as f:
         data = tomllib.load(f)
 
     version = data["project"]["version"]
     major = int(version.split(".")[0])
+    classifiers = data["project"].get("classifiers", [])
+    dev_status = [c for c in classifiers if "Development Status" in c]
+    assert dev_status, "Missing Development Status classifier"
 
-    if major < 1:
-        classifiers = data["project"].get("classifiers", [])
-        dev_status = [c for c in classifiers if "Development Status" in c]
-        assert dev_status, "Missing Development Status classifier"
-        # Pre-1.0 should not claim Production/Stable
+    if major >= 1:
+        assert any("5 - Production/Stable" in c for c in dev_status), (
+            f"v{version} (GA) must use 'Production/Stable' classifier"
+        )
+    else:
         for c in dev_status:
             assert "5 - Production/Stable" not in c, (
                 f"Pre-1.0 release must not claim Production/Stable: {c}"

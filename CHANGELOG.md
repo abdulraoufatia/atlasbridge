@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [1.0.0] — 2026-02-23 — GA Release
+
+### Highlights
+
+AtlasBridge v1.0.0 is the first stable release. All 8 contract surfaces are frozen and enforced by CI safety tests. 2005 tests, 85.80% coverage, 30 safety test files. Supports macOS, Linux, and Windows (experimental).
+
 ### Added
 
 - **Windows ConPTY experimental adapter (#60)** — full `WindowsTTY` implementation using `pywinpty`, gated behind `--experimental` flag on `atlasbridge run`, with CRLF normalisation, Windows build validation (10 1809+), 19 unit tests, and non-blocking Windows CI matrix entry
@@ -36,8 +44,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **PyPI classifier** — `Development Status :: 2 - Pre-Alpha` → `Development Status :: 5 - Production/Stable`
 - **Coverage floors raised to GA-grade** — global 84% → 85%, Tier 2 75% → 80% (#113)
 - **Docs: removed commercial/SaaS language** — replaced "Private (commercial)" with "Open Source (experimental)" across README and enterprise docs (#115, #116, #117)
+
+### Fixed
+
+- **Windows poller lock** — `poller_lock.py` now uses `msvcrt.locking()` on Windows instead of POSIX-only `fcntl`, fixing test collection crash on Windows CI
 
 ---
 
