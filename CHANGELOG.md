@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Per-agent getting started guides** — Claude Code, OpenAI Codex CLI, and Gemini CLI guides with setup, prompt patterns, policy examples, and troubleshooting (#99)
 - **Policy cookbook** — copy-paste-ready patterns for git, CI/CD, Dependabot, package managers, session scoping, compound conditions, and rate limiting (#100)
 - **ChannelMessageGate engine** — pure, deterministic accept/reject for all channel messages with 10-step evaluation, 10 reason codes, and frozen dataclass I/O (#156)
+- **Channel accept/reject UX** — phone-friendly message formatter with AcceptType enum (reply/chat_turn/interrupt) and short rejection messages (#159)
+- **Channel rate limiter** — token-bucket rate limiting (10/min, burst 3) with per-user per-channel buckets and enforced floor of 1/min (#160)
+- **Binary menu normalization** — detect semantic yes/no numbered menus and map natural language replies to correct option numbers (#166)
+- **Channel gating safety tests** — 24 safety tests proving gate structure, injection safety, and invariant preservation (#162)
+- **Channel message gating documentation** — evaluation order, session states, rejection reasons, rate limiting, troubleshooting (#163)
 
 ### Changed
 

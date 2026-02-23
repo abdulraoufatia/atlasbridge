@@ -122,6 +122,34 @@ Choose **Y** to keep your existing tokens and settings.
 
 ---
 
+## Channel Message Issues
+
+### "Agent is working. Message not sent."
+
+**Cause:** The agent is streaming output. Messages are blocked during streaming.
+
+**Fix:** Wait for the agent to finish. When it needs input, a prompt will appear.
+
+### "Policy does not allow this action."
+
+**Cause:** Your policy doesn't permit this message type in the current session state.
+
+**Fix:** To allow chat turns when idle, add `allow_chat_turns: true` to your policy. To allow interrupts during execution, add `allow_interrupts: true`. See [Channel Message Gating](channel-message-gating.md).
+
+### "This prompt requires local input."
+
+**Cause:** The agent is asking for a password or token. These must be entered in the terminal.
+
+**Fix:** Switch to the terminal where the session is running and enter the value directly.
+
+### "You are not authorized for this session."
+
+**Cause:** Your channel user ID is not on the session's allowlist.
+
+**Fix:** Contact the session operator to add your user ID.
+
+---
+
 ## General Debugging
 
 ### View logs
