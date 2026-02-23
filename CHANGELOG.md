@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Local-only execution boundary (Epic #145)** — 19 safety tests enforcing injection path restriction, gate evaluation ordering, cloud isolation, phone-first interaction, docs-lint, boundary message completeness, and SaaS program gate (#146, #147, #148, #149, #150)
+- **Phone-first interaction docs** — `docs/phone-first-interaction.md` with text-only operation guide, synonym tables, boundary messages, and Enter/newline semantics (#147)
+- **SaaS program gate** — `docs/decisions/001-saas-program-gate.md` decision record defining what must be true before any SaaS code merges, with decision record template (#150)
+- **Docs-lint grep guard** — safety test preventing "cloud execution" language in user-facing docs (#148)
+- **CLI main.py split** — reduced from 481 to 146 lines; all 27 commands preserved via extracted modules with Click wrappers (#125)
+- **Audit rotation size-based threshold** — `AUDIT_MAX_ROWS=10000`, `archive_oldest_audit_events()` method, `--max-rows` CLI option with union semantics, 4 unit tests (#126)
 - **Dashboard integration e2e test** — 11 tests verifying real HTTP server binding, route responses, and loopback-only enforcement (#101)
 - **Performance benchmark tests** — 12 tests verifying detect() <5ms, 100k-line flood <50ms p99, pre-compiled regex patterns (#67)
 - **Per-agent getting started guides** — Claude Code, OpenAI Codex CLI, and Gemini CLI guides with setup, prompt patterns, policy examples, and troubleshooting (#99)
