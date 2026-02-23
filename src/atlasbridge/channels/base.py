@@ -183,6 +183,28 @@ class BaseChannel(ABC):
         """
 
     # ------------------------------------------------------------------
+    # Editable output — returns message ID for later editing
+    # ------------------------------------------------------------------
+
+    async def send_output_editable(self, text: str, session_id: str = "") -> str:
+        """
+        Send CLI output and return its message ID for later editing.
+
+        Default delegates to ``send_output()`` and returns ``""``.
+        Channels may override to return a real message ID that can be
+        passed to ``edit_prompt_message()`` for streaming updates.
+
+        Args:
+            text:       Cleaned CLI output text (ANSI-stripped).
+            session_id: Session context for routing.
+
+        Returns:
+            Channel message ID as a string, or ``""`` if not supported.
+        """
+        await self.send_output(text, session_id=session_id)
+        return ""
+
+    # ------------------------------------------------------------------
     # Agent prose — rich formatted text (non-monospace)
     # ------------------------------------------------------------------
 
@@ -198,6 +220,29 @@ class BaseChannel(ABC):
             session_id: Session context for routing.
         """
         await self.notify(text, session_id=session_id)
+
+    # ------------------------------------------------------------------
+    # Plan rendering — detected plan with action buttons
+    # ------------------------------------------------------------------
+
+    async def send_plan(self, plan: Any, session_id: str = "") -> str:
+        """
+        Send a detected plan to the channel with Execute/Modify/Cancel buttons.
+
+        Default renders the plan as text via ``send_agent_message()``.
+        Channels may override for richer formatting with inline buttons.
+
+        Args:
+            plan:       A DetectedPlan instance (title, steps, raw_text).
+            session_id: Session context for routing.
+
+        Returns:
+            Channel message ID as a string, or ``""`` if not supported.
+        """
+        steps_text = "\n".join(f"{i + 1}. {s}" for i, s in enumerate(plan.steps))
+        text = f"**{plan.title}**\n\n{steps_text}"
+        await self.send_agent_message(text, session_id=session_id)
+        return ""
 
     # ------------------------------------------------------------------
     # Return path — receive replies from the human

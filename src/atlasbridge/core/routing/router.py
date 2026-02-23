@@ -138,11 +138,32 @@ class PromptRouter:
 
     async def handle_reply(self, reply: Reply) -> None:
         """Process an incoming Reply from the channel."""
+        # Plan response handling (sentinel prompt_id)
+        if reply.prompt_id == "__plan__":
+            await self.handle_plan_response(
+                session_id=reply.session_id,
+                decision=reply.value,
+            )
+            return
+
         # Free-text replies have empty prompt_id — resolve to active prompt
         if not reply.prompt_id:
             resolved = self._resolve_free_text_reply(reply)
             if resolved is None:
-                # No active prompt — route to chat mode if handler is set
+                # No active prompt — check conversation state
+                state = self._get_conversation_state(reply)
+
+                if state is not None and state == "streaming":
+                    self._queue_for_next_turn(reply)
+                    session_id = self._resolve_session_for_reply(reply) or ""
+                    if self._channel is not None:
+                        await self._channel.notify(
+                            "Queued for next turn.",
+                            session_id=session_id,
+                        )
+                    return
+
+                # RUNNING, IDLE, or unknown → chat mode
                 if self._chat_mode_handler is not None:
                     logger.info(
                         "chat_mode_input",
@@ -311,6 +332,82 @@ class PromptRouter:
         if queue:
             next_event = queue.pop(0)
             await self._dispatch(next_event)
+
+    # ------------------------------------------------------------------
+    # TTL expiry sweep (called by scheduler)
+    # ------------------------------------------------------------------
+
+    def _get_conversation_state(self, reply: Reply) -> str | None:
+        """Resolve conversation state from a reply's thread context."""
+        if self._conversation_registry is None:
+            return None
+        if reply.thread_id:
+            channel_name = reply.channel_identity.split(":")[0]
+            binding = self._conversation_registry.get_binding(channel_name, reply.thread_id)
+            if binding is not None:
+                return binding.state
+        return None
+
+    def _resolve_session_for_reply(self, reply: Reply) -> str | None:
+        """Resolve session_id from reply's thread context."""
+        if self._conversation_registry is None:
+            return None
+        if reply.thread_id:
+            channel_name = reply.channel_identity.split(":")[0]
+            return self._conversation_registry.resolve(channel_name, reply.thread_id)
+        return None
+
+    def _queue_for_next_turn(self, reply: Reply) -> None:
+        """Queue a message for delivery when the agent finishes streaming."""
+        if self._conversation_registry is None:
+            return
+        if reply.thread_id:
+            channel_name = reply.channel_identity.split(":")[0]
+            binding = self._conversation_registry.get_binding(channel_name, reply.thread_id)
+            if binding is not None:
+                binding.queued_messages.append(reply.value)
+                logger.debug(
+                    "message_queued",
+                    queue_depth=len(binding.queued_messages),
+                )
+
+    async def handle_plan_response(self, session_id: str, decision: str) -> None:
+        """Handle a plan button response (execute/modify/cancel)."""
+        log = logger.bind(session_id=session_id[:8], decision=decision)
+
+        if decision == "execute":
+            log.info("plan_execute")
+            if self._channel is not None:
+                await self._channel.notify(
+                    "Plan accepted. Agent continuing.",
+                    session_id=session_id,
+                )
+
+        elif decision == "modify":
+            log.info("plan_modify")
+            if self._channel is not None:
+                await self._channel.notify(
+                    "Send your modifications as a message.",
+                    session_id=session_id,
+                )
+
+        elif decision == "cancel":
+            log.info("plan_cancel")
+            if self._chat_mode_handler is not None:
+                cancel_reply = Reply(
+                    prompt_id="",
+                    session_id=session_id,
+                    value="Cancel the current plan. Do not proceed with these steps.",
+                    nonce="",
+                    channel_identity="system:plan_cancel",
+                    timestamp="",
+                )
+                await self._chat_mode_handler(cancel_reply)
+            if self._channel is not None:
+                await self._channel.notify(
+                    "Plan cancelled. Cancellation sent to agent.",
+                    session_id=session_id,
+                )
 
     # ------------------------------------------------------------------
     # TTL expiry sweep (called by scheduler)

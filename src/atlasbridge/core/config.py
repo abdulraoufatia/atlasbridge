@@ -191,6 +191,31 @@ class AdaptersConfig(BaseModel):
     claude: AdapterClaudeConfig = Field(default_factory=AdapterClaudeConfig)
 
 
+class StreamingConfig(BaseModel):
+    """Configuration for PTY output streaming to channels."""
+
+    batch_interval_s: float = 2.0
+    max_output_chars: int = 2000
+    max_messages_per_minute: int = 15
+    min_meaningful_chars: int = 10
+    edit_last_message: bool = True
+    redact_secrets: bool = True
+
+    @field_validator("batch_interval_s")
+    @classmethod
+    def validate_batch_interval(cls, v: float) -> float:
+        if not (0.5 <= v <= 30.0):
+            raise ValueError("batch_interval_s must be between 0.5 and 30.0")
+        return v
+
+    @field_validator("max_messages_per_minute")
+    @classmethod
+    def validate_rate_limit(cls, v: int) -> int:
+        if not (1 <= v <= 60):
+            raise ValueError("max_messages_per_minute must be between 1 and 60")
+        return v
+
+
 # ---------------------------------------------------------------------------
 # Root config
 # ---------------------------------------------------------------------------
@@ -206,6 +231,7 @@ class AtlasBridgeConfig(BaseModel):
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     adapters: AdaptersConfig = Field(default_factory=AdaptersConfig)
+    streaming: StreamingConfig = Field(default_factory=StreamingConfig)
 
     @model_validator(mode="after")
     def at_least_one_channel(self) -> AtlasBridgeConfig:

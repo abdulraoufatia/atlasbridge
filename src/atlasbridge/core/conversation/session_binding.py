@@ -25,8 +25,36 @@ class ConversationState(StrEnum):
 
     IDLE = "idle"  # Bound but session not yet running
     RUNNING = "running"  # Session active, accepting chat input
+    STREAMING = "streaming"  # Agent producing output; user messages queued
     AWAITING_INPUT = "awaiting_input"  # Prompt detected, waiting on user
     STOPPED = "stopped"  # Session ended
+
+
+VALID_CONVERSATION_TRANSITIONS: dict[ConversationState, frozenset[ConversationState]] = {
+    ConversationState.IDLE: frozenset({ConversationState.RUNNING, ConversationState.STOPPED}),
+    ConversationState.RUNNING: frozenset(
+        {
+            ConversationState.STREAMING,
+            ConversationState.AWAITING_INPUT,
+            ConversationState.STOPPED,
+        }
+    ),
+    ConversationState.STREAMING: frozenset(
+        {
+            ConversationState.RUNNING,
+            ConversationState.AWAITING_INPUT,
+            ConversationState.STOPPED,
+        }
+    ),
+    ConversationState.AWAITING_INPUT: frozenset(
+        {
+            ConversationState.RUNNING,
+            ConversationState.STREAMING,
+            ConversationState.STOPPED,
+        }
+    ),
+    ConversationState.STOPPED: frozenset(),  # terminal
+}
 
 
 @dataclass
@@ -39,6 +67,7 @@ class ConversationBinding:
     state: ConversationState = ConversationState.IDLE
     created_at: float = field(default_factory=time.monotonic)
     last_activity: float = field(default_factory=time.monotonic)
+    queued_messages: list[str] = field(default_factory=list)
 
 
 # Default TTL: 4 hours
@@ -121,6 +150,42 @@ class ConversationRegistry:
         if binding is not None:
             binding.state = state
             binding.last_activity = time.monotonic()
+
+    def transition_state(
+        self, channel_name: str, thread_id: str, new_state: ConversationState
+    ) -> bool:
+        """Transition state with validation. Returns True if transition was valid."""
+        binding = self.get_binding(channel_name, thread_id)
+        if binding is None:
+            return False
+        valid = VALID_CONVERSATION_TRANSITIONS.get(binding.state, frozenset())
+        if new_state not in valid:
+            logger.warning(
+                "invalid_conversation_transition",
+                from_state=binding.state,
+                to_state=new_state,
+                channel=channel_name,
+            )
+            return False
+        binding.state = new_state
+        binding.last_activity = time.monotonic()
+        return True
+
+    def get_state_for_session(self, session_id: str) -> ConversationState | None:
+        """Return conversation state for a session, or None if no binding exists."""
+        for b in self._bindings.values():
+            if b.session_id == session_id and not self._is_expired(b):
+                return b.state
+        return None
+
+    def drain_queued_messages(self, session_id: str) -> list[str]:
+        """Pop and return all queued messages for a session."""
+        messages: list[str] = []
+        for b in self._bindings.values():
+            if b.session_id == session_id and not self._is_expired(b):
+                messages.extend(b.queued_messages)
+                b.queued_messages.clear()
+        return messages
 
     def unbind(self, session_id: str) -> int:
         """Remove all bindings for a session (called on session end).

@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.10.0] — 2026-02-23
+
+### Added
+
+- **STREAMING conversation state** (Phase C.Z)
+  - New `ConversationState.STREAMING` in session binding state machine
+  - `VALID_CONVERSATION_TRANSITIONS` — validated state transition graph
+  - `transition_state()`, `get_state_for_session()`, `drain_queued_messages()` on `ConversationRegistry`
+  - State-driven routing: STREAMING queues messages, RUNNING→chat, AWAITING_INPUT→prompt, STOPPED→drop
+
+- **Streaming configuration** — `StreamingConfig` model with configurable batch interval, rate limit, message editing, and secret redaction
+
+- **Secret redaction in output forwarding**
+  - `OutputForwarder._redact()` strips Telegram bot tokens, Slack tokens, OpenAI keys, GitHub PATs, and AWS access keys
+  - Applied before any output reaches a channel
+
+- **Message editing mode** — `send_output_editable()` on channels returns message IDs for streaming edits instead of sending new messages
+
+- **Plan detection in agent output**
+  - `DetectedPlan` frozen dataclass + `detect_plan()` pure function
+  - Two strategies: header + numbered steps (≥2), headerless + action verbs (≥3, ≥60% verb density)
+  - `StreamingManager` with bounded 8192-char accumulator for incremental plan detection
+
+- **Plan rendering with Execute/Modify/Cancel buttons**
+  - `send_plan()` on `BaseChannel` with Telegram (inline keyboard) and Slack (Block Kit) overrides
+  - Plan button responses routed via `__plan__` sentinel prompt_id
+  - Execute notifies only (no PTY injection); Modify prompts for text; Cancel injects via chat handler
+
+- **20 new safety tests** — secret redaction, plan detection safety, streaming state invariants, state-driven routing, accumulator bounds, conversation state transitions
+
+### Changed
+
+- `OutputForwarder` accepts optional `StreamingConfig`, `ConversationRegistry`, and `StreamingManager`
+- `OutputRouter` classifies `PLAN_OUTPUT` alongside `AGENT_MESSAGE`, `CLI_OUTPUT`, and `NOISE`
+- `PromptRouter` consults `ConversationState` before dispatching free-text replies
+- Telegram `_handle_callback()` parses `plan:` prefix for plan button responses
+- Slack socket mode handler detects `plan_` action_id prefix for plan actions
+
+---
+
 ## [0.9.9] — 2026-02-23
 
 ### Fixed

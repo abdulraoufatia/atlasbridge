@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 
 from atlasbridge.core.conversation.session_binding import (
+    VALID_CONVERSATION_TRANSITIONS,
     ConversationBinding,
     ConversationRegistry,
     ConversationState,
@@ -15,11 +16,15 @@ class TestConversationState:
     def test_all_states_exist(self) -> None:
         assert ConversationState.IDLE == "idle"
         assert ConversationState.RUNNING == "running"
+        assert ConversationState.STREAMING == "streaming"
         assert ConversationState.AWAITING_INPUT == "awaiting_input"
         assert ConversationState.STOPPED == "stopped"
 
     def test_state_count(self) -> None:
-        assert len(ConversationState) == 4
+        assert len(ConversationState) == 5
+
+    def test_streaming_state_exists(self) -> None:
+        assert ConversationState.STREAMING == "streaming"
 
 
 class TestBindResolve:
@@ -205,3 +210,75 @@ class TestActiveCount:
         assert reg.active_count == 2
         reg.unbind("sess-001")
         assert reg.active_count == 1
+
+
+class TestValidatedTransitions:
+    def test_valid_transitions_running_to_streaming(self) -> None:
+        valid = VALID_CONVERSATION_TRANSITIONS[ConversationState.RUNNING]
+        assert ConversationState.STREAMING in valid
+
+    def test_valid_transitions_streaming_to_running(self) -> None:
+        valid = VALID_CONVERSATION_TRANSITIONS[ConversationState.STREAMING]
+        assert ConversationState.RUNNING in valid
+
+    def test_invalid_transition_stopped_to_streaming(self) -> None:
+        valid = VALID_CONVERSATION_TRANSITIONS[ConversationState.STOPPED]
+        assert ConversationState.STREAMING not in valid
+        assert len(valid) == 0
+
+    def test_transition_state_validates(self) -> None:
+        reg = ConversationRegistry()
+        reg.bind("telegram", "12345", "sess-001")
+        # RUNNING → STREAMING should succeed
+        assert reg.transition_state("telegram", "12345", ConversationState.STREAMING) is True
+        b = reg.get_binding("telegram", "12345")
+        assert b is not None
+        assert b.state == ConversationState.STREAMING
+
+    def test_transition_state_rejects_invalid(self) -> None:
+        reg = ConversationRegistry()
+        reg.bind("telegram", "12345", "sess-001")
+        reg.update_state("telegram", "12345", ConversationState.STOPPED)
+        # STOPPED → STREAMING should fail
+        assert reg.transition_state("telegram", "12345", ConversationState.STREAMING) is False
+
+    def test_transition_state_nonexistent_returns_false(self) -> None:
+        reg = ConversationRegistry()
+        assert reg.transition_state("telegram", "99999", ConversationState.RUNNING) is False
+
+
+class TestGetStateForSession:
+    def test_get_state_for_session(self) -> None:
+        reg = ConversationRegistry()
+        reg.bind("telegram", "12345", "sess-001")
+        assert reg.get_state_for_session("sess-001") == ConversationState.RUNNING
+
+    def test_get_state_for_session_none(self) -> None:
+        reg = ConversationRegistry()
+        assert reg.get_state_for_session("nonexistent") is None
+
+
+class TestQueuedMessages:
+    def test_queued_messages_accumulate(self) -> None:
+        reg = ConversationRegistry()
+        b = reg.bind("telegram", "12345", "sess-001")
+        b.queued_messages.append("hello")
+        b.queued_messages.append("world")
+        assert len(b.queued_messages) == 2
+
+    def test_drain_queued_messages(self) -> None:
+        reg = ConversationRegistry()
+        b = reg.bind("telegram", "12345", "sess-001")
+        b.queued_messages.extend(["msg1", "msg2", "msg3"])
+        drained = reg.drain_queued_messages("sess-001")
+        assert drained == ["msg1", "msg2", "msg3"]
+        assert len(b.queued_messages) == 0
+
+    def test_drain_empty_returns_empty(self) -> None:
+        reg = ConversationRegistry()
+        reg.bind("telegram", "12345", "sess-001")
+        assert reg.drain_queued_messages("sess-001") == []
+
+    def test_drain_nonexistent_session_returns_empty(self) -> None:
+        reg = ConversationRegistry()
+        assert reg.drain_queued_messages("nonexistent") == []

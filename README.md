@@ -419,6 +419,7 @@ See [CHANGELOG.md](CHANGELOG.md) for full version history.
 | v0.9.7 | Released | Sprint S1 — mypy strict, audit rotation, circuit breaker, cloud spec extraction |
 | v0.9.8 | Released | Conversation UX v2 — interaction pipeline, ML classifier protocol, session binding, output router |
 | v0.9.9 | Released | Chat mode UX — per-plan escalation, folder trust detection, no more "arrow keys" messages |
+| v0.10.0 | Released | Full conversational agent mode — streaming state, plan detection, secret redaction |
 | v1.0.0 | Planned | GA — stable APIs, 2-week freeze window, then tag |
 
 ---

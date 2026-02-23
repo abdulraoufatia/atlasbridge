@@ -24,6 +24,7 @@ from atlasbridge.core.interaction.plan import build_plan
 if TYPE_CHECKING:
     from atlasbridge.adapters.base import BaseAdapter
     from atlasbridge.channels.base import BaseChannel
+    from atlasbridge.core.conversation.session_binding import ConversationRegistry
     from atlasbridge.core.interaction.fuser import ClassificationFuser
     from atlasbridge.core.prompt.detector import PromptDetector
     from atlasbridge.core.prompt.models import PromptEvent, Reply
@@ -49,11 +50,13 @@ class InteractionEngine:
         channel: BaseChannel,
         session_manager: SessionManager,
         fuser: ClassificationFuser | None = None,
+        conversation_registry: ConversationRegistry | None = None,
     ) -> None:
         self._classifier = InteractionClassifier()
         self._fuser = fuser
         self._channel = channel
         self._session_id = session_id
+        self._conversation_registry = conversation_registry
 
         self._executor = InteractionExecutor(
             adapter=adapter,

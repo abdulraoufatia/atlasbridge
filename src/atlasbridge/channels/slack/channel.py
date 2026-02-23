@@ -129,6 +129,25 @@ class SlackChannel(BaseChannel):
                     {"channel": ch_id, "text": formatted},
                 )
 
+    async def send_output_editable(self, text: str, session_id: str = "") -> str:
+        """Send CLI output and return a Slack channel:ts identifier for editing."""
+        if len(text) > 3000:
+            text = text[:3000] + "\n...(truncated)"
+        formatted = f"```\n{text}\n```"
+        msg_id = ""
+        for uid in self._allowed:
+            ch_id = await self._get_dm_channel(uid)
+            if ch_id:
+                result = await self._api(
+                    "chat.postMessage",
+                    {"channel": ch_id, "text": formatted},
+                )
+                if result and not msg_id:
+                    ts = result.get("ts", "")
+                    if ts:
+                        msg_id = f"{ch_id}:{ts}"
+        return msg_id
+
     async def send_agent_message(self, text: str, session_id: str = "") -> None:
         """Send agent prose with mrkdwn formatting (not code block)."""
         if len(text) > 3500:
@@ -140,6 +159,59 @@ class SlackChannel(BaseChannel):
                     "chat.postMessage",
                     {"channel": ch_id, "text": text, "mrkdwn": True},
                 )
+
+    async def send_plan(self, plan: Any, session_id: str = "") -> str:
+        """Send a plan with Block Kit action buttons (Execute/Modify/Cancel)."""
+        steps_text = "\n".join(f"{i + 1}. {s}" for i, s in enumerate(plan.steps))
+        blocks = [
+            {
+                "type": "header",
+                "text": {"type": "plain_text", "text": plan.title[:150]},
+            },
+            {
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": steps_text[:3000]},
+            },
+            {
+                "type": "actions",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {"type": "plain_text", "text": "Execute"},
+                        "action_id": f"plan_execute:{session_id}",
+                        "style": "primary",
+                    },
+                    {
+                        "type": "button",
+                        "text": {"type": "plain_text", "text": "Modify"},
+                        "action_id": f"plan_modify:{session_id}",
+                    },
+                    {
+                        "type": "button",
+                        "text": {"type": "plain_text", "text": "Cancel"},
+                        "action_id": f"plan_cancel:{session_id}",
+                        "style": "danger",
+                    },
+                ],
+            },
+        ]
+        msg_id = ""
+        for uid in self._allowed:
+            ch_id = await self._get_dm_channel(uid)
+            if ch_id:
+                result = await self._api(
+                    "chat.postMessage",
+                    {
+                        "channel": ch_id,
+                        "text": f"{plan.title}\n{steps_text}",
+                        "blocks": blocks,
+                    },
+                )
+                if result and not msg_id:
+                    ts = result.get("ts", "")
+                    if ts:
+                        msg_id = f"{ch_id}:{ts}"
+        return msg_id
 
     async def edit_prompt_message(
         self,
@@ -224,6 +296,13 @@ class SlackChannel(BaseChannel):
                         msg_ts = payload.get("message", {}).get("ts", "")
                         thread_id = f"{ch_id}:{msg_ts}" if ch_id and msg_ts else ""
                         for action in payload.get("actions", []):
+                            action_id = action.get("action_id", "")
+                            # Plan button actions: plan_execute:{session_id}
+                            if action_id.startswith("plan_"):
+                                await self._handle_plan_action(
+                                    action_id, user_id, thread_id=thread_id
+                                )
+                                continue
                             value = action.get("value", "")
                             if value:
                                 await self._handle_action(value, user_id, thread_id=thread_id)
@@ -261,6 +340,38 @@ class SlackChannel(BaseChannel):
             logger.error("slack_socket_connection_error", error=str(exc))
         finally:
             await client.close()
+
+    async def _handle_plan_action(
+        self, action_id: str, user_id: str, *, thread_id: str = ""
+    ) -> None:
+        """Parse plan button action_id and enqueue Reply."""
+        if not self.is_allowed(f"slack:{user_id}"):
+            logger.warning("slack_plan_action_rejected", user_id=user_id)
+            return
+        # action_id format: plan_execute:{session_id}
+        try:
+            action_type, session_id = action_id.split(":", 1)
+        except ValueError:
+            return
+        # Map action_type to decision
+        decision_map = {
+            "plan_execute": "execute",
+            "plan_modify": "modify",
+            "plan_cancel": "cancel",
+        }
+        decision = decision_map.get(action_type)
+        if not decision:
+            return
+        reply = Reply(
+            prompt_id="__plan__",
+            session_id=session_id,
+            value=decision,
+            nonce="",
+            channel_identity=f"slack:{user_id}",
+            timestamp=datetime.now(UTC).isoformat(),
+            thread_id=thread_id,
+        )
+        await self._reply_queue.put(reply)
 
     async def _handle_action(self, value: str, user_id: str, *, thread_id: str = "") -> None:
         """Parse callback value and enqueue Reply."""

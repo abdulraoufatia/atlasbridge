@@ -102,12 +102,34 @@ class MultiChannel(BaseChannel):
             return_exceptions=True,
         )
 
+    async def send_output_editable(self, text: str, session_id: str = "") -> str:
+        """Broadcast CLI output and return first successful message ID."""
+        results = await asyncio.gather(
+            *[ch.send_output_editable(text, session_id) for ch in self._channels],
+            return_exceptions=True,
+        )
+        for ch, result in zip(self._channels, results, strict=False):
+            if isinstance(result, str) and result:
+                return f"{ch.channel_name}:{result}"
+        return ""
+
     async def send_agent_message(self, text: str, session_id: str = "") -> None:
         """Broadcast agent prose to all sub-channels."""
         await asyncio.gather(
             *[ch.send_agent_message(text, session_id) for ch in self._channels],
             return_exceptions=True,
         )
+
+    async def send_plan(self, plan: Any, session_id: str = "") -> str:
+        """Broadcast plan to all sub-channels and return first message ID."""
+        results = await asyncio.gather(
+            *[ch.send_plan(plan, session_id) for ch in self._channels],
+            return_exceptions=True,
+        )
+        for ch, result in zip(self._channels, results, strict=False):
+            if isinstance(result, str) and result:
+                return f"{ch.channel_name}:{result}"
+        return ""
 
     async def edit_prompt_message(
         self,

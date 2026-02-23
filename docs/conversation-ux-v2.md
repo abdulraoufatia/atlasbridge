@@ -1,8 +1,8 @@
 # Conversation UX v2 — Interaction Pipeline
 
 **Status:** Current
-**Phase:** C.Y + C.Y2 — Local UX improvement
-**Version:** v0.9.9
+**Phase:** C.Y + C.Y2 + C.Z — Full Conversational Agent Mode
+**Version:** v0.10.0
 
 ---
 
@@ -17,6 +17,9 @@ Conversation UX v2 upgrades the human-operator experience from a raw terminal re
 - **Retry and escalation** — if the CLI doesn't respond after injection, retry once then escalate
 - **Password redaction** — credentials are never shown in feedback messages or logs
 - **Operator feedback** — "Sent: y + Enter", "CLI advanced", "Sent: [REDACTED] + Enter"
+- **Plan detection** — agent execution plans are detected and presented with Execute/Modify/Cancel buttons
+- **Streaming state** — PTY output transitions session to STREAMING; user messages are queued until output settles
+- **Secret redaction** — tokens and API keys are stripped from output before reaching channels
 
 ---
 
@@ -37,6 +40,12 @@ Chat Mode (no active prompt):
   User message → PromptRouter._chat_mode_handler
     → InteractionEngine.handle_chat_input()
       → PTY stdin
+
+Streaming + Plan Detection (v0.10.0):
+  PTY output → OutputForwarder → StreamingManager.accumulate()
+    → detect_plan() → DetectedPlan? → channel.send_plan() (buttons)
+  State: RUNNING → STREAMING (output active) → RUNNING (idle)
+  User message during STREAMING → queued → drained on RUNNING
 ```
 
 ---
@@ -206,6 +215,42 @@ In `DaemonManager._run_adapter_session()`:
 
 ---
 
+## Streaming and Plan Detection (v0.10.0)
+
+### STREAMING State
+
+The `ConversationState` enum includes a `STREAMING` state. When the OutputForwarder detects active PTY output, it transitions the conversation to STREAMING. During STREAMING:
+
+- User messages are **queued** in `ConversationBinding.queued_messages`, not injected
+- The channel notifies the user: "Queued for next turn."
+- After 2 idle flush cycles (no new output), state transitions back to RUNNING
+- Queued messages are drained and injected as chat input
+
+State diagram: `IDLE → RUNNING → STREAMING → RUNNING → AWAITING_INPUT → RUNNING → STOPPED`
+
+### Plan Detection
+
+The `StreamingManager` accumulates output and runs `detect_plan()` on each batch. When a plan is detected:
+
+1. The plan is rendered via `channel.send_plan()` with Execute/Modify/Cancel buttons
+2. **Execute** — notifies "Plan accepted. Agent continuing." (no PTY injection)
+3. **Modify** — notifies "Send your modifications as a message." (next free-text → chat mode)
+4. **Cancel** — injects cancellation text via chat handler (uses `\r`)
+
+Plan responses use the `__plan__` sentinel prompt_id and are routed by `PromptRouter.handle_plan_response()`.
+
+### Secret Redaction
+
+The `OutputForwarder._redact()` method strips tokens matching known patterns before any output reaches a channel:
+
+- Telegram bot tokens (`\d+:[A-Za-z0-9_-]{35}`)
+- Slack tokens (`xoxb-`, `xoxp-`, `xapp-`)
+- OpenAI keys (`sk-`)
+- GitHub PATs (`ghp_`, `gho_`, `ghs_`, `ghp_`)
+- AWS access keys (`AKIA`)
+
+---
+
 ## Invariant Preservation
 
 All existing correctness invariants remain enforced:
@@ -223,6 +268,10 @@ All existing correctness invariants remain enforced:
 | Password safety | `suppress_value=True` prevents credentials in feedback/logs |
 | ML never executes | Fuser outputs classification only; execution goes through deterministic plan→executor |
 | Thread isolation | ConversationRegistry prevents cross-thread session leakage |
+| No secret leakage | `_redact()` strips tokens before any channel send |
+| Plan never injects on Execute | Execute decision notifies only; no PTY injection |
+| Bounded accumulator | StreamingManager capped at 8192 chars |
+| State-driven routing | STREAMING queues messages; STOPPED drops; RUNNING→chat; AWAITING_INPUT→prompt |
 
 ---
 
@@ -244,5 +293,9 @@ All existing correctness invariants remain enforced:
 | `test_session_binding.py` | 20 | Bind/resolve/unbind, TTL, state transitions, multi-channel |
 | `test_conversation_flow.py` | 8 | End-to-end conversation binding lifecycle |
 | `test_ml_safety.py` | 7 | ML cannot override HIGH, disagreement flags, escalation |
+| `test_plan_detector.py` | 15 | Plan header detection, headerless plans, step extraction, edge cases |
+| `test_streaming.py` | 10 | Accumulation, plan detection, presentation, resolution, reset |
+| `test_streaming_safety.py` | 15 | Secret redaction, plan safety, streaming state, accumulator bounds |
+| `test_state_routing_safety.py` | 5 | State-driven routing invariants for all conversation states |
 
-**Total:** 200+ tests covering the interaction pipeline and conversation subsystem.
+**Total:** 245+ tests covering the interaction pipeline, conversation subsystem, and streaming.

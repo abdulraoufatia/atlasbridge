@@ -307,3 +307,84 @@ class TestRouterWithEngineIntegration:
         # Chat mode should have been invoked (inject into PTY)
         mock_tty = adapter._supervisors["sess-006"]
         mock_tty.inject_reply.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Plan execution flow
+# ---------------------------------------------------------------------------
+
+
+class TestPlanExecutionFlow:
+    @pytest.mark.asyncio
+    async def test_plan_execute_does_not_inject(self) -> None:
+        """Execute decision does NOT inject anything into the PTY."""
+        channel = AsyncMock()
+        channel.is_allowed = MagicMock(return_value=True)
+        channel.send_prompt.return_value = "msg-100"
+        sm = SessionManager()
+        session = Session(session_id="sess-plan-1", tool="claude")
+        sm.register(session)
+
+        detector = _make_detector()
+        adapter = _make_adapter(detector)
+
+        router = PromptRouter(
+            session_manager=sm,
+            channel=channel,
+            adapter_map={"sess-plan-1": adapter},
+            store=MagicMock(),
+        )
+
+        reply = Reply(
+            prompt_id="__plan__",
+            session_id="sess-plan-1",
+            value="execute",
+            nonce="",
+            channel_identity="telegram:12345",
+            timestamp=datetime.now(UTC).isoformat(),
+        )
+
+        await router.handle_reply(reply)
+
+        # Execute should NOT inject into PTY
+        adapter.inject_reply.assert_not_called()
+        # But should notify the channel
+        channel.notify.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_plan_cancel_uses_chat_handler(self) -> None:
+        """Cancel decision goes through the chat mode handler."""
+        channel = AsyncMock()
+        channel.is_allowed = MagicMock(return_value=True)
+        channel.send_prompt.return_value = "msg-100"
+        sm = SessionManager()
+        session = Session(session_id="sess-plan-2", tool="claude")
+        sm.register(session)
+
+        chat_handler = AsyncMock()
+
+        router = PromptRouter(
+            session_manager=sm,
+            channel=channel,
+            adapter_map={},
+            store=MagicMock(),
+            chat_mode_handler=chat_handler,
+        )
+
+        reply = Reply(
+            prompt_id="__plan__",
+            session_id="sess-plan-2",
+            value="cancel",
+            nonce="",
+            channel_identity="telegram:12345",
+            timestamp=datetime.now(UTC).isoformat(),
+        )
+
+        await router.handle_reply(reply)
+
+        # Cancel should go through chat handler
+        chat_handler.assert_called_once()
+        cancel_reply = chat_handler.call_args[0][0]
+        assert "cancel" in cancel_reply.value.lower()
+        # Channel should be notified
+        channel.notify.assert_called()

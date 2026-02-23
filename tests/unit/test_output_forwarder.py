@@ -1,4 +1,4 @@
-"""Unit tests for OutputForwarder — batching, ANSI stripping, rate limiting."""
+"""Unit tests for OutputForwarder — batching, ANSI stripping, rate limiting, redaction."""
 
 from __future__ import annotations
 
@@ -8,7 +8,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from atlasbridge.core.config import StreamingConfig
 from atlasbridge.core.interaction.output_forwarder import (
+    _SECRET_PATTERNS,
     BATCH_INTERVAL_S,
     MAX_MESSAGES_PER_MINUTE,
     MAX_OUTPUT_CHARS,
@@ -19,6 +21,10 @@ from atlasbridge.core.interaction.output_forwarder import (
 def _make_channel() -> MagicMock:
     ch = MagicMock()
     ch.send_output = AsyncMock()
+    ch.send_output_editable = AsyncMock(return_value="")
+    ch.send_agent_message = AsyncMock()
+    ch.edit_prompt_message = AsyncMock()
+    ch.notify = AsyncMock()
     return ch
 
 
@@ -57,6 +63,13 @@ class TestFeed:
         # Should still buffer (errors="replace")
         assert fwd._buffer_chars > 0
 
+    def test_feed_resets_idle_counter(self) -> None:
+        ch = _make_channel()
+        fwd = OutputForwarder(ch, "sess-001")
+        fwd._idle_cycles = 5
+        fwd.feed(b"Hello from the CLI agent\n")
+        assert fwd._idle_cycles == 0
+
 
 class TestFlush:
     @pytest.mark.asyncio
@@ -65,8 +78,8 @@ class TestFlush:
         fwd = OutputForwarder(ch, "sess-001")
         fwd.feed(b"Running npm install...\n")
         await fwd._flush()
-        ch.send_output.assert_called_once()
-        sent_text = ch.send_output.call_args[0][0]
+        ch.send_output_editable.assert_called_once()
+        sent_text = ch.send_output_editable.call_args[0][0]
         assert "npm install" in sent_text
 
     @pytest.mark.asyncio
@@ -83,7 +96,7 @@ class TestFlush:
         ch = _make_channel()
         fwd = OutputForwarder(ch, "sess-001")
         await fwd._flush()
-        ch.send_output.assert_not_called()
+        ch.send_output_editable.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_skips_tiny_fragments(self) -> None:
@@ -93,7 +106,7 @@ class TestFlush:
         fwd._buffer.append("hi.")
         fwd._buffer_chars = 3
         await fwd._flush()
-        ch.send_output.assert_not_called()
+        ch.send_output_editable.assert_not_called()
 
 
 class TestTruncation:
@@ -105,7 +118,7 @@ class TestTruncation:
         fwd._buffer.append(long_text)
         fwd._buffer_chars = len(long_text)
         await fwd._flush()
-        sent = ch.send_output.call_args[0][0]
+        sent = ch.send_output_editable.call_args[0][0]
         assert len(sent) <= MAX_OUTPUT_CHARS + 50  # +50 for truncation marker
         assert "truncated" in sent
 
@@ -122,7 +135,7 @@ class TestRateLimiting:
 
         fwd.feed(b"This should be rate limited text output\n")
         await fwd._flush()
-        ch.send_output.assert_not_called()
+        ch.send_output_editable.assert_not_called()
 
     def test_can_send_when_under_limit(self) -> None:
         ch = _make_channel()
@@ -160,7 +173,7 @@ class TestFlushLoop:
         with pytest.raises(asyncio.CancelledError):
             await task
 
-        ch.send_output.assert_called()
+        ch.send_output_editable.assert_called()
 
     @pytest.mark.asyncio
     async def test_final_flush_on_cancel(self) -> None:
@@ -178,16 +191,193 @@ class TestFlushLoop:
             await task
 
         # Final flush should have sent it
-        ch.send_output.assert_called()
+        ch.send_output_editable.assert_called()
 
 
 class TestSendFailure:
     @pytest.mark.asyncio
     async def test_send_failure_does_not_crash(self) -> None:
         ch = _make_channel()
-        ch.send_output.side_effect = RuntimeError("network error")
+        ch.send_output_editable.side_effect = RuntimeError("network error")
         fwd = OutputForwarder(ch, "sess-001")
         fwd.feed(b"Some substantial output from CLI\n")
         # Should not raise
         await fwd._flush()
-        ch.send_output.assert_called_once()
+        ch.send_output_editable.assert_called_once()
+
+
+# -----------------------------------------------------------------------
+# New tests for Commit 2: StreamingConfig, redaction, editing, state
+# -----------------------------------------------------------------------
+
+
+class TestConfigDefaults:
+    def test_config_defaults_match_constants(self) -> None:
+        """Without StreamingConfig, forwarder uses module-level constants."""
+        ch = _make_channel()
+        fwd = OutputForwarder(ch, "sess-001")
+        assert fwd._batch_interval == BATCH_INTERVAL_S
+        assert fwd._max_output_chars == MAX_OUTPUT_CHARS
+        assert fwd._max_messages_per_minute == MAX_MESSAGES_PER_MINUTE
+
+    def test_custom_batch_interval(self) -> None:
+        ch = _make_channel()
+        cfg = StreamingConfig(batch_interval_s=5.0)
+        fwd = OutputForwarder(ch, "sess-001", streaming_config=cfg)
+        assert fwd._batch_interval == 5.0
+
+    def test_custom_rate_limit(self) -> None:
+        ch = _make_channel()
+        cfg = StreamingConfig(max_messages_per_minute=30)
+        fwd = OutputForwarder(ch, "sess-001", streaming_config=cfg)
+        assert fwd._max_messages_per_minute == 30
+
+    def test_custom_max_output_chars(self) -> None:
+        ch = _make_channel()
+        cfg = StreamingConfig(max_output_chars=500)
+        fwd = OutputForwarder(ch, "sess-001", streaming_config=cfg)
+        assert fwd._max_output_chars == 500
+
+
+class TestSecretRedaction:
+    def test_redact_telegram_token(self) -> None:
+        text = "Found token: 1234567890:ABCdefGHIjklMNOpqrSTUvwxYZ_1234567890ab"
+        result = OutputForwarder._redact(text)
+        assert "[REDACTED]" in result
+        assert "1234567890:ABC" not in result
+
+    def test_redact_slack_bot_token(self) -> None:
+        text = "Bot token: xoxb-FAKE000-FAKE000-FAKETOKEN0000"
+        result = OutputForwarder._redact(text)
+        assert "[REDACTED]" in result
+        assert "xoxb-" not in result
+
+    def test_redact_slack_app_token(self) -> None:
+        text = "App token: xapp-1-ABCDEFGHIJ-1234567890-abcdefghij"
+        result = OutputForwarder._redact(text)
+        assert "[REDACTED]" in result
+        assert "xapp-" not in result
+
+    def test_redact_openai_api_key(self) -> None:
+        text = "Key: sk-ABCDEFGHIJKLMNOPQRSTuvwxyz1234567890abcdef"
+        result = OutputForwarder._redact(text)
+        assert "[REDACTED]" in result
+        assert "sk-ABCD" not in result
+
+    def test_redact_github_pat(self) -> None:
+        text = "Token: ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij"
+        result = OutputForwarder._redact(text)
+        assert "[REDACTED]" in result
+        assert "ghp_" not in result
+
+    def test_redact_aws_key(self) -> None:
+        text = "Key: AKIAIOSFODNN7EXAMPLE"
+        result = OutputForwarder._redact(text)
+        assert "[REDACTED]" in result
+        assert "AKIA" not in result
+
+    def test_no_redact_normal_text(self) -> None:
+        text = "This is normal CLI output with no secrets"
+        result = OutputForwarder._redact(text)
+        assert result == text
+
+    @pytest.mark.asyncio
+    async def test_redaction_applied_in_flush(self) -> None:
+        """Secret redaction is applied before sending to channel."""
+        ch = _make_channel()
+        fwd = OutputForwarder(ch, "sess-001")
+        fwd.feed(b"Token: sk-ABCDEFGHIJKLMNOPQRSTuvwxyz1234567890xx\n")
+        await fwd._flush()
+        sent = ch.send_output_editable.call_args[0][0]
+        assert "[REDACTED]" in sent
+        assert "sk-ABCD" not in sent
+
+    @pytest.mark.asyncio
+    async def test_redaction_disabled_via_config(self) -> None:
+        """When redact_secrets=False, secrets pass through."""
+        ch = _make_channel()
+        cfg = StreamingConfig(redact_secrets=False)
+        fwd = OutputForwarder(ch, "sess-001", streaming_config=cfg)
+        fwd.feed(b"Token: sk-ABCDEFGHIJKLMNOPQRSTuvwxyz1234567890xx\n")
+        await fwd._flush()
+        sent = ch.send_output_editable.call_args[0][0]
+        assert "sk-ABCD" in sent
+
+
+class TestMessageEditing:
+    @pytest.mark.asyncio
+    async def test_first_send_uses_editable(self) -> None:
+        ch = _make_channel()
+        ch.send_output_editable.return_value = "msg-123"
+        fwd = OutputForwarder(ch, "sess-001")
+        fwd.feed(b"First output from the CLI agent\n")
+        await fwd._flush()
+        ch.send_output_editable.assert_called_once()
+        assert fwd._last_message_id == "msg-123"
+
+    @pytest.mark.asyncio
+    async def test_second_send_edits_last_message(self) -> None:
+        ch = _make_channel()
+        ch.send_output_editable.return_value = "msg-123"
+        fwd = OutputForwarder(ch, "sess-001")
+        fwd._last_message_id = "msg-123"
+        fwd.feed(b"Second output from the CLI agent\n")
+        await fwd._flush()
+        ch.edit_prompt_message.assert_called_once()
+        edit_args = ch.edit_prompt_message.call_args
+        assert edit_args[0][0] == "msg-123"
+
+    @pytest.mark.asyncio
+    async def test_edit_failure_falls_back_to_new_message(self) -> None:
+        ch = _make_channel()
+        ch.edit_prompt_message.side_effect = RuntimeError("edit failed")
+        ch.send_output_editable.return_value = "msg-456"
+        fwd = OutputForwarder(ch, "sess-001")
+        fwd._last_message_id = "msg-old"
+        fwd.feed(b"Output after edit failure in channel\n")
+        await fwd._flush()
+        ch.send_output_editable.assert_called_once()
+        assert fwd._last_message_id == "msg-456"
+
+    @pytest.mark.asyncio
+    async def test_editing_disabled_via_config(self) -> None:
+        ch = _make_channel()
+        ch.send_output_editable.return_value = "msg-123"
+        cfg = StreamingConfig(edit_last_message=False)
+        fwd = OutputForwarder(ch, "sess-001", streaming_config=cfg)
+        fwd._last_message_id = "msg-old"
+        fwd.feed(b"Output when editing is disabled completely\n")
+        await fwd._flush()
+        # Should send new message, not edit
+        ch.edit_prompt_message.assert_not_called()
+        ch.send_output_editable.assert_called_once()
+
+
+class TestIdleCycleTransition:
+    @pytest.mark.asyncio
+    async def test_idle_cycles_increment_on_empty_flush(self) -> None:
+        ch = _make_channel()
+        fwd = OutputForwarder(ch, "sess-001")
+        await fwd._flush()
+        assert fwd._idle_cycles == 1
+        await fwd._flush()
+        assert fwd._idle_cycles == 2
+
+    @pytest.mark.asyncio
+    async def test_idle_cycles_reset_on_feed(self) -> None:
+        ch = _make_channel()
+        fwd = OutputForwarder(ch, "sess-001")
+        await fwd._flush()
+        await fwd._flush()
+        assert fwd._idle_cycles == 2
+        fwd.feed(b"New output from the CLI agent\n")
+        assert fwd._idle_cycles == 0
+
+
+class TestSecretPatterns:
+    """Verify all compiled secret patterns are valid regex."""
+
+    def test_all_patterns_compile(self) -> None:
+        assert len(_SECRET_PATTERNS) >= 6
+        for pat in _SECRET_PATTERNS:
+            assert pat.pattern  # each has a non-empty pattern string

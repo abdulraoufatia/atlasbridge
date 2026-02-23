@@ -49,6 +49,7 @@ This index helps you find the right document fast, whether you are a new user, a
 | [approval-lifecycle.md](approval-lifecycle.md) | Contributor | Prompt approval state machine (CREATED → PENDING → APPROVED/DENIED/EXPIRED) | When working on prompt routing or approval logic | Current |
 | [channel-token-setup.md](channel-token-setup.md) | User | Step-by-step Telegram and Slack token acquisition | During first-time setup | Current |
 | [channels.md](channels.md) | Contributor | BaseChannel interface, multi-channel routing, extensibility | When writing or modifying a channel | Current |
+| [chat-session-mode.md](chat-session-mode.md) | Both | Chat mode, session states, STREAMING state, message queuing, conversation registry | When understanding chat session lifecycle | Current |
 | [conversation-ux-v2.md](conversation-ux-v2.md) | Both | Interaction pipeline: classifier, plans, executor, chat mode, output forwarding | When understanding or extending conversation UX | Current |
 | [claude-adapter-spec.md](claude-adapter-spec.md) | Contributor | Claude Code adapter: launch model, three-layer detection, injection, prompt patterns | When debugging Claude Code integration | Current |
 | [cli-ux.md](cli-ux.md) | Both | CLI design principles, command overview, TUI behavior | When learning or extending CLI commands | Current |
@@ -92,6 +93,7 @@ This index helps you find the right document fast, whether you are a new user, a
 | [releasing.md](releasing.md) | Contributor | Release process: tag-only publishing, version bumping, CI gates | When cutting a release | Current |
 | [automation-architecture.md](automation-architecture.md) | Contributor | GitHub Actions automation: issue triage, PR status sync, sprint rotation, governance guard | When modifying or extending project automation | Current |
 | [sprint-automation-prompt.md](sprint-automation-prompt.md) | Contributor | Portable sprint-driven development prompt for Claude Code: tier-ordered execution, test-gated progression, memory system, wiki/project board automation | When setting up sprint automation on a new project | Current |
+| [streaming-behavior.md](streaming-behavior.md) | Both | Streaming architecture: OutputForwarder, secret redaction, plan detection, StreamingConfig | When understanding or configuring streaming behavior | Current |
 | [project-hygiene.md](project-hygiene.md) | Contributor | Operating protocol for project board hygiene: Done evidence rules, sprint convention, status definitions | When updating project board after merging work | Current |
 | [positioning-v1.md](positioning-v1.md) | Both | v1.0 positioning: what AtlasBridge is/is not, target audience, invariants, compatibility | Before v1.0 launch | Current |
 | [ga-readiness-checklist.md](ga-readiness-checklist.md) | Contributor | GA readiness audit: contract freeze, coverage, threat model, CI matrix, verdict | Before tagging v1.0 | Current |

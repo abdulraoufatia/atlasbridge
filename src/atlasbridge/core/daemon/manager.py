@@ -339,12 +339,34 @@ class DaemonManager:
                 channel=self._channel,
                 session_manager=self._session_manager,
                 fuser=fuser,
+                conversation_registry=self._conversation_registry,
             )
 
             # Output router classifies agent prose vs CLI output
             output_router = OutputRouter()
+
+            # Build StreamingConfig from raw config dict (if present)
+            streaming_config = None
+            if self._config.get("streaming"):
+                from atlasbridge.core.config import StreamingConfig
+
+                try:
+                    streaming_config = StreamingConfig.model_validate(self._config["streaming"])
+                except Exception:  # noqa: BLE001
+                    pass  # Fall back to module-level constants
+
+            # StreamingManager for plan detection in output
+            from atlasbridge.core.interaction.streaming import StreamingManager
+
+            streaming_manager = StreamingManager(self._channel, session_id)
+
             output_forwarder = OutputForwarder(
-                self._channel, session_id, output_router=output_router
+                self._channel,
+                session_id,
+                output_router=output_router,
+                streaming_config=streaming_config,
+                conversation_registry=self._conversation_registry,
+                streaming_manager=streaming_manager,
             )
 
             # Inject into the PromptRouter (works for both PromptRouter and IntentRouter)

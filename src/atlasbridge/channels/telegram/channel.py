@@ -171,6 +171,26 @@ class TelegramChannel(BaseChannel):
                 },
             )
 
+    async def send_output_editable(self, text: str, session_id: str = "") -> str:
+        """Send CLI output and return the Telegram message_id for editing."""
+        if len(text) > 3900:
+            text = text[:3900] + "\n...(truncated)"
+        formatted = f"<pre>{text}</pre>"
+        msg_id = ""
+        for uid in self._allowed:
+            result = await self._api(
+                "sendMessage",
+                {
+                    "chat_id": uid,
+                    "text": formatted,
+                    "parse_mode": "HTML",
+                    "disable_notification": True,
+                },
+            )
+            if result and not msg_id:
+                msg_id = str(result.get("message_id", ""))
+        return msg_id
+
     async def send_agent_message(self, text: str, session_id: str = "") -> None:
         """Send agent prose with HTML formatting (not <pre> monospace)."""
         if len(text) > 4000:
@@ -184,6 +204,37 @@ class TelegramChannel(BaseChannel):
                     "parse_mode": "HTML",
                 },
             )
+
+    async def send_plan(self, plan: Any, session_id: str = "") -> str:
+        """Send a detected plan with inline Execute/Modify/Cancel buttons."""
+        steps_html = "\n".join(f"  {i + 1}. {s}" for i, s in enumerate(plan.steps))
+        text = f"<b>{plan.title}</b>\n\n{steps_html}"
+        if len(text) > 3900:
+            text = text[:3900] + "\n...(truncated)"
+
+        buttons = [
+            [
+                {"text": "Execute", "callback_data": f"plan:{session_id}:execute"},
+                {"text": "Modify", "callback_data": f"plan:{session_id}:modify"},
+                {"text": "Cancel", "callback_data": f"plan:{session_id}:cancel"},
+            ]
+        ]
+        keyboard = {"inline_keyboard": buttons}
+
+        msg_id = ""
+        for uid in self._allowed:
+            result = await self._api(
+                "sendMessage",
+                {
+                    "chat_id": uid,
+                    "text": text,
+                    "parse_mode": "HTML",
+                    "reply_markup": keyboard,
+                },
+            )
+            if result and not msg_id:
+                msg_id = str(result.get("message_id", ""))
+        return msg_id
 
     async def edit_prompt_message(
         self,
@@ -276,6 +327,28 @@ class TelegramChannel(BaseChannel):
             logger.warning("telegram_callback_rejected", user_id=user_id, reason="not_allowed")
             return
 
+        # Extract chat_id for thread binding
+        cb_chat_id = cb.get("message", {}).get("chat", {}).get("id")
+
+        # Parse: plan:{session_id}:{decision}
+        if data.startswith("plan:"):
+            try:
+                _, session_id, decision = data.split(":", 2)
+            except ValueError:
+                return
+            reply = Reply(
+                prompt_id="__plan__",
+                session_id=session_id,
+                value=decision,
+                nonce="",
+                channel_identity=f"telegram:{user_id}",
+                timestamp=_utcnow(),
+                thread_id=str(cb_chat_id) if cb_chat_id else "",
+            )
+            await self._reply_queue.put(reply)
+            await self._api("answerCallbackQuery", {"callback_query_id": cb["id"]})
+            return
+
         # Parse: ans:{prompt_id}:{session_id}:{nonce}:{value}
         try:
             parts = data.split(":", 4)
@@ -284,9 +357,6 @@ class TelegramChannel(BaseChannel):
             _, prompt_id, session_id, nonce, value = parts
         except ValueError:
             return
-
-        # Extract chat_id for thread binding
-        cb_chat_id = cb.get("message", {}).get("chat", {}).get("id")
 
         reply = Reply(
             prompt_id=prompt_id,

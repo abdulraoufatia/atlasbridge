@@ -25,6 +25,7 @@ class OutputKind(StrEnum):
 
     AGENT_MESSAGE = "agent_message"
     CLI_OUTPUT = "cli_output"
+    PLAN_OUTPUT = "plan_output"
     NOISE = "noise"
 
 
@@ -57,6 +58,13 @@ _PROSE_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"^(Sure|Done|Updated|Created|Fixed|Added)\b", re.IGNORECASE),
 ]
 
+# Patterns that suggest a plan block (checked before general prose scoring)
+_PLAN_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(r"^#+\s*Plan\b", re.IGNORECASE),
+    re.compile(r"^Plan\s*:", re.IGNORECASE),
+    re.compile(r"^Here(?:'s| is) (?:my |the )?plan\b", re.IGNORECASE),
+]
+
 
 class OutputRouter:
     """
@@ -81,6 +89,11 @@ class OutputRouter:
         # Bypass mode → everything is CLI output
         if self._show_raw:
             return OutputKind.CLI_OUTPUT
+
+        # Check for plan headers before general scoring
+        for pat in _PLAN_PATTERNS:
+            if pat.search(stripped):
+                return OutputKind.PLAN_OUTPUT
 
         lines = stripped.splitlines()
 

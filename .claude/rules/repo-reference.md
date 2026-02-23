@@ -12,7 +12,9 @@ src/atlasbridge/         ← installed package (where = ["src"])
     prompt/              — detector.py, state.py, models.py
     session/             — models.py, manager.py
     routing/             — router.py
-    interaction/         — classifier.py, plan.py, executor.py, engine.py, output_forwarder.py
+    interaction/         — classifier.py, plan.py, executor.py, engine.py, output_forwarder.py,
+                           plan_detector.py, streaming.py, output_router.py, ml_classifier.py, fuser.py
+    conversation/        — session_binding.py (thread→session binding + state machine)
     store/               — database.py (SQLite WAL)
     audit/               — writer.py (hash-chained audit log)
     daemon/              — manager.py (orchestrates everything)
@@ -63,7 +65,9 @@ docs/                    — all design documents
 | `src/atlasbridge/core/interaction/output_forwarder.py` | OutputForwarder — batched PTY output → channel messages |
 | `src/atlasbridge/core/interaction/ml_classifier.py` | MLClassifier protocol + NullMLClassifier default |
 | `src/atlasbridge/core/interaction/fuser.py` | ClassificationFuser — deterministic + ML fusion rules |
-| `src/atlasbridge/core/interaction/output_router.py` | OutputRouter — agent prose vs CLI output classification |
+| `src/atlasbridge/core/interaction/output_router.py` | OutputRouter — agent prose vs CLI output vs plan classification |
+| `src/atlasbridge/core/interaction/plan_detector.py` | DetectedPlan + detect_plan() — pure plan detection in agent output |
+| `src/atlasbridge/core/interaction/streaming.py` | StreamingManager — bounded accumulator, plan presentation |
 | `src/atlasbridge/core/conversation/session_binding.py` | ConversationRegistry — thread→session binding + state machine |
 | `src/atlasbridge/core/session/manager.py` | SessionManager (in-memory registry) |
 | `src/atlasbridge/core/store/database.py` | SQLite WAL store + decide_prompt() guard |
@@ -176,4 +180,6 @@ CREATED → ROUTED → AWAITING_REPLY → REPLY_RECEIVED → INJECTED → RESOLV
 | v0.9.6 | Phase H | Released | Hard freeze — contract surface audit, tag-only publish, coverage governance, 1336 tests |
 | v0.9.7 | Phase C.Y | Released | Conversation UX v2 — interaction pipeline (classify→plan→execute), chat mode, output forwarding |
 | v0.9.8 | Phase C.Y2 | Released | Conversation session binding, ML classifier protocol, classification fuser, output router |
+| v0.9.9 | Phase C.Y3 | Released | Chat mode UX — per-plan escalation, folder trust detection, no more "arrow keys" messages |
+| v0.10.0 | Phase C.Z | Released | Full conversational agent mode — streaming state, plan detection, secret redaction |
 | v1.0.0 | GA | Planned | Stable adapter + channel API, all platforms, all agents |

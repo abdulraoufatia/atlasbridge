@@ -435,3 +435,96 @@ class TestExpireOverdue:
 
         await router.expire_overdue()
         assert sm.status == PromptStatus.EXPIRED
+
+
+# ---------------------------------------------------------------------------
+# Plan response handling
+# ---------------------------------------------------------------------------
+
+
+class TestPlanResponse:
+    @pytest.mark.asyncio
+    async def test_plan_execute_notifies_channel(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+    ) -> None:
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},
+            store=MagicMock(),
+        )
+        s = _session()
+        session_manager.register(s)
+        await router.handle_plan_response(s.session_id, "execute")
+        mock_channel.notify.assert_called_once()
+        assert "accepted" in mock_channel.notify.call_args[0][0].lower()
+
+    @pytest.mark.asyncio
+    async def test_plan_modify_sends_guidance(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+    ) -> None:
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},
+            store=MagicMock(),
+        )
+        s = _session()
+        session_manager.register(s)
+        await router.handle_plan_response(s.session_id, "modify")
+        mock_channel.notify.assert_called_once()
+        assert "modifications" in mock_channel.notify.call_args[0][0].lower()
+
+    @pytest.mark.asyncio
+    async def test_plan_cancel_injects_via_chat(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+    ) -> None:
+        chat_handler = AsyncMock()
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},
+            store=MagicMock(),
+            chat_mode_handler=chat_handler,
+        )
+        s = _session()
+        session_manager.register(s)
+        await router.handle_plan_response(s.session_id, "cancel")
+        chat_handler.assert_called_once()
+        sent_reply = chat_handler.call_args[0][0]
+        assert "cancel" in sent_reply.value.lower()
+
+    @pytest.mark.asyncio
+    async def test_plan_sentinel_prompt_id_routed(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+    ) -> None:
+        """Reply with prompt_id='__plan__' is routed to handle_plan_response."""
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},
+            store=MagicMock(),
+        )
+        s = _session()
+        session_manager.register(s)
+        from datetime import datetime
+
+        reply = Reply(
+            prompt_id="__plan__",
+            session_id=s.session_id,
+            value="execute",
+            nonce="",
+            channel_identity="telegram:12345",
+            timestamp=datetime.now(UTC).isoformat(),
+        )
+        await router.handle_reply(reply)
+        mock_channel.notify.assert_called_once()
+        assert "accepted" in mock_channel.notify.call_args[0][0].lower()
