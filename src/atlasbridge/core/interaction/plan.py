@@ -35,10 +35,6 @@ class InteractionPlan:
     display_template: str = ""  # e.g. "Sent: {value} + Enter"
     feedback_on_advance: str = ""  # e.g. "CLI advanced"
     feedback_on_stall: str = ""  # e.g. "CLI did not respond..."
-    escalation_template: str = (
-        "Injection did not advance the CLI after {retries} retries. "
-        "Please try running this step locally."
-    )
 
     # Channel rendering hint
     button_layout: str = ""  # "yes_no" | "numbered" | "confirm_enter" | "none"
@@ -61,9 +57,6 @@ def build_plan(interaction_class: InteractionClass) -> InteractionPlan:
                 display_template="Sent: {value} + Enter",
                 feedback_on_advance="CLI advanced",
                 feedback_on_stall='CLI did not respond to "{value}", retrying...',
-                escalation_template=(
-                    'CLI did not respond to "{value}" after retries. Please respond locally.'
-                ),
                 button_layout="yes_no",
             )
 
@@ -77,9 +70,6 @@ def build_plan(interaction_class: InteractionClass) -> InteractionPlan:
                 display_template="Sent: Enter",
                 feedback_on_advance="CLI advanced",
                 feedback_on_stall="CLI did not advance after Enter, retrying...",
-                escalation_template=(
-                    "CLI did not advance after pressing Enter. Please continue locally."
-                ),
                 button_layout="confirm_enter",
             )
 
@@ -93,9 +83,6 @@ def build_plan(interaction_class: InteractionClass) -> InteractionPlan:
                 display_template="Sent: option {value} + Enter",
                 feedback_on_advance="Option {value} accepted",
                 feedback_on_stall='CLI did not accept option "{value}", retrying...',
-                escalation_template=(
-                    'CLI did not accept option "{value}" after retries. Please select locally.'
-                ),
                 button_layout="numbered",
             )
 
@@ -109,9 +96,6 @@ def build_plan(interaction_class: InteractionClass) -> InteractionPlan:
                 display_template='Sent: "{value}" + Enter',
                 feedback_on_advance="CLI accepted input",
                 feedback_on_stall="CLI may still be processing...",
-                escalation_template=(
-                    "CLI did not accept input after injection. Please enter text locally."
-                ),
                 button_layout="none",
             )
 
@@ -126,9 +110,6 @@ def build_plan(interaction_class: InteractionClass) -> InteractionPlan:
                 display_template="Sent: [REDACTED] + Enter",
                 feedback_on_advance="CLI accepted credential",
                 feedback_on_stall="CLI did not advance after credential input",
-                escalation_template=(
-                    "CLI did not accept credential after injection. Please enter locally."
-                ),
                 button_layout="none",
             )
 
@@ -143,9 +124,6 @@ def build_plan(interaction_class: InteractionClass) -> InteractionPlan:
                 display_template="Trust: {value} + Enter",
                 feedback_on_advance="Folder trust accepted",
                 feedback_on_stall='CLI did not respond to trust "{value}", retrying...',
-                escalation_template=(
-                    "Folder trust prompt did not advance. Please respond locally."
-                ),
                 button_layout="trust_folder",
             )
 
@@ -157,12 +135,9 @@ def build_plan(interaction_class: InteractionClass) -> InteractionPlan:
                 verify_advance=False,
                 advance_timeout_s=0.0,
                 escalate_on_exhaustion=True,
-                display_template="This prompt could not be handled remotely.",
+                display_template="This prompt requires raw keyboard interaction (arrow keys).",
                 feedback_on_advance="",
                 feedback_on_stall="",
-                escalation_template=(
-                    "This prompt could not be handled remotely. Please respond locally."
-                ),
                 button_layout="none",
             )
 
