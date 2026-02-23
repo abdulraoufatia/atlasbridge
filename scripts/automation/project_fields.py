@@ -5,7 +5,7 @@ for the "AtlasBridge — Master Roadmap" project (number 17).
 
 Usage:
     from project_fields import (
-        PROJECT_ID, STATUS, PHASE, PRIORITY,
+        PROJECT_ID, STATUS, PHASE, PRIORITY, EDITION,
         graphql_query, graphql_mutation, add_item_to_project, set_field_value,
     )
 """
@@ -39,6 +39,8 @@ EFFORT_FIELD_ID = "PVTSSF_lAHOBHKkbc4BP12zzg-IjrU"
 IMPACT_FIELD_ID = "PVTSSF_lAHOBHKkbc4BP12zzg-Ijto"
 SPRINT_FIELD_ID = "PVTF_lAHOBHKkbc4BP12zzg-IjpY"
 BLOCKED_BY_FIELD_ID = "PVTF_lAHOBHKkbc4BP12zzg-IjvA"
+TARGET_DATE_FIELD_ID = "PVTF_lAHOBHKkbc4BP12zzg-MsT4"
+EDITION_FIELD_ID = "PVTSSF_lAHOBHKkbc4BP12zzg-MsV4"
 
 
 # ---------------------------------------------------------------------------
@@ -74,13 +76,14 @@ STATUS = FieldOptions(
 PHASE = FieldOptions(
     field_id=PHASE_FIELD_ID,
     options={
-        "A": "0aeeb321",
-        "B": "7bf45c09",
-        "C": "31c54a35",
-        "D": "4851eef8",
-        "E": "df977a10",
-        "F": "bd7be5ac",
-        "G": "5f39f602",
+        "A": "59450c8c",
+        "B": "da43e009",
+        "C": "2aae8075",
+        "D": "c73593c0",
+        "E": "8cfab998",
+        "F": "04c26123",
+        "G": "ce46bb70",
+        "H": "d8741409",
     },
 )
 
@@ -110,19 +113,21 @@ CATEGORY = FieldOptions(
 RISK_LEVEL = FieldOptions(
     field_id=RISK_LEVEL_FIELD_ID,
     options={
-        "Low": "9504cfba",
-        "Medium": "c7d62b11",
-        "High": "658d107b",
+        "Low": "c9903d13",
+        "Medium": "c8f63fc9",
+        "High": "b7677831",
+        "Critical": "47cc58df",
     },
 )
 
 EFFORT = FieldOptions(
     field_id=EFFORT_FIELD_ID,
     options={
-        "XS": "b8ffea37",
-        "S": "9bac8313",
-        "M": "3026fd98",
-        "L": "bf3f084d",
+        "XS": "d6668cba",
+        "S": "700963a8",
+        "M": "83f5274d",
+        "L": "106e9496",
+        "XL": "6f6d240e",
     },
 )
 
@@ -134,6 +139,15 @@ IMPACT = FieldOptions(
         "Governance": "5038bbba",
         "Revenue Path": "3403edf6",
         "Risk Reduction": "6f53b253",
+    },
+)
+
+EDITION = FieldOptions(
+    field_id=EDITION_FIELD_ID,
+    options={
+        "Community": "ea9177c5",
+        "Pro": "9edb2417",
+        "Enterprise": "c2cd6c57",
     },
 )
 
@@ -166,6 +180,10 @@ def redact_for_logging(text: str) -> str:
 _RATE_LIMIT_DELAY = 1.0  # seconds between mutations
 
 
+class GraphQLError(Exception):
+    """Raised when a GraphQL mutation fails after retries."""
+
+
 def graphql_query(query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
     """Execute a read-only GraphQL query via `gh api graphql`."""
     cmd = ["gh", "api", "graphql", "-f", f"query={query}"]
@@ -187,11 +205,12 @@ def graphql_mutation(
     variables: dict[str, Any] | None = None,
     *,
     dry_run: bool = False,
+    retries: int = 2,
 ) -> dict[str, Any] | None:
     """Execute a GraphQL mutation via `gh api graphql`.
 
     With dry_run=True, prints the mutation but does not execute.
-    Rate-limits to 1 mutation per second.
+    Rate-limits to 1 mutation per second. Retries transient failures.
     """
     if dry_run:
         safe_query = redact_for_logging(query)
@@ -206,15 +225,22 @@ def graphql_mutation(
         for key, value in variables.items():
             cmd.extend(["-f", f"{key}={value}"])
 
-    time.sleep(_RATE_LIMIT_DELAY)
+    last_error = ""
+    for attempt in range(1, retries + 2):  # retries + 1 total attempts
+        time.sleep(_RATE_LIMIT_DELAY)
 
-    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    if result.returncode != 0:
-        stderr = redact_for_logging(result.stderr)
-        print(f"GraphQL mutation failed: {stderr}", file=sys.stderr)
-        sys.exit(1)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if result.returncode == 0:
+            return json.loads(result.stdout)
 
-    return json.loads(result.stdout)
+        last_error = redact_for_logging(result.stderr)
+        if attempt <= retries:
+            delay = _RATE_LIMIT_DELAY * attempt
+            msg = f"  GraphQL mutation attempt {attempt} failed, retrying in {delay}s..."
+            print(msg, file=sys.stderr)
+            time.sleep(delay)
+
+    raise GraphQLError(f"GraphQL mutation failed after {retries + 1} attempts: {last_error}")
 
 
 def get_issue_node_id(issue_number: int | str) -> str:
@@ -232,7 +258,10 @@ def get_issue_node_id(issue_number: int | str) -> str:
 
 
 def add_item_to_project(content_id: str, *, dry_run: bool = False) -> str | None:
-    """Add an issue/PR to the project. Returns the project item ID."""
+    """Add an issue/PR to the project. Returns the project item ID.
+
+    Raises GraphQLError if the mutation fails after retries.
+    """
     query = """
     mutation($projectId: ID!, $contentId: ID!) {
       addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {

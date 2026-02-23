@@ -29,6 +29,7 @@ from project_fields import (
     PRIORITY,
     RISK_LEVEL,
     STATUS,
+    GraphQLError,
     add_item_to_project,
     get_issue_node_id,
     set_single_select_field,
@@ -67,10 +68,24 @@ def classify(title: str, labels: list[str]) -> Classification:
     label_set = {lb.lower() for lb in labels}
 
     # --- Phase (from labels first, then title) ---
-    for phase_key in ("a", "b", "c", "d", "e", "f", "g"):
-        if f"phase:{phase_key}" in label_set and c.phase is None:
-            c.phase = phase_key.upper()
-            c.matched_rules.append(f"label:phase:{phase_key} -> Phase {c.phase}")
+    # Labels use format "phase:E-ga", "phase:F-ga-freeze", etc.
+    # Match any label starting with "phase:<letter>" (case-insensitive).
+    phase_label_map = {
+        "a": "A",
+        "b": "B",
+        "c": "C",
+        "d": "D",
+        "e": "E",
+        "f": "F",
+        "g": "G",
+        "h": "H",
+    }
+    for label in label_set:
+        if label.startswith("phase:") and c.phase is None:
+            phase_letter = label[len("phase:") :][0:1].lower()
+            if phase_letter in phase_label_map:
+                c.phase = phase_label_map[phase_letter]
+                c.matched_rules.append(f"label:{label} -> Phase {c.phase}")
 
     if c.phase is None:
         phase_title_rules: list[tuple[list[str], str]] = [
@@ -187,12 +202,21 @@ def apply_classification(
     dry_run: bool = False,
     status_override: str | None = None,
 ) -> None:
-    """Add issue to project and set all classified fields."""
+    """Add issue to project and set all classified fields.
+
+    Status is critical — failure aborts. Other fields are best-effort:
+    a transient GraphQL error logs a warning but does not block the sync.
+    """
     node_id = get_issue_node_id(issue_number)
     print(f"Issue #{issue_number} (node: {node_id[:12]}...)")
 
-    # Add to project
-    item_id = add_item_to_project(node_id, dry_run=dry_run)
+    # Add to project (critical — abort on failure)
+    try:
+        item_id = add_item_to_project(node_id, dry_run=dry_run)
+    except GraphQLError as exc:
+        print(f"  FATAL: failed to add item to project: {exc}", file=sys.stderr)
+        sys.exit(1)
+
     if dry_run:
         print("  [DRY RUN] Would add to project and set fields:")
         print(f"    Status: {status_override or classification.status}")
@@ -209,28 +233,37 @@ def apply_classification(
         print("  Failed to add item to project", file=sys.stderr)
         sys.exit(1)
 
-    # Set Status
+    errors: list[str] = []
+
+    # Set Status (critical — abort on failure)
     effective_status = status_override or classification.status or "Backlog"
     if STATUS.get(effective_status):
-        set_single_select_field(item_id, STATUS, effective_status, dry_run=dry_run)
+        try:
+            set_single_select_field(item_id, STATUS, effective_status, dry_run=dry_run)
+        except GraphQLError as exc:
+            print(f"  FATAL: failed to set status: {exc}", file=sys.stderr)
+            sys.exit(1)
 
-    # Set Phase
-    if classification.phase and PHASE.get(classification.phase):
-        set_single_select_field(item_id, PHASE, classification.phase, dry_run=dry_run)
+    # Best-effort fields — log warnings but continue
+    best_effort_fields: list[tuple[str, str | None, object]] = [
+        ("Phase", classification.phase, PHASE),
+        ("Priority", classification.priority, PRIORITY),
+        ("Category", classification.category, CATEGORY),
+        ("Risk Level", classification.risk_level, RISK_LEVEL),
+    ]
 
-    # Set Priority
-    if classification.priority and PRIORITY.get(classification.priority):
-        set_single_select_field(item_id, PRIORITY, classification.priority, dry_run=dry_run)
+    for field_name, value, field_opts in best_effort_fields:
+        if value and field_opts.get(value):  # type: ignore[union-attr]
+            try:
+                set_single_select_field(item_id, field_opts, value, dry_run=dry_run)  # type: ignore[arg-type]
+            except GraphQLError as exc:
+                errors.append(f"{field_name}={value}")
+                print(f"  WARN: failed to set {field_name}: {exc}", file=sys.stderr)
 
-    # Set Category
-    if classification.category and CATEGORY.get(classification.category):
-        set_single_select_field(item_id, CATEGORY, classification.category, dry_run=dry_run)
-
-    # Set Risk Level
-    if classification.risk_level and RISK_LEVEL.get(classification.risk_level):
-        set_single_select_field(item_id, RISK_LEVEL, classification.risk_level, dry_run=dry_run)
-
-    print(f"  Classification complete. {len(classification.matched_rules)} rules matched.")
+    if errors:
+        print(f"  Classification partial — failed fields: {', '.join(errors)}")
+    else:
+        print(f"  Classification complete. {len(classification.matched_rules)} rules matched.")
 
 
 # ---------------------------------------------------------------------------
