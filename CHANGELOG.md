@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Performance benchmark tests** — 12 tests verifying detect() <5ms, 100k-line flood <50ms p99, pre-compiled regex patterns (#67)
 - **Per-agent getting started guides** — Claude Code, OpenAI Codex CLI, and Gemini CLI guides with setup, prompt patterns, policy examples, and troubleshooting (#99)
 - **Policy cookbook** — copy-paste-ready patterns for git, CI/CD, Dependabot, package managers, session scoping, compound conditions, and rate limiting (#100)
+- **ChannelMessageGate engine** — pure, deterministic accept/reject for all channel messages with 10-step evaluation, 10 reason codes, and frozen dataclass I/O (#156)
 
 ### Changed
 
