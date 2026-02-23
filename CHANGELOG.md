@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased] — Phase E: GA Preparation
+## [0.10.1] — 2026-02-23 — Phase E: GA Preparation
 
 ### Added
 
