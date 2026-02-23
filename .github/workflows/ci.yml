@@ -178,7 +178,7 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          pytest --cov=atlasbridge --cov-report=xml --cov-report=term-missing -v
+          pytest --cov=atlasbridge --cov-report=xml --cov-report=term-missing -v ${{ matrix.os == 'windows-latest' && '--timeout=10' || '' }}
 
       - name: Verify tiered coverage
         if: matrix.python-version == '3.11' && matrix.os == 'ubuntu-latest'

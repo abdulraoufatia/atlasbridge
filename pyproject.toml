@@ -75,6 +75,7 @@ dev = [
     "pytest-asyncio>=0.23",
     "pytest-cov>=5.0",
     "pytest-mock>=3.14",
+    "pytest-timeout>=2.3",
     "respx>=0.21",
     # Linting and formatting
     "ruff>=0.4",
