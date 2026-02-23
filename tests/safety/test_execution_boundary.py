@@ -39,7 +39,6 @@ ALLOWED_INJECTION_MODULES = {
     "os/tty/base.py",
     "os/tty/macos.py",
     "os/tty/linux.py",
-    "os/tty/windows.py",
 }
 
 # Dangerous exec-like calls that should never appear in channel/cloud code

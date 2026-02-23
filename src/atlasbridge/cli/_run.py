@@ -22,19 +22,12 @@ console = Console()
     default="",
     help="Path to a policy YAML file (v0 or v1) for this session.",
 )
-@click.option(
-    "--experimental",
-    is_flag=True,
-    default=False,
-    help="Enable experimental features (e.g. Windows ConPTY backend).",
-)
 def run_cmd(
     tool: str,
     tool_args: tuple[str, ...],
     session_label: str,
     cwd: str,
     policy_file: str,
-    experimental: bool,
 ) -> None:
     """Launch a CLI tool under AtlasBridge supervision."""
     command = [tool] + list(tool_args)
@@ -45,7 +38,6 @@ def run_cmd(
         cwd=cwd,
         policy_file=policy_file,
         console=console,
-        experimental=experimental,
     )
 
 
@@ -56,7 +48,6 @@ def cmd_run(
     cwd: str,
     console: Console,
     policy_file: str = "",
-    experimental: bool = False,
 ) -> None:
     """Load config and run the tool under AtlasBridge supervision (foreground)."""
     import atlasbridge.adapters  # noqa: F401 — registers all built-in adapters
@@ -125,7 +116,6 @@ def cmd_run(
                 cwd=cwd,
                 config=config,
                 policy_file=policy_file,
-                experimental=experimental,
             )
         )
     except KeyboardInterrupt:
@@ -140,7 +130,6 @@ async def _run_async(
     cwd: str,
     config: object,
     policy_file: str = "",
-    experimental: bool = False,
 ) -> None:
     from atlasbridge.core.daemon.manager import DaemonManager
 
@@ -148,7 +137,6 @@ async def _run_async(
     cfg_dict = _config_to_dict(
         tool=tool, command=command, label=label, cwd=cwd, config=config, policy_file=policy_file
     )
-    cfg_dict["experimental"] = experimental
 
     manager = DaemonManager(cfg_dict)
     await manager.start()

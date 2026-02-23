@@ -13,17 +13,12 @@ The lock file contains the PID of the holder for diagnostics.
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import os
-import sys
 from pathlib import Path
 
 import structlog
-
-if sys.platform == "win32":
-    import msvcrt
-else:
-    import fcntl
 
 logger = structlog.get_logger()
 
@@ -89,10 +84,7 @@ class PollerLock:
         self._locks_dir.mkdir(parents=True, exist_ok=True)
         try:
             self._fd = os.open(str(self._lock_path), os.O_CREAT | os.O_RDWR, 0o600)
-            if sys.platform == "win32":
-                msvcrt.locking(self._fd, msvcrt.LK_NBLCK, 1)
-            else:
-                fcntl.flock(self._fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(self._fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
             # Lock held by another process
             if self._fd is not None:
@@ -113,10 +105,7 @@ class PollerLock:
         """Release the lock and close the file descriptor."""
         if self._fd is not None:
             try:
-                if sys.platform == "win32":
-                    msvcrt.locking(self._fd, msvcrt.LK_UNLCK, 1)
-                else:
-                    fcntl.flock(self._fd, fcntl.LOCK_UN)
+                fcntl.flock(self._fd, fcntl.LOCK_UN)
                 os.close(self._fd)
             except OSError:
                 pass

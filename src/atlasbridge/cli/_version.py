@@ -19,21 +19,16 @@ console = Console()
     default=False,
     help="Show install path, config path, and build info",
 )
-@click.option("--experimental", is_flag=True, default=False, help="Show experimental flags")
-def version_cmd(as_json: bool, verbose: bool, experimental: bool) -> None:
+def version_cmd(as_json: bool, verbose: bool) -> None:
     """Show version information and feature flags."""
     import importlib.util
     import platform
     import sys as _sys
 
     flags = {
-        "conpty_backend": _sys.platform == "win32",
         "slack_channel": False,
         "whatsapp_channel": False,
     }
-    if experimental:
-        flags["windows_conpty"] = _sys.platform == "win32"
-        flags["conpty_backend"] = _sys.platform == "win32"
 
     # Resolve install path (location of the atlasbridge package)
     spec = importlib.util.find_spec("atlasbridge")

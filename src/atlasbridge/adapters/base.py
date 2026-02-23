@@ -104,7 +104,7 @@ class BaseAdapter(ABC):
         Return True if the OS-level TTY is blocked on read (Signal 2).
 
         This is the TTY-blocked-on-read heuristic. Implementation varies
-        by platform (ioctl/select on POSIX, ConPTY state on Windows).
+        by platform (ioctl/select on POSIX).
         """
 
     # ------------------------------------------------------------------

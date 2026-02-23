@@ -1,10 +1,9 @@
 """
-Abstract PTY/ConPTY supervisor interface.
+Abstract PTY supervisor interface.
 
 Concrete implementations:
   MacOSTTY   — ptyprocess (POSIX, macOS)
   LinuxTTY   — ptyprocess (POSIX, Linux)
-  WindowsTTY — winpty / ConPTY (Windows, experimental)
 
 All implementations share a four-task asyncio loop:
   pty_reader       — read PTY master fd; feed detector; forward to stdout
@@ -43,7 +42,7 @@ class BaseTTY(ABC):
     """
     Abstract PTY supervisor.
 
-    Subclasses wrap a concrete PTY implementation (ptyprocess, ConPTY)
+    Subclasses wrap a concrete PTY implementation (ptyprocess)
     and expose a uniform async interface for the daemon.
     """
 
