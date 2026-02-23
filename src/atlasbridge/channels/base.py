@@ -31,6 +31,10 @@ from atlasbridge.core.prompt.models import PromptEvent, Reply
 
 logger = structlog.get_logger()
 
+#: Frozen API version for BaseChannel contract (semver).
+#: Bump major on breaking changes, minor on additions, patch on docs-only.
+CHANNEL_API_VERSION = "1.0.0"
+
 
 class ChannelCircuitBreaker:
     """
