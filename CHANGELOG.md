@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Dashboard integration e2e test** — 11 tests verifying real HTTP server binding, route responses, and loopback-only enforcement (#101)
+- **Performance benchmark tests** — 12 tests verifying detect() <5ms, 100k-line flood <50ms p99, pre-compiled regex patterns (#67)
 
 ### Changed
 
