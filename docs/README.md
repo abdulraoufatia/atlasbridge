@@ -11,11 +11,15 @@ This index helps you find the right document fast, whether you are a new user, a
 ### A) Users — I just installed AtlasBridge
 
 1. [Channel Token Setup](channel-token-setup.md) — get Telegram or Slack credentials
-2. [Autonomy Modes](autonomy-modes.md) — understand Off / Assist / Full
-3. [Policy Authoring Guide](policy-authoring.md) — write your first policy
-4. [CLI UX](cli-ux.md) — learn the commands and TUI
-5. [Dashboard](dashboard.md) — local governance dashboard, SSH tunnel access, session export
-6. [Setup (Non-interactive)](setup-noninteractive.md) — headless / CI deployment
+2. **Per-agent quick start** — pick your AI tool:
+   - [Claude Code](claude-code-getting-started.md) — `atlasbridge run claude`
+   - [OpenAI Codex CLI](openai-getting-started.md) — `atlasbridge run openai`
+   - [Gemini CLI](gemini-getting-started.md) — `atlasbridge run gemini`
+3. [Autonomy Modes](autonomy-modes.md) — understand Off / Assist / Full
+4. [Policy Authoring Guide](policy-authoring.md) — write your first policy
+5. [CLI UX](cli-ux.md) — learn the commands and TUI
+6. [Dashboard](dashboard.md) — local governance dashboard, SSH tunnel access, session export
+7. [Setup (Non-interactive)](setup-noninteractive.md) — headless / CI deployment
 
 ### B) Power Users — writing policies and tuning autopilot
 
@@ -43,6 +47,9 @@ This index helps you find the right document fast, whether you are a new user, a
 | Document | Audience | What you'll learn | When to read it | Status |
 |----------|----------|-------------------|-----------------|--------|
 | [architecture.md](architecture.md) | Contributor | System design: PTY supervisor, tri-signal detection, state machine, routing, adapters, channels, audit, invariants | Before making structural changes | Current |
+| [claude-code-getting-started.md](claude-code-getting-started.md) | User | Claude Code setup, prompt patterns, policy examples, troubleshooting | When starting with Claude Code | Current |
+| [openai-getting-started.md](openai-getting-started.md) | User | OpenAI Codex CLI setup, prompt patterns, policy examples, troubleshooting | When starting with Codex CLI | Current |
+| [gemini-getting-started.md](gemini-getting-started.md) | User | Gemini CLI setup, prompt patterns, policy examples, troubleshooting | When starting with Gemini CLI | Current |
 | [autonomy-modes.md](autonomy-modes.md) | Both | The three operational modes (Off / Assist / Full) and when each applies | After install, before choosing a mode | Current |
 | [autopilot.md](autopilot.md) | Both | Autopilot engine architecture, policy evaluation flow, decision trace, kill switch | Before enabling autopilot | Current |
 | [adapters.md](adapters.md) | Contributor | BaseAdapter interface, contract spec, vendor-neutral philosophy | When writing or modifying an adapter | Current |
