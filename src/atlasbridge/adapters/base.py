@@ -19,6 +19,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
+ADAPTER_API_VERSION = "1.0.0"
+
 
 class BaseAdapter(ABC):
     """

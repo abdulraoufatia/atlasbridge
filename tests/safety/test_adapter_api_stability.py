@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import inspect
+import re
 
-from atlasbridge.adapters.base import AdapterRegistry, BaseAdapter
+from atlasbridge.adapters.base import ADAPTER_API_VERSION, AdapterRegistry, BaseAdapter
 
 # Frozen abstract method set for v0.9.0
 FROZEN_ABSTRACT_METHODS = frozenset(
@@ -104,3 +105,35 @@ def test_registry_methods_exist():
     assert callable(getattr(AdapterRegistry, "register", None))
     assert callable(getattr(AdapterRegistry, "get", None))
     assert callable(getattr(AdapterRegistry, "list_all", None))
+
+
+def test_adapter_api_version_semver():
+    """ADAPTER_API_VERSION must be a valid semver string."""
+    assert re.match(r"^\d+\.\d+\.\d+$", ADAPTER_API_VERSION), (
+        f"ADAPTER_API_VERSION is not valid semver: {ADAPTER_API_VERSION!r}"
+    )
+
+
+def test_all_adapters_implement_abstract_methods():
+    """Every registered adapter must implement all abstract methods."""
+    import atlasbridge.adapters.claude_code  # noqa: F401
+    import atlasbridge.adapters.gemini_cli  # noqa: F401
+    import atlasbridge.adapters.openai_cli  # noqa: F401
+
+    for name, adapter_cls in AdapterRegistry.list_all().items():
+        remaining = _get_abstract_methods(adapter_cls)
+        assert not remaining, (
+            f"Adapter '{name}' ({adapter_cls.__name__}) has unimplemented "
+            f"abstract methods: {sorted(remaining)}"
+        )
+
+
+def test_all_adapters_have_required_class_attrs():
+    """Every registered adapter must define tool_name, description, min_tool_version."""
+    import atlasbridge.adapters.claude_code  # noqa: F401
+    import atlasbridge.adapters.gemini_cli  # noqa: F401
+    import atlasbridge.adapters.openai_cli  # noqa: F401
+
+    for name, adapter_cls in AdapterRegistry.list_all().items():
+        assert adapter_cls.tool_name, f"Adapter '{name}' has empty tool_name"
+        assert adapter_cls.description, f"Adapter '{name}' has empty description"

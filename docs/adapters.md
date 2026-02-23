@@ -1,8 +1,8 @@
 # AtlasBridge Adapter Interface Specification
 
-**Version:** 0.3.0
-**Status:** Authoritative Design
-**Last updated:** 2026-02-21
+**Version:** 1.0.0
+**Status:** Frozen (GA)
+**Last updated:** 2026-02-23
 
 ---
 
