@@ -152,10 +152,6 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         python-version: ["3.11", "3.12"]
-        exclude:
-          # Run macos only on 3.11 to save CI minutes
-          - os: macos-latest
-            python-version: "3.12"
         include:
           # Python 3.13 forward-compat check (non-blocking)
           - os: ubuntu-latest
