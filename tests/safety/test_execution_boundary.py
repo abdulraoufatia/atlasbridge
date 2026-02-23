@@ -359,7 +359,6 @@ _ALLOWED_CLOUD_DOCS = {
     "enterprise-trust-boundaries.md",
     "positioning-v1.md",
     "roadmap-90-days.md",
-    "roadmap-12month.md",
     "threat-model.md",
     "phone-first-interaction.md",
 }
