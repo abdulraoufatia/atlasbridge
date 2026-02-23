@@ -352,11 +352,11 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history, or [GitHub Releas
 
 ## Enterprise Governance (Experimental)
 
-AtlasBridge follows an **open-core** model:
+AtlasBridge follows an **open-source** model (MIT license):
 
-- **Community** (public, MIT) — policy engine, PTY supervisor, prompt detection, channel relay, audit log, hash-chained decision trace. Fully functional. Always free.
-- **Pro** (public, MIT) — deterministic risk classifier, decision trace v2, policy pinning, RBAC. Phase A — local governance, shipping now.
-- **Enterprise** (private, future) — SaaS backend, multi-tenant policy management, web dashboard. Phase B is scaffolding only; Phase C is design only.
+- **Community** — policy engine, PTY supervisor, prompt detection, channel relay, audit log, hash-chained decision trace. Fully functional. Always free.
+- **Pro** — deterministic risk classifier, decision trace v2, policy pinning, RBAC. Phase A — local governance, shipping now.
+- **Enterprise** (experimental, open source) — cloud governance, multi-tenant policy management, web dashboard. Phase B is scaffolding only; Phase C is design only.
 
 | Feature | Edition | Maturity |
 |---------|---------|----------|
@@ -397,7 +397,7 @@ AtlasBridge follows [Semantic Versioning](https://semver.org/). All 8 contract s
 - Deterministic policy evaluation before every injection
 - Append-only, hash-chained audit log
 
-> **Future roadmap** includes SaaS, multi-tenant, authentication, cloud control, enterprise SSO — but v1.0 is strictly local-first. See [saas-alpha-roadmap.md](docs/saas-alpha-roadmap.md).
+> **Future roadmap** includes multi-tenant governance, authentication, cloud observability, enterprise SSO — but v1.0 is strictly local-first. See [saas-alpha-roadmap.md](docs/saas-alpha-roadmap.md).
 
 ## Status
 

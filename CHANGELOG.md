@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Dashboard integration e2e test** — 11 tests verifying real HTTP server binding, route responses, and loopback-only enforcement (#101)
+
+### Changed
+
+- **Coverage floors raised to GA-grade** — global 84% → 85%, Tier 2 75% → 80% (#113)
+- **Docs: removed commercial/SaaS language** — replaced "Private (commercial)" with "Open Source (experimental)" across README and enterprise docs (#115, #116, #117)
+
+---
+
 ## [0.10.1] — 2026-02-23 — Phase E: GA Preparation
 
 ### Added

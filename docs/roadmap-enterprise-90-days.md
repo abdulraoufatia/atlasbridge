@@ -1,14 +1,14 @@
 # AtlasBridge Enterprise Evolution — 90-Day Roadmap
 
 > This document extends the core product roadmap at [docs/roadmap-90-days.md](roadmap-90-days.md).
-> It covers the enterprise evolution from local runtime governance to cloud-connected SaaS platform.
+> It covers the enterprise evolution from local runtime governance to cloud-connected governance platform.
 
 ---
 
 ## Guiding Principles
 
 - **Execution stays local in all phases.** Cloud observes, does not execute. The local runtime is always the source of truth for policy evaluation and action execution. The cloud layer provides visibility, policy distribution, and audit aggregation — never command execution.
-- **Open Core model.** Phase A and Phase B local features are public (open source). Phase C cloud server and dashboard are private (commercial).
+- **Open Source model.** Phase A and Phase B local features are public (open source). Phase C cloud server and dashboard are experimental (open source).
 - **Ship value early.** Phase A delivers immediate governance value with zero infrastructure cost. Every milestone is independently useful.
 
 ---
@@ -19,7 +19,7 @@
 |-------|-----|-----------|
 | **Phase A** | **Highest** | Immediate governance value. Tamper-evident audit, risk classification, policy pinning. No infrastructure cost. Ships to every user. |
 | **Phase B** | High | Enables centralized visibility without changing local behavior. Moderate infrastructure cost (WebSocket server). |
-| **Phase C** | Medium | Full SaaS platform. Highest infrastructure and maintenance cost. Requires Phase A + B maturity. Revenue potential but long payback. |
+| **Phase C** | Medium | Full cloud governance platform. Highest infrastructure and maintenance cost. Requires Phase A + B maturity. |
 
 ---
 
@@ -166,17 +166,19 @@ Phase C is the full cloud governance platform — API server, web dashboard, SSO
 
 ---
 
-## Open Core Boundary
+## Open Source Boundary
+
+> Current version is fully open source under MIT. Future licensing may change.
 
 | Component | License | Rationale |
 |-----------|---------|-----------|
-| `src/atlasbridge/core/` | Public (open source) | Core runtime, always free |
-| `src/atlasbridge/enterprise/` | Public (open source) | Local enterprise features, ships to all users |
-| `src/atlasbridge/cloud/` (client) | Public (open source) | Client-side cloud integration, ships to all users |
-| Governance API server | **Private** (commercial) | Server-side cloud platform, revenue source |
-| Web Dashboard | **Private** (commercial) | SaaS dashboard, revenue source |
+| `src/atlasbridge/core/` | Open source (MIT) | Core runtime, always free |
+| `src/atlasbridge/enterprise/` | Open source (MIT) | Local enterprise features, ships to all users |
+| `src/atlasbridge/cloud/` (client) | Open source (MIT) | Client-side cloud integration, ships to all users |
+| Governance API server | Open source (experimental) | Server-side cloud platform, not yet implemented |
+| Web Dashboard | Open source (experimental) | Cloud dashboard, not yet implemented |
 
-The boundary is clear: everything that runs on the user's machine is open source. Everything that runs on AtlasBridge's servers is commercial.
+The boundary is clear: everything that runs on the user's machine is open source. Server-side cloud components are experimental and not yet implemented.
 
 ---
 

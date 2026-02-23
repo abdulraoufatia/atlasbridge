@@ -234,7 +234,7 @@ omit = [
 ]
 
 [tool.coverage.report]
-fail_under = 84
+fail_under = 85
 show_missing = true
 
 [tool.bandit]

@@ -341,17 +341,19 @@ atlasbridge policy pin-status           # Show current pin state
 | `src/atlasbridge/channels/` | All notification channels | Channel ecosystem must be open |
 | `tests/` | All tests | Tests validate the open source code |
 
-### Private (Commercial)
+### Experimental (Not Yet Implemented)
 
-| Component | Contents | Rationale |
-|-----------|----------|-----------|
-| Governance API Server | FastAPI server, PostgreSQL schema, migrations, API logic | Revenue source, operational complexity |
-| Web Dashboard | Frontend application, dashboard API endpoints | Revenue source, ongoing development |
-| Cloud Infrastructure | Deployment configs, monitoring, scaling | Operational IP |
+> Current version is fully open source under MIT. Future licensing may change.
+
+| Component | Contents | Status |
+|-----------|----------|--------|
+| Governance API Server | FastAPI server, PostgreSQL schema, migrations, API logic | Design only, not implemented |
+| Web Dashboard | Frontend application, dashboard API endpoints | Design only, not implemented |
+| Cloud Infrastructure | Deployment configs, monitoring, scaling | Design only, not implemented |
 
 ### Boundary Rule
 
-Everything that runs on the user's machine is open source. Everything that runs on AtlasBridge's servers is commercial. The user's data never leaves their machine unless they explicitly enable cloud sync.
+Everything that runs on the user's machine is open source. Server-side cloud components are experimental and not yet implemented. The user's data never leaves their machine unless they explicitly enable cloud sync.
 
 ---
 
