@@ -41,6 +41,7 @@ This index helps you find the right document fast, whether you are a new user, a
 6. [Release Process](release.md) — tagging, TestPyPI, OIDC publishing
 7. [Roadmap](roadmap-90-days.md) — milestones and planned work
 8. [Sprint Automation Prompt](sprint-automation-prompt.md) — portable sprint workflow for Claude Code
+9. [Brand System](branding.md) — colors, typography, icon rules, CSS tokens
 
 ---
 
@@ -49,6 +50,7 @@ This index helps you find the right document fast, whether you are a new user, a
 | Document | Audience | What you'll learn | When to read it | Status |
 |----------|----------|-------------------|-----------------|--------|
 | [architecture.md](architecture.md) | Contributor | System design: PTY supervisor, tri-signal detection, state machine, routing, adapters, channels, audit, invariants | Before making structural changes | Current |
+| [branding.md](branding.md) | Contributor | Brand system v1: color palette, typography, icon rules, CSS tokens, dark/light mode | When modifying UI surfaces | Current |
 | [claude-code-getting-started.md](claude-code-getting-started.md) | User | Claude Code setup, prompt patterns, policy examples, troubleshooting | When starting with Claude Code | Current |
 | [openai-getting-started.md](openai-getting-started.md) | User | OpenAI Codex CLI setup, prompt patterns, policy examples, troubleshooting | When starting with Codex CLI | Current |
 | [gemini-getting-started.md](gemini-getting-started.md) | User | Gemini CLI setup, prompt patterns, policy examples, troubleshooting | When starting with Gemini CLI | Current |

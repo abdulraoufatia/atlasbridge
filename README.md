@@ -1,4 +1,6 @@
-# AtlasBridge
+<p align="center">
+  <img src="assets/brand/logo/banner.png" alt="AtlasBridge — Controlled Autonomy for AI Agents" width="100%">
+</p>
 
 > **v1.0 — Local Governance Runtime for AI CLI Agents**
 
