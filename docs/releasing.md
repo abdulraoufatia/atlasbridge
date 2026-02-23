@@ -23,6 +23,7 @@ This document describes how releases are cut and published.
 - **RC tags:** `vX.Y.Z-rcN` (e.g., `v1.0.0-rc1`) publish to TestPyPI, not PyPI.
 - **No auto-merge.** All PRs require manual review and approval.
 - **Version must match everywhere:** `pyproject.toml`, `__init__.py`, and the git tag must agree.
+- **Publishing is idempotent.** Re-running the publish workflow for an already-published version skips the upload and exits cleanly (no red checks).
 
 ---
 
@@ -38,7 +39,8 @@ Before publishing, it:
 3. Builds sdist and wheel.
 4. Verifies `.tcss` assets are included in the wheel.
 5. Runs `twine check` on the distribution.
-6. Publishes to PyPI via OIDC trusted publishing.
+6. Checks if the version already exists on PyPI (idempotency guard).
+7. Publishes to PyPI via OIDC trusted publishing (skipped if already published).
 
 RC tags (`*-rc*`) are excluded from PyPI and published to TestPyPI instead.
 
@@ -59,9 +61,9 @@ pip install --index-url https://test.pypi.org/simple/ atlasbridge
 
 ### "File already exists" error on PyPI
 
-If you manually published with `twine upload` before the GitHub Action ran, PyPI will reject the duplicate. Solutions:
-- Do not manually publish. Let the tag-triggered workflow handle it.
-- If you must publish manually, do not push the tag (or delete and re-push after fixing).
+The publish workflow is idempotent — if the version already exists on PyPI, the workflow skips the upload and exits successfully. This prevents re-tagging or re-running the workflow from causing a red check.
+
+If you see this error in older workflow runs (before the idempotency guard was added), it is safe to ignore.
 
 ### CI is red on main
 
