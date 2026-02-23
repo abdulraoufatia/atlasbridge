@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.9.8] — 2026-02-23
+
+### Added
+
+- **Conversation UX v2 — Interaction Pipeline** (Phase C.Y, PR #141)
+  - `InteractionClassifier` — refines PromptType into 6 InteractionClass values (YES_NO, CONFIRM_ENTER, NUMBERED_CHOICE, FREE_TEXT, PASSWORD_INPUT, CHAT_INPUT)
+  - `InteractionPlan` + `build_plan()` — frozen execution strategy per class (retry, verify, escalate, display templates)
+  - `InteractionExecutor` — injection with retry, advance verification, and password redaction
+  - `InteractionEngine` — per-session classify → plan → execute orchestrator
+  - `OutputForwarder` — batched PTY output streaming to channels (rate-limited, ANSI-stripped)
+  - `send_output()` on all channels for monospace CLI output messages
+  - Chat mode — operators type naturally between prompts; messages injected to PTY stdin
+  - 132 tests covering the interaction pipeline
+
+- **Conversation Session Binding** (Phase C.Y2, PR #142)
+  - `ConversationRegistry` — thread→session binding with TTL (4h default), state machine (IDLE/RUNNING/AWAITING_INPUT/STOPPED), and automatic unbind on session end
+  - `MLClassifier` Protocol + `NullMLClassifier` default — clean extension point for future ML-assisted classification
+  - `MLClassification` StrEnum with 9 values including ML-only types FOLDER_TRUST, RAW_TERMINAL
+  - `ClassificationFuser` — deterministic + ML fusion with 6 safety-first rules (deterministic always wins at HIGH confidence)
+  - `OutputRouter` — classifies PTY output as agent prose (AGENT_MESSAGE), CLI output (CLI_OUTPUT), or noise (NOISE)
+  - `send_agent_message()` — non-abstract default on `BaseChannel` with rich formatting overrides (HTML on Telegram, mrkdwn on Slack)
+  - `Reply.thread_id` field for channel thread binding
+  - Thread ID extraction in Telegram (chat_id) and Slack (channel:message_ts)
+  - Session start/stop lifecycle notifications via channel
+  - New `InteractionClass` values: FOLDER_TRUST (trust-folder special case), RAW_TERMINAL (arrow-key prompts, always escalates)
+  - Full daemon wiring: ConversationRegistry, ClassificationFuser, OutputRouter injected per session
+
+### Changed
+
+- `PromptRouter` accepts optional `conversation_registry` for deterministic thread→session resolution
+- `OutputForwarder` accepts optional `output_router` for agent prose vs CLI output routing
+- `InteractionEngine` accepts optional `fuser` for ML-assisted classification
+- Safety tests updated for FOLDER_TRUST and RAW_TERMINAL interaction types
+
+---
+
 ## [0.9.7] — 2026-02-22
 
 ### Added
