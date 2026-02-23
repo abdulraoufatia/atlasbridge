@@ -17,8 +17,9 @@ from typing import TYPE_CHECKING
 
 import structlog
 
-from atlasbridge.core.interaction.classifier import InteractionClassifier
+from atlasbridge.core.interaction.classifier import InteractionClass, InteractionClassifier
 from atlasbridge.core.interaction.executor import InjectionResult, InteractionExecutor
+from atlasbridge.core.interaction.normalizer import detect_binary_menu, normalize_reply
 from atlasbridge.core.interaction.plan import build_plan
 
 if TYPE_CHECKING:
@@ -101,6 +102,32 @@ class InteractionEngine:
 
         plan = build_plan(ic)
 
+        # Normalize reply for binary semantic menus (e.g., "yes" → "1")
+        injection_value = reply.value
+        if ic == InteractionClass.NUMBERED_CHOICE:
+            menu = detect_binary_menu(event.excerpt)
+            if menu is not None:
+                normalized = normalize_reply(menu, reply.value)
+                if normalized is not None:
+                    log.debug(
+                        "reply_normalized",
+                        original=reply.value,
+                        normalized=normalized,
+                        yes_option=menu.yes_option,
+                        no_option=menu.no_option,
+                    )
+                    injection_value = normalized
+                else:
+                    # Ambiguous — ask user to pick a number
+                    await self._notify(f"Please reply with {menu.yes_option} or {menu.no_option}.")
+                    return InjectionResult(
+                        success=False,
+                        injected_value=reply.value,
+                        feedback_message=(
+                            f"Ambiguous reply. Send {menu.yes_option} or {menu.no_option}."
+                        ),
+                    )
+
         log.debug(
             "interaction_classified",
             interaction_class=ic,
@@ -110,7 +137,7 @@ class InteractionEngine:
 
         result = await self._executor.execute(
             plan=plan,
-            value=reply.value,
+            value=injection_value,
             prompt_type=event.prompt_type,
             event=event,
         )

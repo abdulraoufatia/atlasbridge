@@ -26,9 +26,10 @@ This index helps you find the right document fast, whether you are a new user, a
 1. [Policy Cookbook](policy-cookbook.md) — copy-paste-ready patterns for common scenarios
 2. [Policy DSL v0 Reference](policy-dsl.md) — full schema, evaluation semantics
 3. [Policy DSL v1 Extensions](policy-dsl-v1.md) — compound conditions, session tags, inheritance
-4. [Autopilot Engine](autopilot.md) — engine architecture, decision trace, kill switch
-5. [QA Top 20 Failure Scenarios](qa-top-20-failure-scenarios.md) — what can go wrong and how it is tested
-6. [Reliability](reliability.md) — PTY supervisor, failure modes, recovery
+4. [Channel Message Gating](channel-message-gating.md) — how messages are accepted/rejected, rejection reasons, rate limiting
+5. [Autopilot Engine](autopilot.md) — engine architecture, decision trace, kill switch
+6. [QA Top 20 Failure Scenarios](qa-top-20-failure-scenarios.md) — what can go wrong and how it is tested
+7. [Reliability](reliability.md) — PTY supervisor, failure modes, recovery
 
 ### C) Contributors — I want to develop AtlasBridge
 
@@ -57,6 +58,7 @@ This index helps you find the right document fast, whether you are a new user, a
 | [approval-lifecycle.md](approval-lifecycle.md) | Contributor | Prompt approval state machine (CREATED → PENDING → APPROVED/DENIED/EXPIRED) | When working on prompt routing or approval logic | Current |
 | [channel-token-setup.md](channel-token-setup.md) | User | Step-by-step Telegram and Slack token acquisition | During first-time setup | Current |
 | [channels.md](channels.md) | Contributor | BaseChannel interface, multi-channel routing, extensibility | When writing or modifying a channel | Current |
+| [channel-message-gating.md](channel-message-gating.md) | Both | Channel message gating: evaluation order, session states, rejection reasons, rate limiting, binary menu normalization, troubleshooting | When understanding how channel messages are accepted/rejected | Current |
 | [chat-session-mode.md](chat-session-mode.md) | Both | Chat mode, session states, STREAMING state, message queuing, conversation registry | When understanding chat session lifecycle | Current |
 | [conversation-ux-v2.md](conversation-ux-v2.md) | Both | Interaction pipeline: classifier, plans, executor, chat mode, output forwarding | When understanding or extending conversation UX | Current |
 | [claude-adapter-spec.md](claude-adapter-spec.md) | Contributor | Claude Code adapter: launch model, three-layer detection, injection, prompt patterns | When debugging Claude Code integration | Current |

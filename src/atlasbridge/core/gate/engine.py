@@ -23,6 +23,14 @@ from atlasbridge.core.conversation.session_binding import ConversationState
 from atlasbridge.core.interaction.classifier import InteractionClass
 
 
+class AcceptType(StrEnum):
+    """Type of accepted channel message."""
+
+    REPLY = "reply"  # AWAITING_INPUT prompt reply
+    CHAT_TURN = "chat_turn"  # IDLE free text
+    INTERRUPT = "interrupt"  # RUNNING with interrupt policy
+
+
 class GateRejectReason(StrEnum):
     """Machine-readable reason codes for gate rejections."""
 
@@ -121,6 +129,7 @@ class GateDecision:
     reason_message: str = ""
     next_action_hint: str = ""
     injection_payload: str | None = None
+    accept_type: AcceptType | None = None
 
 
 def _reject(reason: GateRejectReason) -> GateDecision:
@@ -133,11 +142,12 @@ def _reject(reason: GateRejectReason) -> GateDecision:
     )
 
 
-def _accept(payload: str) -> GateDecision:
+def _accept(payload: str, accept_type: AcceptType = AcceptType.REPLY) -> GateDecision:
     """Build an accept decision with the sanitized payload."""
     return GateDecision(
         action="accept",
         injection_payload=payload,
+        accept_type=accept_type,
     )
 
 
@@ -180,7 +190,7 @@ def evaluate_gate(ctx: GateContext) -> GateDecision:
         if not ctx.allow_interrupts:
             return _reject(GateRejectReason.REJECT_BUSY_RUNNING)
         # Interrupt allowed by policy — accept
-        return _accept(ctx.message_body)
+        return _accept(ctx.message_body, AcceptType.INTERRUPT)
 
     if ctx.conversation_state == ConversationState.STOPPED:
         return _reject(GateRejectReason.REJECT_NO_ACTIVE_SESSION)
@@ -214,7 +224,7 @@ def evaluate_gate(ctx: GateContext) -> GateDecision:
     if ctx.conversation_state == ConversationState.IDLE:
         if not ctx.allow_chat_turns:
             return _reject(GateRejectReason.REJECT_POLICY_DENY)
-        return _accept(ctx.message_body)
+        return _accept(ctx.message_body, AcceptType.CHAT_TURN)
 
     # 6. Default deny — unrecognized state
     return _reject(GateRejectReason.REJECT_POLICY_DENY)
