@@ -17,7 +17,7 @@
 
 policy_version: "0"
 name: "escalation-only"
-autonomy_mode: off    # Global gate: no auto-reply regardless of rules
+autonomy_mode: "off"  # Global gate: no auto-reply regardless of rules
 
 rules:
 

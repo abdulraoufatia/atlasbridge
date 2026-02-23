@@ -211,7 +211,100 @@ atlasbridge policy migrate policy.yaml --dry-run
    - If `any_of` is set: OR logic (match if any sub-block passes)
    - Otherwise: flat AND logic (all criteria must pass)
 3. If `none_of` is set: NOT filter applied after the primary match
-4. If no rule matches: `defaults.no_match` or `defaults.low_confidence` applies
+4. `session_tag` is checked as exact case-sensitive match
+5. `max_confidence` is an upper bound (`<=`); `min_confidence` is a lower bound (`>=`)
+6. If no rule matches: `defaults.no_match` or `defaults.low_confidence` applies
+7. All v0 evaluation semantics are preserved (regex timeout, idempotency, decision trace)
+
+---
+
+## Field reference (v1 additions)
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `policy_version` | `"1"` | required | Must be `"1"` for v1 policies |
+| `extends` | `str` | `null` | Path to base policy (relative or absolute) |
+| `match.max_confidence` | `"low"` \| `"medium"` \| `"high"` | `null` | Upper bound on confidence level |
+| `match.session_tag` | `str` | `null` | Exact match on session label |
+| `match.any_of` | `list[match]` | `null` | OR: match if any sub-block passes |
+| `match.none_of` | `list[match]` | `null` | NOT: fail if any sub-block matches |
+
+**Inherited from v0** (unchanged): `tool_id`, `repo`, `prompt_type`, `contains`,
+`contains_is_regex`, `min_confidence`, `action`, `defaults`, `autonomy_mode`, `name`.
+
+See [Policy DSL v0 reference](policy-dsl.md) for full v0 field documentation.
+
+---
+
+## Validation rules
+
+- Unknown fields in `match`, `action`, `defaults`, or root cause a parse error (`extra: "forbid"`)
+- `any_of` and flat criteria (e.g. `prompt_type`) are mutually exclusive on the same block
+- `none_of` can coexist with flat criteria or `any_of`
+- `contains_is_regex: true` enforces a 100ms regex compilation timeout
+- Circular `extends` chains raise `PolicyParseError`
+- The base policy referenced by `extends` must also be v1
+- Rule IDs must be unique within a policy (including inherited rules)
+- `max_confidence` must be `>=` `min_confidence` if both are set (logical constraint)
+
+---
+
+## Edge cases
+
+| Scenario | Behaviour |
+|----------|-----------|
+| Empty `match: {}` | Matches all prompts (catch-all) |
+| Empty `any_of: []` | Never matches (no sub-blocks pass) |
+| Empty `none_of: []` | Always passes (nothing excluded) |
+| `any_of` with one sub-block | Equivalent to flat criteria |
+| `min_confidence: high` + `max_confidence: high` | Only matches HIGH confidence exactly |
+| `session_tag` not set on rule | Matches any session regardless of label |
+| `session_tag` set but session has no label | Rule does not match |
+| Overlapping rules | First-match-wins; order matters |
+| `extends` with conflicting rule IDs | Child rule shadows base rule |
+| `extends` with conflicting `defaults` | Child defaults override base defaults |
+
+---
+
+## Anti-patterns
+
+**Overly broad `any_of`:**
+```yaml
+# BAD: matches everything — equivalent to an empty match
+match:
+  any_of:
+    - {}
+    - prompt_type: [yes_no]
+```
+
+**`none_of` without positive criteria:**
+```yaml
+# BAD: matches everything EXCEPT "sudo" — too broad
+match:
+  none_of:
+    - contains: "sudo"
+  action:
+    type: auto_reply
+    value: "y"
+```
+
+**Auto-reply to `free_text` with empty value:**
+```yaml
+# DANGEROUS: silently presses Enter on all free-text prompts
+match:
+  prompt_type: [free_text]
+action:
+  type: auto_reply
+  value: ""
+```
+
+**Mismatched confidence bounds:**
+```yaml
+# USELESS: min > max means the rule can never match
+match:
+  min_confidence: high
+  max_confidence: low
+```
 
 ---
 

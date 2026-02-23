@@ -63,11 +63,12 @@ rules:
       type: auto_reply
       value: "y"
 
-  # ---- none_of: exclude dangerous patterns from auto-reply ----
-  - id: safe-free-text-auto
+  # ---- none_of: exclude dangerous patterns from escalation ----
+  - id: safe-free-text-escalate
     description: |
-      Auto-reply to free_text prompts UNLESS the prompt contains "sudo" or "root".
-      Uses none_of to exclude dangerous patterns.
+      Escalate free_text prompts to the human, UNLESS the prompt contains
+      "sudo" or "root" — those are denied outright by the deny-destructive
+      rule above.  Uses none_of to exclude dangerous patterns.
     match:
       prompt_type: [free_text]
       min_confidence: high
@@ -75,8 +76,8 @@ rules:
         - contains: "sudo"
         - contains: "root"
     action:
-      type: auto_reply
-      value: ""
+      type: require_human
+      message: "Free-text prompt detected — requires human review."
 
   # ---- max_confidence: handle low-confidence prompts specially ----
   - id: low-confidence-notify
