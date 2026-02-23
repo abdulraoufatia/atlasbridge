@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 from pathlib import Path
 
 import click
@@ -35,15 +34,6 @@ def _read_pid() -> int | None:
 
 
 def _pid_alive(pid: int) -> bool:
-    if sys.platform == "win32":
-        import ctypes
-
-        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
-        handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
-        if handle:
-            kernel32.CloseHandle(handle)
-            return True
-        return False
     try:
         os.kill(pid, 0)
         return True

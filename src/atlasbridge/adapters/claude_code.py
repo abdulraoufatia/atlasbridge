@@ -24,7 +24,7 @@ from typing import Any
 from atlasbridge.adapters.base import AdapterRegistry, BaseAdapter
 from atlasbridge.core.prompt.detector import PromptDetector
 from atlasbridge.core.prompt.models import PromptType
-from atlasbridge.os.tty.windows import get_tty_class
+from atlasbridge.os.tty import get_tty_class
 
 # Value normalisation: (prompt_type, value) → bytes to inject
 _NORMALISE: dict[str, dict[str, bytes]] = {
@@ -58,7 +58,7 @@ class ClaudeCodeAdapter(BaseAdapter):
         self._supervisors: dict[str, Any] = {}  # session_id → BaseTTY
         self._detectors: dict[str, PromptDetector] = {}
         self._output_buffers: dict[str, bytearray] = {}
-        self.experimental: bool = False  # set by DaemonManager from config
+        self.experimental: bool = False  # reserved for future use
 
     async def start_session(
         self,
@@ -74,7 +74,7 @@ class ClaudeCodeAdapter(BaseAdapter):
             env=env or {},
             cwd=cwd,
         )
-        tty_class = get_tty_class(experimental=self.experimental)
+        tty_class = get_tty_class()
         tty = tty_class(cfg, session_id)
         self._supervisors[session_id] = tty
         self._detectors[session_id] = self._make_detector(session_id)

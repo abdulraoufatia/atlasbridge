@@ -113,7 +113,7 @@ pip install "atlasbridge[slack]"
 pip install --upgrade atlasbridge
 ```
 
-Requires Python 3.11+. Works on macOS, Linux, and Windows (experimental).
+Requires Python 3.11+. Works on macOS and Linux.
 
 ---
 
@@ -423,7 +423,7 @@ See [CHANGELOG.md](CHANGELOG.md) for full version history.
 | v0.9.9 | Released | Chat mode UX — per-plan escalation, folder trust detection, no more "arrow keys" messages |
 | v0.10.0 | Released | Full conversational agent mode — streaming state, plan detection, secret redaction |
 | v1.0.1 | Released | Prompt spam dedup fix, GA-stable |
-| v1.0.0 | Released | GA — stable APIs, 2005 tests, 8 frozen contract surfaces, Windows experimental |
+| v1.0.0 | Released | GA — stable APIs, 2005 tests, 8 frozen contract surfaces |
 
 ---
 
@@ -463,7 +463,7 @@ src/atlasbridge/
     daemon/     — daemon manager (orchestrates all subsystems)
     policy/     — Policy DSL v0/v1: model, parser, evaluator, explain
     autopilot/  — AutopilotEngine, kill switch, decision trace
-  os/tty/       — PTY supervisors (macOS, Linux, Windows experimental)
+  os/tty/       — PTY supervisors (macOS, Linux)
   os/systemd/   — Linux systemd user service integration
   adapters/     — CLI tool adapters (Claude Code, OpenAI CLI, Gemini CLI)
   channels/     — notification channels (Telegram, Slack, MultiChannel)

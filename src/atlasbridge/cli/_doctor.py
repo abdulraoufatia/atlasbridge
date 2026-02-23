@@ -36,13 +36,11 @@ def _check_platform() -> dict:
     supported = plat in ("darwin", "linux") or plat.startswith("linux")
     if supported:
         return {"name": "Platform", "status": "pass", "detail": plat}
-    if plat == "win32":
-        return {
-            "name": "Platform",
-            "status": "warn",
-            "detail": "Windows (experimental — use --experimental flag, WSL2 recommended)",
-        }
-    return {"name": "Platform", "status": "warn", "detail": f"{plat} (unsupported)"}
+    return {
+        "name": "Platform",
+        "status": "fail",
+        "detail": f"{plat} (unsupported — macOS and Linux only)",
+    }
 
 
 def _check_ptyprocess() -> dict:

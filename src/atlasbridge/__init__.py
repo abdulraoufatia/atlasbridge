@@ -8,7 +8,7 @@ AtlasBridge relays your decision back to the CLI. Execution resumes.
 
 Package layout (src/atlasbridge/):
   core/       — daemon, scheduler, session, prompt, routing, store, audit
-  os/tty/     — PTY/ConPTY supervisor per platform
+  os/tty/     — PTY supervisor per platform (macOS, Linux)
   adapters/   — CLI tool adapters (Claude Code, OpenAI, ...)
   channels/   — notification channels (Telegram, Slack, ...)
   cli/        — Click CLI entry point

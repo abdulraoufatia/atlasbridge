@@ -89,7 +89,6 @@ def classify(title: str, labels: list[str]) -> Classification:
 
     if c.phase is None:
         phase_title_rules: list[tuple[list[str], str]] = [
-            (["conpty", "windows"], "E"),
             (["websocket", "heartbeat", "cloud sync", "audit stream"], "F"),
             (["dashboard", "sso", "governance api", "saml", "oauth"], "G"),
             (["adapter", "pty", "detector", "prompt detection"], "E"),

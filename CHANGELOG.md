@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **Windows support** — removed Windows ConPTY adapter, `--experimental` flag, `pywinpty` optional dependency, and Windows CI matrix entry. AtlasBridge now supports macOS and Linux only.
+
 ---
 
 ## [1.0.1] — 2026-02-23
@@ -23,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Highlights
 
-AtlasBridge v1.0.0 is the first stable release. All 8 contract surfaces are frozen and enforced by CI safety tests. 2005 tests, 85.80% coverage, 30 safety test files. Supports macOS, Linux, and Windows (experimental).
+AtlasBridge v1.0.0 is the first stable release. All 8 contract surfaces are frozen and enforced by CI safety tests. 2005 tests, 85.80% coverage, 30 safety test files. Supports macOS and Linux.
 
 ### Added
 
