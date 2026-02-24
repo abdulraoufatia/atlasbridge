@@ -63,6 +63,7 @@ class PromptRouter:
         chat_mode_handler: Callable[[Reply], Awaitable[Any]] | None = None,
         conversation_registry: Any = None,  # ConversationRegistry — optional
         audit_writer: AuditWriter | None = None,
+        dry_run: bool = False,
     ) -> None:
         self._sessions = session_manager
         self._channel = channel
@@ -72,6 +73,7 @@ class PromptRouter:
         self._chat_mode_handler = chat_mode_handler
         self._conversation_registry = conversation_registry
         self._audit_writer = audit_writer
+        self._dry_run = dry_run
 
         # Active state machines: prompt_id → PromptStateMachine
         self._machines: dict[str, PromptStateMachine] = {}
@@ -148,6 +150,16 @@ class PromptRouter:
 
         sm = PromptStateMachine(event=event)
         self._machines[event.prompt_id] = sm
+
+        if self._dry_run:
+            sm.transition(PromptStatus.ROUTED, "dry run — channel suppressed")
+            log.info(
+                "dry_run_prompt_detected",
+                prompt_type=event.prompt_type,
+                confidence=event.confidence,
+                excerpt=event.excerpt[:80],
+            )
+            return
 
         try:
             sm.transition(PromptStatus.ROUTED, "dispatching to channel")

@@ -86,8 +86,9 @@ class AuditWriter:
         writer.prompt_detected("session-id", "prompt-id", "yes_no", "high")
     """
 
-    def __init__(self, db: Database) -> None:
+    def __init__(self, db: Database, dry_run: bool = False) -> None:
         self._db = db
+        self._dry_run = dry_run
 
     def _write(
         self,
@@ -96,6 +97,8 @@ class AuditWriter:
         session_id: str = "",
         prompt_id: str = "",
     ) -> None:
+        if self._dry_run:
+            payload = {**payload, "dry_run": True}
         event_id = secrets.token_hex(12)
         self._db.append_audit_event(
             event_id=event_id,

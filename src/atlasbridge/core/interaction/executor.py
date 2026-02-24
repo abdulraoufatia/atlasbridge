@@ -60,11 +60,13 @@ class InteractionExecutor:
         session_id: str,
         detector: PromptDetector,
         notify_fn: Callable[[str], Awaitable[None]],
+        dry_run: bool = False,
     ) -> None:
         self._adapter = adapter
         self._session_id = session_id
         self._detector = detector
         self._notify_fn = notify_fn
+        self._dry_run = dry_run
 
     async def execute(
         self,
@@ -95,6 +97,19 @@ class InteractionExecutor:
             interaction_class=plan.interaction_class,
             suppress_value=plan.suppress_value,
         )
+
+        if self._dry_run:
+            log.info(
+                "dry_run_skip_injection",
+                would_inject=display_value,
+                prompt_type=prompt_type,
+            )
+            return InjectionResult(
+                success=True,
+                injected_value=display_value,
+                cli_advanced=None,
+                feedback_message=f"[DRY RUN] Would inject: {display_value}",
+            )
 
         for attempt in range(1 + plan.max_retries):
             pre_inject_time = self._detector.last_output_time
@@ -189,6 +204,15 @@ class InteractionExecutor:
         suppression. No advance verification.
         """
         log = logger.bind(session_id=self._session_id[:8])
+
+        if self._dry_run:
+            log.info("dry_run_skip_chat_input", value_length=len(value))
+            return InjectionResult(
+                success=True,
+                injected_value=value,
+                cli_advanced=None,
+                feedback_message=f"[DRY RUN] Would send chat: {value!r}",
+            )
 
         try:
             # Access the adapter's TTY supervisor for direct injection.

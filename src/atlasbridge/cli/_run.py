@@ -22,12 +22,19 @@ console = Console()
     default="",
     help="Path to a policy YAML file (v0 or v1) for this session.",
 )
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Run the full pipeline (detect/classify/policy/plan) without injecting into the PTY.",
+)
 def run_cmd(
     tool: str,
     tool_args: tuple[str, ...],
     session_label: str,
     cwd: str,
     policy_file: str,
+    dry_run: bool,
 ) -> None:
     """Launch a CLI tool under AtlasBridge supervision."""
     command = [tool] + list(tool_args)
@@ -37,6 +44,7 @@ def run_cmd(
         label=session_label,
         cwd=cwd,
         policy_file=policy_file,
+        dry_run=dry_run,
         console=console,
     )
 
@@ -48,6 +56,7 @@ def cmd_run(
     cwd: str,
     console: Console,
     policy_file: str = "",
+    dry_run: bool = False,
 ) -> None:
     """Load config and run the tool under AtlasBridge supervision (foreground)."""
     import atlasbridge.adapters  # noqa: F401 — registers all built-in adapters
@@ -83,6 +92,9 @@ def cmd_run(
         channel_parts.append(f"Slack ({len(config.slack.allowed_users)} user(s))")
     channel_str = " + ".join(channel_parts) or "no channel configured"
 
+    if dry_run:
+        console.print("[bold yellow][DRY RUN][/bold yellow] No injection will occur.")
+        console.print()
     console.print(f"[bold]AtlasBridge[/bold] supervising: [cyan]{' '.join(command)}[/cyan]")
     console.print(f"Prompts will arrive via: {channel_str}")
     console.print()
@@ -116,6 +128,7 @@ def cmd_run(
                 cwd=cwd,
                 config=config,
                 policy_file=policy_file,
+                dry_run=dry_run,
             )
         )
     except KeyboardInterrupt:
@@ -130,12 +143,19 @@ async def _run_async(
     cwd: str,
     config: object,
     policy_file: str = "",
+    dry_run: bool = False,
 ) -> None:
     from atlasbridge.core.daemon.manager import DaemonManager
 
     # Convert AtlasBridgeConfig to the dict format DaemonManager expects
     cfg_dict = _config_to_dict(
-        tool=tool, command=command, label=label, cwd=cwd, config=config, policy_file=policy_file
+        tool=tool,
+        command=command,
+        label=label,
+        cwd=cwd,
+        config=config,
+        policy_file=policy_file,
+        dry_run=dry_run,
     )
 
     manager = DaemonManager(cfg_dict)
@@ -143,7 +163,13 @@ async def _run_async(
 
 
 def _config_to_dict(
-    tool: str, command: list[str], label: str, cwd: str, config: object, policy_file: str = ""
+    tool: str,
+    command: list[str],
+    label: str,
+    cwd: str,
+    config: object,
+    policy_file: str = "",
+    dry_run: bool = False,
 ) -> dict:
     """Convert AtlasBridgeConfig + run params into the DaemonManager config dict."""
     from pathlib import Path
@@ -178,4 +204,6 @@ def _config_to_dict(
     }
     if policy_file:
         result["policy_file"] = policy_file
+    if dry_run:
+        result["dry_run"] = True
     return result

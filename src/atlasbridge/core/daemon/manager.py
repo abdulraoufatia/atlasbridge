@@ -56,6 +56,7 @@ class DaemonManager:
     def __init__(self, config: dict[str, Any]) -> None:
         self._config = config
         self._data_dir = Path(config.get("data_dir", str(_DEFAULT_DATA_DIR)))
+        self._dry_run: bool = config.get("dry_run", False)
         self._db: Database | None = None
         self._channel: BaseChannel | None = None
         self._session_manager: SessionManager | None = None
@@ -69,7 +70,12 @@ class DaemonManager:
 
     async def start(self) -> None:
         """Start all subsystems and run until shutdown."""
-        logger.info("daemon_starting", pid=os.getpid(), data_dir=str(self._data_dir))
+        logger.info(
+            "daemon_starting",
+            pid=os.getpid(),
+            data_dir=str(self._data_dir),
+            dry_run=self._dry_run,
+        )
         self._write_pid_file()
 
         try:
@@ -126,7 +132,7 @@ class DaemonManager:
         that were awaiting reply when the previous daemon instance died.
         """
         pending = getattr(self, "_pending_renotify", [])
-        if not pending or self._channel is None:
+        if not pending or self._channel is None or self._dry_run:
             return
 
         count = 0
@@ -145,6 +151,10 @@ class DaemonManager:
         self._pending_renotify = []
 
     async def _init_channel(self) -> None:
+        if self._dry_run:
+            logger.info("dry_run_channel_suppressed")
+            return
+
         channel_config = self._config.get("channels", {})
         channels: list[Any] = []
 
@@ -228,7 +238,10 @@ class DaemonManager:
         logger.info("intent_router_initialized")
 
     async def _init_router(self) -> None:
-        if self._session_manager is None or self._channel is None:
+        if self._session_manager is None:
+            return
+        # In dry-run mode, channel is None but router still needed for event logging
+        if self._channel is None and not self._dry_run:
             return
         from atlasbridge.core.routing.router import PromptRouter
 
@@ -238,6 +251,7 @@ class DaemonManager:
             adapter_map=self._adapters,
             store=self._db,
             conversation_registry=self._conversation_registry,
+            dry_run=self._dry_run,
         )
 
     # ------------------------------------------------------------------
@@ -291,7 +305,7 @@ class DaemonManager:
         logger.info("session_starting", tool=tool, session_id=session_id[:8])
 
         # Session lifecycle: notify channel of session start
-        if self._channel is not None:
+        if self._channel is not None and not self._dry_run:
             await self._channel.notify(
                 f"Session started: {tool} ({session_id[:8]})",
                 session_id=session_id,
@@ -341,6 +355,7 @@ class DaemonManager:
                 session_manager=self._session_manager,
                 fuser=fuser,
                 conversation_registry=self._conversation_registry,
+                dry_run=self._dry_run,
             )
 
             # Output router classifies agent prose vs CLI output
@@ -438,7 +453,7 @@ class DaemonManager:
                 self._conversation_registry.unbind(session_id)
 
             # Session lifecycle: notify channel of session end
-            if self._channel is not None:
+            if self._channel is not None and not self._dry_run:
                 try:
                     await self._channel.notify(
                         f"Session ended: {tool} ({session_id[:8]})",

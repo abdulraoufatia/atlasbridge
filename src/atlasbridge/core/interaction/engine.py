@@ -52,18 +52,21 @@ class InteractionEngine:
         session_manager: SessionManager,
         fuser: ClassificationFuser | None = None,
         conversation_registry: ConversationRegistry | None = None,
+        dry_run: bool = False,
     ) -> None:
         self._classifier = InteractionClassifier()
         self._fuser = fuser
         self._channel = channel
         self._session_id = session_id
         self._conversation_registry = conversation_registry
+        self._dry_run = dry_run
 
         self._executor = InteractionExecutor(
             adapter=adapter,
             session_id=session_id,
             detector=detector,
             notify_fn=self._notify,
+            dry_run=dry_run,
         )
 
     async def _notify(self, message: str) -> None:
