@@ -368,12 +368,20 @@ class TestIdempotencyKey:
         # idempotency_key = SHA-256(policy_hash:prompt_id:session_id)[:16]
         # prompt_text is NOT part of the key — only prompt_id and session_id
         d1 = evaluate(
-            policy=policy, prompt_text="foo", prompt_type="yes_no",
-            confidence="high", prompt_id="p1", session_id="test-session",
+            policy=policy,
+            prompt_text="foo",
+            prompt_type="yes_no",
+            confidence="high",
+            prompt_id="p1",
+            session_id="test-session",
         )
         d2 = evaluate(
-            policy=policy, prompt_text="foo", prompt_type="yes_no",
-            confidence="high", prompt_id="p2", session_id="test-session",
+            policy=policy,
+            prompt_text="foo",
+            prompt_type="yes_no",
+            confidence="high",
+            prompt_id="p2",
+            session_id="test-session",
         )
         assert d1.idempotency_key != d2.idempotency_key
 

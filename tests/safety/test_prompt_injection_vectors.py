@@ -45,9 +45,7 @@ def _expires_at(seconds: float = 300.0) -> str:
 
 def _ensure_session(db: Database, session_id: str) -> None:
     """Create session record if it doesn't exist (for FK constraint)."""
-    existing = db._db.execute(
-        "SELECT id FROM sessions WHERE id = ?", (session_id,)
-    ).fetchone()
+    existing = db._db.execute("SELECT id FROM sessions WHERE id = ?", (session_id,)).fetchone()
     if not existing:
         db._db.execute(
             "INSERT INTO sessions (id, tool, command, status) VALUES (?, ?, ?, ?)",
@@ -83,7 +81,7 @@ class TestSQLInjection:
         "malicious_id",
         [
             "'; DROP TABLE prompts; --",
-            "\" OR 1=1 --",
+            '" OR 1=1 --',
             "1; UPDATE prompts SET status='replied'",
             "' UNION SELECT * FROM prompts --",
             "Robert'); DROP TABLE sessions;--",
@@ -256,9 +254,7 @@ class TestAuditTamperResistance:
         writer.prompt_detected("s1", "p1", "yes_no", "high")
         writer.reply_received("s1", "p1", "tg:123", "y", "n1")
 
-        rows = db._db.execute(
-            "SELECT * FROM audit_events ORDER BY timestamp ASC"
-        ).fetchall()
+        rows = db._db.execute("SELECT * FROM audit_events ORDER BY timestamp ASC").fetchall()
         assert len(rows) == 3
 
         prev_hash = ""
@@ -284,10 +280,7 @@ class TestAuditTamperResistance:
         writer.prompt_detected("s1", "p1", "yes_no", "high")
 
         # Tamper with first event's payload
-        db._db.execute(
-            "UPDATE audit_events SET payload = '{\"tampered\":true}' "
-            "WHERE rowid = 1"
-        )
+        db._db.execute("UPDATE audit_events SET payload = '{\"tampered\":true}' WHERE rowid = 1")
         db._db.commit()
 
         result = verify_mod.verify_audit_chain(db)
