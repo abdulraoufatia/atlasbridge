@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [1.1.2] — 2026-02-24
+
 ### Fixed
 - **Dashboard default port** — changed from 5000 to 3737 to avoid conflict with macOS AirPlay Receiver (ControlCenter) which occupies port 5000
 - **Dashboard status false positive** — `atlasbridge dashboard status` now performs an HTTP health check against `/api/overview` instead of a blind TCP connect, preventing false positives from unrelated services on the same port
