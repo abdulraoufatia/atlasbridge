@@ -103,7 +103,7 @@ class TestVerifyAuditChainValid:
     def test_session_scoped(self):
         rows = _build_chain(count=3, session_id="sess-abc")
         db = MagicMock()
-        db.get_audit_events_for_session.return_value = rows
+        db._db.execute.return_value.fetchall.return_value = rows
         result = verify_audit_chain(db, session_id="sess-abc")
         assert result.valid is True
         assert result.total_events == 3
@@ -195,7 +195,7 @@ class TestVerifyAuditChainTampered:
         rows[1] = tampered
 
         db = MagicMock()
-        db.get_audit_events_for_session.return_value = rows
+        db._db.execute.return_value.fetchall.return_value = rows
         result = verify_audit_chain(db, session_id="sess-1")
         # Hash mismatch still detected (prev_hash is part of hash input),
         # but no "prev_hash mismatch" error
