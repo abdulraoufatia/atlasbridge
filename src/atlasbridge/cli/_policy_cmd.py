@@ -1,6 +1,6 @@
 """
 CLI commands: ``atlasbridge policy validate``, ``atlasbridge policy test``,
-and ``atlasbridge policy migrate``.
+``atlasbridge policy coverage``, and ``atlasbridge policy migrate``.
 """
 
 from __future__ import annotations
@@ -238,3 +238,28 @@ def policy_migrate(policy_file: str, output: str, dry_run: bool) -> None:
         f"✓  Policy migrated to v{migrated_policy.policy_version} "
         f"({len(migrated_policy.rules)} rule(s)) — {verb} {dest}"
     )
+
+
+@policy_group.command("coverage")
+@click.argument("policy_file", type=click.Path(exists=True, dir_okay=False))
+def policy_coverage(policy_file: str) -> None:
+    """
+    Analyze policy rule coverage and identify gaps.
+
+    Reports which prompt types, confidence levels, and action types are covered,
+    computes a coverage score (0-100), and lists any gaps.
+
+    Example::
+
+        atlasbridge policy coverage ~/.atlasbridge/policy.yaml
+    """
+    from atlasbridge.core.policy.coverage import analyze_coverage, format_coverage
+
+    try:
+        policy = load_policy(policy_file)
+    except PolicyParseError as exc:
+        click.echo(str(exc), err=True)
+        sys.exit(1)
+
+    report = analyze_coverage(policy)
+    click.echo(format_coverage(report))
