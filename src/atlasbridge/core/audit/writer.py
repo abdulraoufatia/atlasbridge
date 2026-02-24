@@ -31,24 +31,14 @@ Hash chain:
 from __future__ import annotations
 
 import hashlib
-import re
 import secrets
 from typing import Any
 
+from atlasbridge.core.security.redactor import redact as redact_secrets
 from atlasbridge.core.store.database import Database
 
 # Excerpt truncation limit — matches issue spec
 _MAX_EXCERPT_CHARS = 20
-
-# Secret patterns for redaction in audit excerpts
-_AUDIT_SECRET_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(r"\d{8,12}:[A-Za-z0-9_\-]{35,}"),  # Telegram bot token
-    re.compile(r"xoxb-[A-Za-z0-9\-]{20,}"),  # Slack bot token
-    re.compile(r"xapp-[A-Za-z0-9\-]{20,}"),  # Slack app token
-    re.compile(r"sk-[A-Za-z0-9]{20,}"),  # OpenAI / generic API key
-    re.compile(r"ghp_[A-Za-z0-9]{36,}"),  # GitHub PAT
-    re.compile(r"AKIA[A-Z0-9]{16}"),  # AWS access key ID
-]
 
 
 def safe_excerpt(body: str, *, is_password: bool = False, is_rate_limited: bool = False) -> str:
@@ -57,16 +47,14 @@ def safe_excerpt(body: str, *, is_password: bool = False, is_rate_limited: bool 
     Rules:
     - Password prompts: always ``"[REDACTED]"``
     - Rate-limited rejections: always ``"[rate limited]"``
-    - Otherwise: first 20 chars, token-redacted
+    - Otherwise: first 20 chars, token-redacted via centralized SecretRedactor
     """
     if is_password:
         return "[REDACTED]"
     if is_rate_limited:
         return "[rate limited]"
     # Redact secrets on full body first, then truncate
-    redacted = body
-    for pattern in _AUDIT_SECRET_PATTERNS:
-        redacted = pattern.sub("[REDACTED]", redacted)
+    redacted = redact_secrets(body)
     return redacted[:_MAX_EXCERPT_CHARS]
 
 

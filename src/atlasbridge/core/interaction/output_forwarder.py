@@ -18,13 +18,13 @@ Optional features (when ``StreamingConfig`` is provided):
 from __future__ import annotations
 
 import asyncio
-import re
 import time
 from typing import TYPE_CHECKING
 
 import structlog
 
 from atlasbridge.core.prompt.sanitize import is_meaningful, strip_ansi
+from atlasbridge.core.security.redactor import redact as _redact_secrets
 
 if TYPE_CHECKING:
     from atlasbridge.channels.base import BaseChannel
@@ -47,16 +47,6 @@ MAX_MESSAGES_PER_MINUTE: int = 15
 
 MIN_MEANINGFUL_CHARS: int = 10
 """Skip fragments shorter than this (after ANSI stripping)."""
-
-# Secret patterns for redaction (compiled once at import time)
-_SECRET_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(r"\d{8,12}:[A-Za-z0-9_\-]{35,}"),  # Telegram bot token
-    re.compile(r"xoxb-[A-Za-z0-9\-]{20,}"),  # Slack bot token
-    re.compile(r"xapp-[A-Za-z0-9\-]{20,}"),  # Slack app token
-    re.compile(r"sk-[A-Za-z0-9]{20,}"),  # OpenAI / generic API key
-    re.compile(r"ghp_[A-Za-z0-9]{36,}"),  # GitHub PAT
-    re.compile(r"AKIA[A-Z0-9]{16}"),  # AWS access key ID
-]
 
 # Number of consecutive idle flush cycles before transitioning from STREAMING → RUNNING
 _IDLE_CYCLES_BEFORE_RUNNING = 2
@@ -205,9 +195,7 @@ class OutputForwarder:
     @staticmethod
     def _redact(text: str) -> str:
         """Replace secret patterns with [REDACTED]."""
-        for pattern in _SECRET_PATTERNS:
-            text = pattern.sub("[REDACTED]", text)
-        return text
+        return _redact_secrets(text)
 
     async def _send_classified(self, text: str) -> None:
         """Route text through OutputRouter or send as CLI output."""

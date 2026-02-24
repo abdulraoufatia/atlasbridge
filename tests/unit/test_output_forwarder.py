@@ -10,12 +10,12 @@ import pytest
 
 from atlasbridge.core.config import StreamingConfig
 from atlasbridge.core.interaction.output_forwarder import (
-    _SECRET_PATTERNS,
     BATCH_INTERVAL_S,
     MAX_MESSAGES_PER_MINUTE,
     MAX_OUTPUT_CHARS,
     OutputForwarder,
 )
+from atlasbridge.core.security.redactor import SecretRedactor
 
 
 def _make_channel() -> MagicMock:
@@ -375,9 +375,8 @@ class TestIdleCycleTransition:
 
 
 class TestSecretPatterns:
-    """Verify all compiled secret patterns are valid regex."""
+    """Verify centralized secret redactor has patterns loaded."""
 
     def test_all_patterns_compile(self) -> None:
-        assert len(_SECRET_PATTERNS) >= 6
-        for pat in _SECRET_PATTERNS:
-            assert pat.pattern  # each has a non-empty pattern string
+        r = SecretRedactor()
+        assert r.pattern_count >= 6

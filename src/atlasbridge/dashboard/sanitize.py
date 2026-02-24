@@ -11,6 +11,8 @@ from __future__ import annotations
 import ipaddress
 import re
 
+from atlasbridge.core.security.redactor import get_redactor as _get_redactor
+
 # ---------------------------------------------------------------------------
 # ANSI stripping — reuse pattern from core.prompt.sanitize
 # ---------------------------------------------------------------------------
@@ -30,31 +32,13 @@ def strip_ansi(text: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Token redaction
+# Token redaction — delegates to centralized SecretRedactor
 # ---------------------------------------------------------------------------
-
-# Each pattern: (compiled regex, replacement label)
-_TOKEN_PATTERNS: list[tuple[re.Pattern[str], str]] = [
-    # Telegram bot tokens: 123456:ABC-DEF...
-    (re.compile(r"\b\d{8,10}:[A-Za-z0-9_-]{35,}\b"), "[REDACTED:telegram-token]"),
-    # Slack bot/user tokens: xoxb-..., xoxp-..., xoxs-...
-    (re.compile(r"\bxox[bpsar]-[A-Za-z0-9-]{10,}\b"), "[REDACTED:slack-token]"),
-    # Generic API keys: sk-..., ak-..., key-...
-    (re.compile(r"\b(?:sk|ak|key)-[A-Za-z0-9]{20,}\b"), "[REDACTED:api-key]"),
-    # GitHub PATs: ghp_, gho_, ghu_, ghs_, ghr_
-    (re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}\b"), "[REDACTED:github-pat]"),
-    # AWS access keys: AKIA...
-    (re.compile(r"\bAKIA[A-Z0-9]{16}\b"), "[REDACTED:aws-key]"),
-    # Generic long hex secrets (64+ hex chars, like SHA-256 hashes used as secrets)
-    (re.compile(r"\b[0-9a-f]{64,}\b"), "[REDACTED:hex-secret]"),
-]
 
 
 def redact_tokens(text: str) -> str:
-    """Replace known token patterns with redaction labels."""
-    for pattern, label in _TOKEN_PATTERNS:
-        text = pattern.sub(label, text)
-    return text
+    """Replace known token patterns with labeled redaction placeholders."""
+    return _get_redactor().redact_labeled(text)
 
 
 # ---------------------------------------------------------------------------
