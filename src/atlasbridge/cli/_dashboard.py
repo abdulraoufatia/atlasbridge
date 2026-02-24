@@ -23,17 +23,96 @@ def dashboard_group() -> None:
 
 
 def _find_dashboard_dir() -> Path | None:
-    """Locate the dashboard/ directory relative to the package root."""
-    # When running from repo: src/atlasbridge/cli/_dashboard.py → repo-root/dashboard/
+    """Locate the dashboard directory (repo, CWD, or bundled+runtime).
+
+    Returns the directory from which the Node.js dashboard can be started,
+    or None if no dashboard is available.
+    """
+    # 1. Repo development: src/atlasbridge/cli/_dashboard.py → repo-root/dashboard/
     pkg_dir = Path(__file__).resolve().parent.parent.parent.parent
     candidate = pkg_dir / "dashboard"
     if candidate.is_dir() and (candidate / "package.json").exists():
         return candidate
-    # Fallback: check cwd
+
+    # 2. CWD fallback (user is in the repo root)
     cwd_candidate = Path.cwd() / "dashboard"
     if cwd_candidate.is_dir() and (cwd_candidate / "package.json").exists():
         return cwd_candidate
+
+    # 3. Bundled dashboard (pip install) → set up runtime directory
+    bundled = Path(__file__).resolve().parent.parent / "_dashboard_dist"
+    if bundled.is_dir() and (bundled / "index.cjs").exists():
+        return _setup_dashboard_runtime(bundled)
+
     return None
+
+
+def _setup_dashboard_runtime(bundled_dir: Path) -> Path | None:
+    """Set up a writable runtime directory from the bundled dashboard dist.
+
+    Copies the bundled dist files to the config directory and installs
+    the required Node.js native dependency (better-sqlite3) on first run.
+    """
+    from atlasbridge.core.config import atlasbridge_dir
+
+    runtime_dir = atlasbridge_dir() / "dashboard-runtime"
+    marker = runtime_dir / ".version"
+
+    # Read bundled version (file size of index.cjs as a simple fingerprint)
+    bundled_entry = bundled_dir / "index.cjs"
+    bundled_fingerprint = str(bundled_entry.stat().st_size)
+
+    # Check if runtime is already set up and current
+    if (
+        marker.exists()
+        and marker.read_text(encoding="utf-8").strip() == bundled_fingerprint
+        and (runtime_dir / "index.cjs").exists()
+        and (runtime_dir / "node_modules").is_dir()
+    ):
+        return runtime_dir
+
+    # Set up or update runtime directory
+    click.echo("Setting up dashboard runtime (first run)...")
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+
+    # Copy bundled files
+    for item in bundled_dir.iterdir():
+        dest = runtime_dir / item.name
+        if item.is_dir():
+            if dest.exists():
+                shutil.rmtree(dest)
+            shutil.copytree(item, dest)
+        else:
+            shutil.copy2(item, dest)
+
+    # Install better-sqlite3 (native Node.js addon required by the dashboard)
+    npm = shutil.which("npm")
+    if npm is None:
+        click.echo(
+            "Error: npm is required to set up the dashboard but was not found.\n"
+            "Install Node.js (v18+) from https://nodejs.org",
+            err=True,
+        )
+        return None
+
+    click.echo("Installing dashboard dependencies...")
+    result = subprocess.run(
+        [npm, "install", "--production", "better-sqlite3"],
+        cwd=str(runtime_dir),
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        click.echo(
+            f"Error: Failed to install dashboard dependencies.\n{result.stderr}",
+            err=True,
+        )
+        return None
+
+    # Write version marker
+    marker.write_text(bundled_fingerprint, encoding="utf-8")
+    click.echo("Dashboard runtime ready.")
+    return runtime_dir
 
 
 def _node_available() -> bool:
@@ -63,8 +142,14 @@ def _start_node_dashboard(host: str, port: int, no_browser: bool, dashboard_dir:
     }
 
     # Prefer pre-built dist, fall back to dev mode via npx tsx
-    dist_entry = dashboard_dir / "dist" / "index.js"
-    if dist_entry.exists():
+    # Bundled runtime: index.cjs is directly in dashboard_dir
+    bundled_entry = dashboard_dir / "index.cjs"
+    # Repo development: index.cjs is in dashboard_dir/dist/
+    dist_entry = dashboard_dir / "dist" / "index.cjs"
+
+    if bundled_entry.exists():
+        cmd = ["node", str(bundled_entry)]
+    elif dist_entry.exists():
         cmd = ["node", str(dist_entry)]
     elif _npx_available():
         cmd = ["npx", "tsx", "server/index.ts"]
@@ -213,9 +298,9 @@ def dashboard_start(
     dashboard_dir = _find_dashboard_dir()
     if dashboard_dir is None:
         click.echo(
-            "Error: Dashboard directory not found.\n"
-            "Expected at: <repo-root>/dashboard/\n\n"
-            "Use the legacy Python dashboard instead:\n\n"
+            "Error: Dashboard could not be set up.\n"
+            "Ensure Node.js (v18+) and npm are installed: https://nodejs.org\n\n"
+            "Alternatively, use the legacy Python dashboard:\n\n"
             "  atlasbridge dashboard start --legacy\n",
             err=True,
         )

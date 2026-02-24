@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Bundled Node.js dashboard** — the pre-built dashboard is now included in the pip package, so `atlasbridge dashboard start` works from any directory without needing the repo checkout
+- **Auto-setup dashboard runtime** — on first run from a pip install, the dashboard automatically sets up its runtime directory and installs the required native dependency (better-sqlite3)
+
+### Fixed
+- **Dashboard entry point** — fixed detection of pre-built dashboard (`index.cjs` instead of `index.js`)
+
 ---
 
 ## [1.1.3] — 2026-02-24

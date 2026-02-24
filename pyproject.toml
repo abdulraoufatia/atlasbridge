@@ -103,7 +103,13 @@ Security = "https://github.com/abdulraoufatia/atlasbridge/blob/main/SECURITY.md"
 where = ["src"]
 
 [tool.setuptools.package-data]
-atlasbridge = ["**/*.tcss", "dashboard/templates/*.html", "dashboard/static/*.css", "dashboard/static/*.js"]
+atlasbridge = [
+    "**/*.tcss",
+    "dashboard/templates/*.html",
+    "dashboard/static/*.css",
+    "dashboard/static/*.js",
+    "_dashboard_dist/**/*",
+]
 
 [tool.ruff]
 target-version = "py311"
