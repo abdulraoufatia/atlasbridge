@@ -87,3 +87,11 @@ build/
 
 # Node (if any tooling)
 node_modules/
+
+# Dashboard (Node.js)
+dashboard/dist/
+dashboard/node_modules/
+dashboard/.env
+dashboard/*.db
+dashboard/*.db-shm
+dashboard/*.db-wal
