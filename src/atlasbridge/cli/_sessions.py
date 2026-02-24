@@ -37,6 +37,22 @@ def sessions_show(session_id: str, as_json: bool = False) -> None:
     cmd_sessions_show(session_id=session_id, as_json=as_json, console=console)
 
 
+@sessions_group.command("trace")
+@click.argument("session_id")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON")
+@click.option(
+    "--type",
+    "event_type",
+    default=None,
+    help="Filter by event type (e.g. prompt_detected, response_injected).",
+)
+def sessions_trace(session_id: str, as_json: bool = False, event_type: str | None = None) -> None:
+    """Show chronological governance trace for a session."""
+    cmd_sessions_trace(
+        session_id=session_id, as_json=as_json, event_type=event_type, console=console
+    )
+
+
 def _open_db():
     """Open the AtlasBridge database if it exists, or return None."""
     from atlasbridge.core.config import load_config
@@ -219,3 +235,65 @@ def cmd_sessions_show(
             console.print(prompt_table)
     finally:
         db.close()
+
+
+# ------------------------------------------------------------------
+# sessions trace
+# ------------------------------------------------------------------
+
+
+def cmd_sessions_trace(
+    *,
+    session_id: str,
+    as_json: bool,
+    event_type: str | None,
+    console: Console,
+) -> None:
+    """Render the governance trace timeline for a session."""
+    from atlasbridge.core.session.trace import (
+        build_session_trace,
+        format_trace,
+        trace_to_json,
+    )
+
+    db = _open_db()
+    if db is None:
+        console.print("[red]No database found.[/red]")
+        sys.exit(1)
+
+    try:
+        # Support short IDs via prefix match
+        full_id = _resolve_session_id(db, session_id)
+        if full_id is None:
+            console.print(f"[red]Session not found: {session_id}[/red]")
+            sys.exit(1)
+
+        trace = build_session_trace(db, full_id)
+        if trace is None:
+            console.print(f"[red]Session not found: {session_id}[/red]")
+            sys.exit(1)
+
+        # Apply event type filter
+        if event_type:
+            trace.events = [e for e in trace.events if e.event_type == event_type]
+            trace.event_count = len(trace.events)
+
+        if as_json:
+            print(trace_to_json(trace))
+        else:
+            console.print(format_trace(trace))
+    finally:
+        db.close()
+
+
+def _resolve_session_id(db, session_id: str) -> str | None:
+    """Resolve a short or full session ID to a full session ID."""
+    row = db.get_session(session_id)
+    if row is not None:
+        return row["id"]
+    # Try prefix match
+    all_rows = db.list_sessions(limit=500)
+    matches = [r for r in all_rows if r["id"].startswith(session_id)]
+    if len(matches) == 1:
+        return matches[0]["id"]
+    return None
