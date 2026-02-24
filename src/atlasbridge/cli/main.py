@@ -85,6 +85,7 @@ def ui() -> None:
 # ---------------------------------------------------------------------------
 
 from atlasbridge.cli._adapter import adapter_group, adapters_cmd  # noqa: E402
+from atlasbridge.cli._audit_cmd import audit_group  # noqa: E402
 from atlasbridge.cli._autopilot import autopilot_group, pause_cmd, resume_cmd  # noqa: E402
 from atlasbridge.cli._channel import channel_group  # noqa: E402
 from atlasbridge.cli._config_cmd import config_group  # noqa: E402
@@ -126,6 +127,7 @@ cli.add_command(cloud_group)
 cli.add_command(edition_cmd)
 cli.add_command(features_cmd)
 cli.add_command(trace_group)
+cli.add_command(audit_group)
 cli.add_command(pause_cmd)
 cli.add_command(resume_cmd)
 cli.add_command(lab_group)
