@@ -673,7 +673,7 @@ export class AtlasBridgeRepo {
       configPath: getConfigPath(),
       dbPath: getAtlasBridgeDbPath(),
       tracePath: getTracePath(),
-      version: "1.1.3",
+      version: "1.1.4",
       environment: "local",
       featureFlags: {
         auto_escalation: true,
