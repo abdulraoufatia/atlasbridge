@@ -99,6 +99,7 @@ from atlasbridge.cli._enterprise import cloud_group, edition_cmd, features_cmd  
 from atlasbridge.cli._lab import lab_group  # noqa: E402
 from atlasbridge.cli._logs import logs_cmd  # noqa: E402
 from atlasbridge.cli._policy_cmd import policy_group  # noqa: E402
+from atlasbridge.cli._profile import profile_group  # noqa: E402
 from atlasbridge.cli._run import run_cmd  # noqa: E402
 from atlasbridge.cli._sessions import sessions_group  # noqa: E402
 from atlasbridge.cli._setup import setup_cmd  # noqa: E402
@@ -122,6 +123,7 @@ cli.add_command(version_cmd, "version")
 cli.add_command(db_group, "db")
 cli.add_command(config_group)
 cli.add_command(policy_group)
+cli.add_command(profile_group)
 cli.add_command(autopilot_group)
 cli.add_command(cloud_group)
 cli.add_command(edition_cmd)

@@ -54,6 +54,7 @@ DB_FILENAME = "atlasbridge.db"
 AUDIT_FILENAME = "audit.log"
 PID_FILENAME = "atlasbridge.pid"
 LOG_FILENAME = "atlasbridge.log"
+PROFILES_DIR_NAME = "profiles"
 
 # ---------------------------------------------------------------------------
 # Timeouts and limits

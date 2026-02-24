@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Agent profiles** — reusable named session presets (`atlasbridge profile create/list/show/delete/set-default`) that bundle session label, policy file, and adapter defaults (#204, #205, #206)
+- **`--profile` flag on `run`** — `atlasbridge run claude --profile ci` applies profile defaults; explicit CLI flags override
+- **Profile-aware policy rules** — v1 `session_tag` match criterion works with profiles for per-workflow policy behavior
+- **Profile-aware policy example** — `config/policies/profile-aware.example.yaml` demonstrates session_tag scoping
+- **Docs** — "Profile-Aware Rules" section added to policy authoring guide
+
 ---
 
 ## [1.1.4] — 2026-02-24

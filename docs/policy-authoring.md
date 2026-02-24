@@ -14,10 +14,11 @@
 4. [Policy Syntax Reference](#4-policy-syntax-reference)
 5. [Working With Policies (CLI)](#5-working-with-policies-cli)
 6. [Writing Good Policies (Patterns)](#6-writing-good-policies-patterns)
-7. [Debugging Policies](#7-debugging-policies)
-8. [FAQ](#8-faq)
-9. [Safety Notes](#9-safety-notes)
-10. [Next Steps](#10-next-steps)
+7. [Profile-Aware Rules](#7-profile-aware-rules)
+8. [Debugging Policies](#8-debugging-policies)
+9. [FAQ](#9-faq)
+10. [Safety Notes](#10-safety-notes)
+11. [Next Steps](#11-next-steps)
 
 ---
 
@@ -615,7 +616,93 @@ Always end your rules list with an explicit catch-all. This makes it clear in th
 
 ---
 
-## 7. Debugging Policies
+## 7. Profile-Aware Rules
+
+Agent profiles let you define reusable session presets (label, policy, adapter) and then scope policy rules to specific profiles using the `session_tag` match criterion in Policy DSL v1.
+
+### 7.1 Setting up profiles
+
+```bash
+# Create profiles for different workflows
+atlasbridge profile create ci --label ci --description "CI/CD pipeline sessions"
+atlasbridge profile create code-review --label code-review --description "Code review sessions"
+
+# Use a profile when running
+atlasbridge run claude --profile ci
+```
+
+When you run with `--profile ci`, the profile's `session_label` ("ci") is passed through as `session_tag` in policy evaluation. This lets you write rules that only apply to specific profiles.
+
+### 7.2 Writing profile-scoped rules
+
+Use `session_tag` in your v1 policy rules to match specific profiles:
+
+```yaml
+policy_version: "1"
+name: "profile-aware"
+autonomy_mode: full
+
+rules:
+  # Only applies when running with --profile ci (session_label: ci)
+  - id: "ci-auto-approve"
+    description: "Auto-yes in CI sessions"
+    match:
+      session_tag: ci
+      prompt_type: [yes_no, confirm_enter]
+      min_confidence: high
+    action:
+      type: auto_reply
+      value: "y"
+
+  # Only applies when running with --profile code-review
+  - id: "review-escalate"
+    description: "Always escalate in code-review sessions"
+    match:
+      session_tag: code-review
+    action:
+      type: require_human
+      message: "Code review session — all prompts require human review."
+
+  # Default rules (no session_tag) apply to all sessions
+  - id: "default-continue"
+    match:
+      prompt_type: [yes_no]
+      contains: "Continue"
+      min_confidence: high
+    action:
+      type: auto_reply
+      value: "y"
+
+defaults:
+  no_match: require_human
+```
+
+### 7.3 How the flow works
+
+```
+Profile.session_label → Session.label → PromptEvent.session_label → session_tag in evaluate()
+```
+
+1. `atlasbridge run claude --profile ci` loads the "ci" profile
+2. Profile's `session_label: ci` is set on the session's `label` field
+3. When a prompt is detected, the router copies `session.label` to `event.session_label`
+4. The policy evaluator uses `session_label` as `session_tag` for rule matching
+5. Rules with `session_tag: ci` match; rules with other tags are skipped
+
+### 7.4 Testing profile-aware rules
+
+```bash
+# Test with a specific session tag (simulates a profile)
+atlasbridge policy test config/policies/profile-aware.example.yaml \
+  --prompt "Continue? [y/n]" --type yes_no --confidence high \
+  --session-tag ci --explain
+```
+
+See `config/policies/profile-aware.example.yaml` for a complete example.
+
+---
+
+## 8. Debugging Policies
 
 ### 7.1 The `--explain` flag
 
@@ -720,7 +807,7 @@ atlasbridge policy validate policy.yaml && atlasbridge run claude
 
 ---
 
-## 8. FAQ
+## 9. FAQ
 
 **Q: Where does AtlasBridge look for my policy file?**
 
@@ -814,7 +901,7 @@ It future-proofs the schema. DSL v0 is the only version currently supported. Fut
 
 ---
 
-## 9. Safety Notes
+## 10. Safety Notes
 
 ### Never auto-reply to credential prompts
 
@@ -909,7 +996,7 @@ No matter what mode you are in, `/pause` (from Telegram/Slack) or `atlasbridge p
 
 ---
 
-## 10. Next Steps
+## 11. Next Steps
 
 - **Full DSL reference** — [docs/policy-dsl.md](policy-dsl.md) covers every field, evaluation algorithm, regex safety limits, idempotency, and decision trace format in complete detail.
 - **Autonomy modes** — [docs/autonomy-modes.md](autonomy-modes.md) describes Off/Assist/Full in detail including the confirmation window, kill switch, and mode transition rules.

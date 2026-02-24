@@ -28,6 +28,12 @@ console = Console()
     default=False,
     help="Run the full pipeline (detect/classify/policy/plan) without injecting into the PTY.",
 )
+@click.option(
+    "--profile",
+    "profile_name",
+    default="",
+    help="Agent profile name (provides defaults for label, policy, adapter).",
+)
 def run_cmd(
     tool: str,
     tool_args: tuple[str, ...],
@@ -35,8 +41,26 @@ def run_cmd(
     cwd: str,
     policy_file: str,
     dry_run: bool,
+    profile_name: str,
 ) -> None:
     """Launch a CLI tool under AtlasBridge supervision."""
+    # Apply profile defaults — explicit CLI flags always win
+    if profile_name:
+        from atlasbridge.core.profile import ProfileStore
+
+        store = ProfileStore()
+        profile = store.get(profile_name)
+        if profile is None:
+            console.print(f"[red]Profile {profile_name!r} not found.[/red]")
+            console.print("Run [cyan]atlasbridge profile list[/cyan] to see available profiles.")
+            sys.exit(1)
+        if not session_label and profile.session_label:
+            session_label = profile.session_label
+        if not policy_file and profile.policy_file:
+            policy_file = profile.policy_file
+        if tool == "claude" and profile.adapter != "claude":
+            tool = profile.adapter
+
     command = [tool] + list(tool_args)
     cmd_run(
         tool=tool,

@@ -1,0 +1,92 @@
+# AtlasBridge Policy DSL v1 — Profile-Aware Policy Example
+#
+# Demonstrates using session_tag to scope rules to specific agent profiles.
+#
+# Profiles set `session_label` which flows through to `session_tag` in
+# policy evaluation. This lets you define different behaviors per profile:
+#
+#   atlasbridge profile create ci --label ci
+#   atlasbridge profile create code-review --label code-review
+#   atlasbridge run claude --profile ci
+#
+# Validate:  atlasbridge policy validate config/policies/profile-aware.example.yaml
+# Test:
+#   atlasbridge policy test config/policies/profile-aware.example.yaml \
+#     --prompt "Continue? [y/n]" --type yes_no --confidence high \
+#     --session-tag ci --explain
+
+policy_version: "1"
+name: "profile-aware"
+autonomy_mode: full
+
+rules:
+
+  # --------------------------------------------------------------------------
+  # CI profile: auto-approve common prompts (high trust environment)
+  # --------------------------------------------------------------------------
+
+  - id: "ci-auto-approve"
+    description: "Auto-yes for CI sessions on high-confidence yes/no prompts"
+    match:
+      session_tag: ci
+      prompt_type:
+        - yes_no
+        - confirm_enter
+      min_confidence: high
+    action:
+      type: auto_reply
+      value: "y"
+
+  - id: "ci-auto-enter"
+    description: "Auto-press Enter for CI sessions on confirmations"
+    match:
+      session_tag: ci
+      prompt_type:
+        - confirm_enter
+      min_confidence: medium
+    action:
+      type: auto_reply
+      value: "\n"
+
+  # --------------------------------------------------------------------------
+  # Code-review profile: conservative — escalate everything
+  # --------------------------------------------------------------------------
+
+  - id: "review-escalate-all"
+    description: "In code-review sessions, always require human approval"
+    match:
+      session_tag: code-review
+    action:
+      type: require_human
+      message: "Code review session — all prompts require human review."
+
+  # --------------------------------------------------------------------------
+  # Default rules (no profile / unlabeled sessions)
+  # --------------------------------------------------------------------------
+
+  - id: "deny-credentials"
+    description: "Never auto-handle credential prompts"
+    match:
+      prompt_type:
+        - free_text
+      contains: "password|token|api.?key|secret"
+      contains_is_regex: true
+      min_confidence: low
+    action:
+      type: deny
+      reason: "Credential prompts are never auto-replied."
+
+  - id: "default-continue"
+    description: "Auto-yes for high-confidence Continue prompts"
+    match:
+      prompt_type:
+        - yes_no
+      contains: "Continue"
+      min_confidence: high
+    action:
+      type: auto_reply
+      value: "y"
+
+defaults:
+  no_match: require_human
+  low_confidence: require_human
