@@ -1,6 +1,6 @@
 """
 CLI commands: ``atlasbridge policy validate``, ``atlasbridge policy test``,
-and ``atlasbridge policy migrate``.
+``atlasbridge policy coverage``, and ``atlasbridge policy migrate``.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ import sys
 import click
 
 from atlasbridge.core.policy.evaluator import evaluate
-from atlasbridge.core.policy.explain import explain_decision, explain_policy
+from atlasbridge.core.policy.explain import debug_policy, explain_decision, explain_policy
 from atlasbridge.core.policy.parser import PolicyParseError, load_policy
 
 
@@ -71,6 +71,12 @@ def policy_validate(policy_file: str) -> None:
     default=False,
     help="Show per-rule match details (verbose).",
 )
+@click.option(
+    "--debug",
+    is_flag=True,
+    default=False,
+    help="Full debug trace — evaluate ALL rules with no short-circuit (implies --explain).",
+)
 def policy_test(
     policy_file: str,
     prompt_text: str,
@@ -80,6 +86,7 @@ def policy_test(
     repo: str,
     session_tag: str,
     explain: bool,
+    debug: bool,
 ) -> None:
     """
     Test a policy against a synthetic prompt and show the decision.
@@ -98,6 +105,20 @@ def policy_test(
     except PolicyParseError as exc:
         click.echo(str(exc), err=True)
         sys.exit(1)
+
+    if debug:
+        click.echo(
+            debug_policy(
+                policy=policy,
+                prompt_text=prompt_text,
+                prompt_type=prompt_type,
+                confidence=confidence,
+                tool_id=tool_id,
+                repo=repo,
+                session_tag=session_tag,
+            )
+        )
+        return
 
     if explain:
         click.echo(
@@ -217,3 +238,28 @@ def policy_migrate(policy_file: str, output: str, dry_run: bool) -> None:
         f"✓  Policy migrated to v{migrated_policy.policy_version} "
         f"({len(migrated_policy.rules)} rule(s)) — {verb} {dest}"
     )
+
+
+@policy_group.command("coverage")
+@click.argument("policy_file", type=click.Path(exists=True, dir_okay=False))
+def policy_coverage(policy_file: str) -> None:
+    """
+    Analyze policy rule coverage and identify gaps.
+
+    Reports which prompt types, confidence levels, and action types are covered,
+    computes a coverage score (0-100), and lists any gaps.
+
+    Example::
+
+        atlasbridge policy coverage ~/.atlasbridge/policy.yaml
+    """
+    from atlasbridge.core.policy.coverage import analyze_coverage, format_coverage
+
+    try:
+        policy = load_policy(policy_file)
+    except PolicyParseError as exc:
+        click.echo(str(exc), err=True)
+        sys.exit(1)
+
+    report = analyze_coverage(policy)
+    click.echo(format_coverage(report))
