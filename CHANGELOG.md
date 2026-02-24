@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.3] — 2026-02-24
+
+### Fixed
+- **Console dashboard port mismatch** — console supervisor, app, and CLI all used 8787 as the dashboard port default instead of 3737, causing the dashboard to not load when started from `atlasbridge console`
+
+---
+
 ## [1.1.2] — 2026-02-24
 
 ### Fixed
