@@ -38,6 +38,7 @@ jobs:
             --exclude-files '\.env\.example' \
             --exclude-files 'docs/.*' \
             --exclude-files 'dashboard/shared/schema\.ts' \
+            --exclude-files 'src/atlasbridge/_dashboard_dist/.*' \
             --exclude-secrets 'sk-test|xoxb-test|ghp_test|password_input' \
             > .secrets-scan-results.json
           python -c "
