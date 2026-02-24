@@ -36,10 +36,7 @@ class OverlapWarning:
     overlap_reason: str
 
     def __str__(self) -> str:
-        return (
-            f"Rules {self.rule_a_id!r} and {self.rule_b_id!r} may overlap: "
-            f"{self.overlap_reason}"
-        )
+        return f"Rules {self.rule_a_id!r} and {self.rule_b_id!r} may overlap: {self.overlap_reason}"
 
 
 def detect_overlaps(policy: Policy | PolicyV1) -> list[OverlapWarning]:

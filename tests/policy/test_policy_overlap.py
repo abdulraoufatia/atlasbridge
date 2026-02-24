@@ -37,9 +37,7 @@ def _rule(
     value: str = "y",
 ) -> PolicyRule:
     pt = [PromptTypeFilter(t) for t in prompt_types] if prompt_types else None
-    action = (
-        AutoReplyAction(value=value) if action_type == "auto_reply" else RequireHumanAction()
-    )
+    action = AutoReplyAction(value=value) if action_type == "auto_reply" else RequireHumanAction()
     return PolicyRule(
         id=rule_id,
         match=MatchCriteria(
