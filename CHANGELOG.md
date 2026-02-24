@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [1.1.0] — 2026-02-24
+
+### Added
+- **Node.js/React dashboard** — full-stack replacement for the Python FastAPI dashboard. React 18 + Express 5 + TypeScript with TailwindCSS and shadcn/ui components. Dual-database architecture: `dashboard.db` (read-write) for RBAC/settings, `atlasbridge.db` (read-only) for live operational data.
+- **AtlasBridgeRepo** — TypeScript read-only data access layer for AtlasBridge SQLite DB and JSONL trace file. Serves sessions, prompts, audit events, traces, integrity verification, and overview metrics from real data.
+- **Dashboard sanitization** — TypeScript port of ANSI stripping and token redaction (Telegram, Slack, GitHub PAT, AWS keys).
+- **CLI dashboard integration** — `atlasbridge dashboard start` now spawns the Node.js dashboard (port 5000) by default. `--legacy` flag preserves the old Python FastAPI dashboard (port 8787).
+
 ### Removed
 - **Windows support** — removed Windows ConPTY adapter, `--experimental` flag, `pywinpty` optional dependency, and Windows CI matrix entry. AtlasBridge now supports macOS and Linux only.
 

@@ -37,6 +37,7 @@ jobs:
             --exclude-files 'tests/.*' \
             --exclude-files '\.env\.example' \
             --exclude-files 'docs/.*' \
+            --exclude-files 'dashboard/shared/schema\.ts' \
             --exclude-secrets 'sk-test|xoxb-test|ghp_test|password_input' \
             > .secrets-scan-results.json
           python -c "

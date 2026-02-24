@@ -188,8 +188,8 @@ export function generateEvidenceJSON(sessionId?: string): EvidenceBundle {
   // Collect unique rule IDs from traces for policy snapshot
   const ruleIds = Array.from(new Set(allTraces.map(t => t.ruleMatched).filter(r => r && r !== "default")));
   const policySnapshot = ruleIds.length > 0
-    ? ruleIds.map(name => ({ name, hash: sha256(name + ":v1.0.1") }))
-    : [{ name: "default", hash: sha256("default:v1.0.1") }];
+    ? ruleIds.map(name => ({ name, hash: sha256(name + ":v1.1.0") }))
+    : [{ name: "default", hash: sha256("default:v1.1.0") }];
 
   return {
     generatedAt: new Date().toISOString(),
