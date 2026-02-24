@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.1] — 2026-02-24
+
+### Fixed
+- **Dashboard full-width layout** — removed 1400px max-width constraint, dashboard now fills full viewport with responsive padding
+
+---
+
 ## [1.1.0] — 2026-02-24
 
 ### Added
