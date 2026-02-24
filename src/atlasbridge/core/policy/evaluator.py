@@ -226,6 +226,7 @@ def _evaluate_rule(
     excerpt: str,
     tool_id: str,
     repo: str,
+    short_circuit: bool = True,
 ) -> RuleMatchResult:
     """Evaluate a single v0 rule. Returns RuleMatchResult with per-criterion reasons."""
     m = rule.match
@@ -244,8 +245,8 @@ def _evaluate_rule(
         reasons.append(("✓ " if ok else "✗ ") + reason)
         if not ok:
             all_pass = False
-            # Short-circuit: don't bother evaluating remaining criteria
-            break
+            if short_circuit:
+                break
 
     return RuleMatchResult(rule_id=rule.id, matched=all_pass, reasons=reasons)
 
@@ -260,6 +261,7 @@ def _eval_criteria_block(
     session_tag: str,
     session_state: str = "",
     channel_message: bool = False,
+    short_circuit: bool = True,
 ) -> tuple[bool, list[str]]:
     """
     Evaluate a MatchCriteriaV1 block (flat OR any_of), returning (matched, reasons).
@@ -271,6 +273,7 @@ def _eval_criteria_block(
 
     if m.any_of is not None:
         # OR semantics: match if ANY sub-block passes
+        any_matched = False
         for i, sub in enumerate(m.any_of):
             sub_matched, sub_reasons = _eval_criteria_block(
                 sub,
@@ -282,13 +285,16 @@ def _eval_criteria_block(
                 session_tag,
                 session_state,
                 channel_message,
+                short_circuit=short_circuit,
             )
             reasons.append(f"any_of[{i}]: {'✓ matched' if sub_matched else '✗ no match'}")
             for r in sub_reasons:
                 reasons.append(f"  {r}")
             if sub_matched:
-                return True, reasons
-        return False, reasons
+                if short_circuit:
+                    return True, reasons
+                any_matched = True
+        return any_matched, reasons
 
     # Flat AND checks
     checks = [
@@ -309,7 +315,8 @@ def _eval_criteria_block(
         reasons.append(("✓ " if ok else "✗ ") + reason)
         if not ok:
             all_pass = False
-            break
+            if short_circuit:
+                break
 
     return all_pass, reasons
 
@@ -324,6 +331,7 @@ def _evaluate_rule_v1(
     session_tag: str,
     session_state: str = "",
     channel_message: bool = False,
+    short_circuit: bool = True,
 ) -> RuleMatchResult:
     """
     Evaluate a single v1 rule.
@@ -346,13 +354,18 @@ def _evaluate_rule_v1(
         session_tag,
         session_state,
         channel_message,
+        short_circuit=short_circuit,
     )
     reasons.extend(primary_reasons)
 
     if not primary_matched:
-        return RuleMatchResult(rule_id=rule.id, matched=False, reasons=reasons)
+        if short_circuit:
+            return RuleMatchResult(rule_id=rule.id, matched=False, reasons=reasons)
+        # In debug mode, continue evaluating none_of for full trace
+        reasons.append("  (primary criteria failed — none_of shown for completeness)")
 
     # Step 2: none_of NOT filter
+    excluded = False
     if m.none_of is not None:
         for i, sub in enumerate(m.none_of):
             sub_matched, sub_reasons = _eval_criteria_block(
@@ -365,15 +378,20 @@ def _evaluate_rule_v1(
                 session_tag,
                 session_state,
                 channel_message,
+                short_circuit=short_circuit,
             )
             if sub_matched:
+                excluded = True
                 reasons.append(f"✗ none_of[{i}]: matched (excluded by NOT condition)")
                 for r in sub_reasons:
                     reasons.append(f"  {r}")
-                return RuleMatchResult(rule_id=rule.id, matched=False, reasons=reasons)
-            reasons.append(f"✓ none_of[{i}]: did not match (NOT condition satisfied)")
+                if short_circuit:
+                    return RuleMatchResult(rule_id=rule.id, matched=False, reasons=reasons)
+            else:
+                reasons.append(f"✓ none_of[{i}]: did not match (NOT condition satisfied)")
 
-    return RuleMatchResult(rule_id=rule.id, matched=True, reasons=reasons)
+    final_matched = primary_matched and not excluded
+    return RuleMatchResult(rule_id=rule.id, matched=final_matched, reasons=reasons)
 
 
 # ---------------------------------------------------------------------------
