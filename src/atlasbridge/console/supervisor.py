@@ -130,7 +130,7 @@ class ProcessSupervisor:
 
     def __init__(self) -> None:
         self._dashboard_proc: asyncio.subprocess.Process | None = None
-        self._dashboard_port: int = 8787
+        self._dashboard_port: int = 3737
         self._dashboard_started: datetime | None = None
 
         self._agent_proc: asyncio.subprocess.Process | None = None
@@ -203,7 +203,7 @@ class ProcessSupervisor:
     # Dashboard
     # ------------------------------------------------------------------
 
-    async def start_dashboard(self, port: int = 8787) -> ProcessInfo:
+    async def start_dashboard(self, port: int = 3737) -> ProcessInfo:
         """Start the dashboard as a long-running subprocess."""
         if self._dashboard_proc is not None and self._dashboard_proc.returncode is None:
             return self.dashboard_status(port)
@@ -248,7 +248,7 @@ class ProcessSupervisor:
         except Exception:  # noqa: BLE001
             return False
 
-    def dashboard_status(self, port: int = 8787) -> ProcessInfo:
+    def dashboard_status(self, port: int = 3737) -> ProcessInfo:
         """Check dashboard status via socket probe."""
         effective_port = port or self._dashboard_port
         listening = _dashboard_healthy(effective_port)

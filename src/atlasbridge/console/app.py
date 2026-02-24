@@ -68,7 +68,7 @@ class ConsoleScreen(Screen):
         self,
         supervisor: ProcessSupervisor,
         default_tool: str = "claude",
-        dashboard_port: int = 8787,
+        dashboard_port: int = 3737,
     ) -> None:
         super().__init__()
         self._supervisor = supervisor
@@ -392,7 +392,7 @@ class ConsoleApp(App):
     def __init__(
         self,
         default_tool: str = "claude",
-        dashboard_port: int = 8787,
+        dashboard_port: int = 3737,
     ) -> None:
         super().__init__()
         self._supervisor = ProcessSupervisor()
@@ -412,6 +412,6 @@ class ConsoleApp(App):
         )
 
 
-def run(default_tool: str = "claude", dashboard_port: int = 8787) -> None:
+def run(default_tool: str = "claude", dashboard_port: int = 3737) -> None:
     """Entry point called from the CLI."""
     ConsoleApp(default_tool=default_tool, dashboard_port=dashboard_port).run()

@@ -9,7 +9,7 @@ import click
 
 @click.command("console")
 @click.option("--tool", default="claude", show_default=True, help="Default agent tool to launch")
-@click.option("--dashboard-port", default=8787, show_default=True, help="Dashboard server port")
+@click.option("--dashboard-port", default=3737, show_default=True, help="Dashboard server port")
 def console_cmd(tool: str, dashboard_port: int) -> None:
     """Launch the operator console (manages daemon, agent, dashboard)."""
     if not sys.stdout.isatty():

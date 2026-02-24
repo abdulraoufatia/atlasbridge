@@ -51,13 +51,13 @@ def test_console_tool_default_is_claude():
 
 
 def test_console_dashboard_port_default():
-    """Console --dashboard-port must default to 8787."""
+    """Console --dashboard-port must default to 3737."""
     from atlasbridge.cli.main import cli
 
     cmd = cli.commands["console"]
     port_param = next(p for p in cmd.params if p.name == "dashboard_port")
-    assert port_param.default == 8787, (
-        f"console --dashboard-port default changed from 8787 to {port_param.default}"
+    assert port_param.default == 3737, (
+        f"console --dashboard-port default changed from 3737 to {port_param.default}"
     )
 
 

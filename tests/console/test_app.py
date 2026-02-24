@@ -38,7 +38,7 @@ class TestConsoleScreenComposition:
         screen = ConsoleScreen(supervisor=supervisor)
         assert screen._supervisor is supervisor
         assert screen._default_tool == "claude"
-        assert screen._dashboard_port == 8787
+        assert screen._dashboard_port == 3737
 
     def test_screen_custom_options(self, supervisor):
         screen = ConsoleScreen(supervisor=supervisor, default_tool="openai", dashboard_port=9999)
@@ -89,7 +89,7 @@ class TestConsoleApp:
     def test_app_creates(self):
         app = ConsoleApp()
         assert app._default_tool == "claude"
-        assert app._dashboard_port == 8787
+        assert app._dashboard_port == 3737
 
     def test_app_custom_options(self):
         app = ConsoleApp(default_tool="gemini", dashboard_port=9000)
