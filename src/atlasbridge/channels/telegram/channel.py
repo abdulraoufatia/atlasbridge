@@ -462,7 +462,9 @@ class TelegramChannel(BaseChannel):
         response_instructions = {
             PromptType.TYPE_YES_NO: "Tap <b>Yes</b> or <b>No</b> below.",
             PromptType.TYPE_CONFIRM_ENTER: "Tap <b>Send Enter</b> below to continue.",
-            PromptType.TYPE_MULTIPLE_CHOICE: "Tap a numbered option below.",
+            PromptType.TYPE_MULTIPLE_CHOICE: (
+                "Reply <b>1</b> or <b>2</b> (or tap a button below)."
+            ),
             PromptType.TYPE_FREE_TEXT: "Type your response and send it as a message.",
         }
         label = type_labels.get(event.prompt_type, event.prompt_type)
@@ -482,7 +484,8 @@ class TelegramChannel(BaseChannel):
         if event.cwd:
             lines.append(f"\nWorkspace:\n{event.cwd}")
 
-        lines.append(f"\nQuestion:\n<pre>{event.excerpt}</pre>")
+        question_html = TelegramChannel._format_question(event)
+        lines.append(f"\nQuestion:\n{question_html}")
 
         if instruction:
             lines.append(f"\nHow to respond:\n{instruction}")
@@ -494,6 +497,68 @@ class TelegramChannel(BaseChannel):
         )
 
         return "\n".join(lines)
+
+    @staticmethod
+    def _format_question(event: PromptEvent) -> str:
+        """Format the question/excerpt for a phone-first experience.
+
+        Removes terminal-only hints and rewrites Claude's folder trust prompt
+        into a workspace trust confirmation while preserving semantics.
+        """
+        excerpt = event.excerpt or ""
+        lower = excerpt.lower()
+
+        # Special-case Claude's folder trust prompt — present as workspace trust.
+        if "trust" in lower and "folder" in lower:
+            # Build a workspace-centric description and sanitised options.
+            tool_label = (event.tool or "Claude Code").strip()
+            lines: list[str] = []
+            lines.append("Workspace trust confirmation")
+            lines.append("")
+            lines.append(
+                f"{tool_label} is asking to trust this workspace for file access and execution."
+            )
+
+            if event.cwd:
+                lines.append("")
+                lines.append("Workspace:")
+                lines.append(event.cwd)
+
+            # Present numbered options without terminal hints or folder wording.
+            if event.choices:
+                lines.append("")
+                lines.append("Options:")
+                for i, raw_choice in enumerate(event.choices, start=1):
+                    choice = (raw_choice or "").strip()
+                    # Soften CLI phrasing: "folder" → "workspace"
+                    choice = choice.replace("this folder", "this workspace")
+                    choice = choice.replace("folder", "workspace")
+                    lines.append(f"{i}. {choice or i}")
+
+            return f"<pre>{'\n'.join(lines)}</pre>"
+
+        # Generic path: strip terminal-only hints but keep the raw question.
+        clean_lines: list[str] = []
+        terminal_phrases = (
+            "enter to confirm",
+            "press enter to continue",
+            "press enter to confirm",
+            "esc to cancel",
+            "escape to cancel",
+            "use the arrow keys",
+            "use ↑/↓",
+        )
+        for line in excerpt.splitlines():
+            l = line.strip()
+            if not l:
+                clean_lines.append(line)
+                continue
+            if any(phrase in l.lower() for phrase in terminal_phrases):
+                continue
+            clean_lines.append(line)
+
+        cleaned = "\n".join(clean_lines).strip() or excerpt.strip()
+        return f"<pre>{cleaned}</pre>"
 
     @staticmethod
     def _build_keyboard(event: PromptEvent) -> list[list[dict[str, str]]]:
