@@ -206,9 +206,7 @@ class PromptRouter:
         decision = self._evaluate_gate(effective_reply)
         if decision is not None and decision.action == "reject":
             session_id = (
-                effective_reply.session_id
-                or self._resolve_session_for_reply(effective_reply)
-                or ""
+                effective_reply.session_id or self._resolve_session_for_reply(effective_reply) or ""
             )
             feedback = format_gate_decision(decision)
             logger.info(
@@ -224,9 +222,7 @@ class PromptRouter:
         # Audit accepted gate decision
         if decision is not None and decision.action == "accept":
             session_id = (
-                effective_reply.session_id
-                or self._resolve_session_for_reply(effective_reply)
-                or ""
+                effective_reply.session_id or self._resolve_session_for_reply(effective_reply) or ""
             )
             self._audit_gate_decision(effective_reply, decision, session_id)
 
