@@ -374,6 +374,87 @@ class TestIdleCycleTransition:
         assert fwd._idle_cycles == 0
 
 
+class TestAwaitingInputProtection:
+    """OutputForwarder must never overwrite AWAITING_INPUT state."""
+
+    def _make_forwarder_with_registry(
+        self,
+    ) -> tuple:
+        from atlasbridge.core.conversation.session_binding import (
+            ConversationRegistry,
+            ConversationState,
+        )
+
+        ch = _make_channel()
+        registry = ConversationRegistry()
+        registry.bind("telegram", "12345", "sess-001")
+        registry.update_state("telegram", "12345", ConversationState.AWAITING_INPUT)
+
+        fwd = OutputForwarder(ch, "sess-001", conversation_registry=registry)
+        return fwd, registry
+
+    def test_transition_to_streaming_skips_awaiting_input(self) -> None:
+        """AWAITING_INPUT must not be overwritten to STREAMING by OutputForwarder."""
+        from atlasbridge.core.conversation.session_binding import ConversationState
+
+        fwd, registry = self._make_forwarder_with_registry()
+        fwd._transition_to_streaming()
+
+        binding = registry.get_binding("telegram", "12345")
+        assert binding is not None
+        assert binding.state == ConversationState.AWAITING_INPUT
+
+    @pytest.mark.asyncio
+    async def test_transition_to_running_skips_awaiting_input(self) -> None:
+        """AWAITING_INPUT must not be overwritten to RUNNING via idle cycles."""
+        from atlasbridge.core.conversation.session_binding import ConversationState
+
+        fwd, registry = self._make_forwarder_with_registry()
+        # _transition_to_running only acts on STREAMING, so AWAITING_INPUT is safe
+        await fwd._transition_to_running()
+
+        binding = registry.get_binding("telegram", "12345")
+        assert binding is not None
+        assert binding.state == ConversationState.AWAITING_INPUT
+
+    def test_transition_to_streaming_works_from_running(self) -> None:
+        """RUNNING → STREAMING is still allowed."""
+        from atlasbridge.core.conversation.session_binding import (
+            ConversationRegistry,
+            ConversationState,
+        )
+
+        ch = _make_channel()
+        registry = ConversationRegistry()
+        registry.bind("telegram", "12345", "sess-001")
+        # Default bind state is RUNNING
+        fwd = OutputForwarder(ch, "sess-001", conversation_registry=registry)
+        fwd._transition_to_streaming()
+
+        binding = registry.get_binding("telegram", "12345")
+        assert binding is not None
+        assert binding.state == ConversationState.STREAMING
+
+    @pytest.mark.asyncio
+    async def test_full_idle_cycle_preserves_awaiting_input(self) -> None:
+        """Simulate the full flush cycle — AWAITING_INPUT must survive."""
+        from atlasbridge.core.conversation.session_binding import ConversationState
+
+        fwd, registry = self._make_forwarder_with_registry()
+
+        # Feed output (simulating buffered output arriving after prompt detected)
+        fwd.feed(b"Some trailing output from the CLI\n")
+        await fwd._flush()
+
+        # Multiple idle cycles
+        await fwd._flush()
+        await fwd._flush()
+
+        binding = registry.get_binding("telegram", "12345")
+        assert binding is not None
+        assert binding.state == ConversationState.AWAITING_INPUT
+
+
 class TestSecretPatterns:
     """Verify centralized secret redactor has patterns loaded."""
 

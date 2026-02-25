@@ -465,10 +465,14 @@ class PromptRouter:
                 # replies to freshly-routed prompts (e.g. trust prompts) to pass
                 # the gate without reporting "No active session" while still
                 # respecting STOPPED/terminal invariants.
-                if state is None:
-                    if session.status == SessionStatus.AWAITING_REPLY:
-                        state = ConversationState.AWAITING_INPUT
-                    elif session.status in (SessionStatus.STARTING, SessionStatus.RUNNING):
+                # Session status is the authoritative source of truth.
+                # The binding state can be stale (e.g. OutputForwarder
+                # transitioned to RUNNING before the prompt was detected),
+                # so override whenever session status says AWAITING_REPLY.
+                if session.status == SessionStatus.AWAITING_REPLY:
+                    state = ConversationState.AWAITING_INPUT
+                elif state is None:
+                    if session.status in (SessionStatus.STARTING, SessionStatus.RUNNING):
                         state = ConversationState.RUNNING
                     elif session.is_terminal:
                         state = ConversationState.STOPPED

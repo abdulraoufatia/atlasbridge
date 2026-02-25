@@ -713,6 +713,65 @@ class TestSpamPrevention:
         mock_adapter.inject_reply.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_gate_overrides_stale_binding_with_session_status(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+        mock_adapter: AsyncMock,
+    ) -> None:
+        """Session status AWAITING_REPLY overrides a stale RUNNING binding state.
+
+        This simulates the scenario where OutputForwarder set the binding to
+        RUNNING before the prompt was detected, but the session has since
+        transitioned to AWAITING_REPLY.  The gate must still accept the reply.
+        """
+        from atlasbridge.core.conversation.session_binding import (
+            ConversationRegistry,
+            ConversationState,
+        )
+
+        registry = ConversationRegistry()
+        s = _session()
+        session_manager.register(s)
+
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={s.session_id: mock_adapter},
+            store=_mock_store(),
+            conversation_registry=registry,
+        )
+
+        # Dispatch prompt → creates binding with AWAITING_INPUT
+        event = _event(s.session_id)
+        await router.route_event(event)
+
+        # Simulate OutputForwarder overwriting the state to RUNNING
+        # (this is the bug scenario — forwarder sets stale state)
+        registry.update_state("telegram", "12345", ConversationState.RUNNING)
+
+        binding = registry.get_binding("telegram", "12345")
+        assert binding is not None
+        assert binding.state == ConversationState.RUNNING  # stale state
+
+        # Reply should still pass the gate because session status is AWAITING_REPLY
+        from datetime import datetime
+
+        reply = Reply(
+            prompt_id="",
+            session_id="",
+            value="y",
+            nonce="test-nonce",
+            channel_identity="telegram:12345",
+            timestamp=datetime.now(UTC).isoformat(),
+            thread_id="12345",
+        )
+        await router.handle_reply(reply)
+
+        # Gate used session status as authority → injection succeeded
+        mock_adapter.inject_reply.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_dedup_allows_after_resolution(
         self,
         session_manager: SessionManager,
