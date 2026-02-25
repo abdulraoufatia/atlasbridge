@@ -46,6 +46,8 @@ FROZEN_TOP_LEVEL = frozenset(
         "resume",
         "dashboard",
         "console",
+        "replay",
+        "risk",
     }
 )
 
