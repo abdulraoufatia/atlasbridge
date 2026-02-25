@@ -20,6 +20,10 @@ Commands:
   atlasbridge version            — show version and feature flags
   atlasbridge lab run <scenario> — Prompt Lab: run a QA scenario (dev/CI only)
   atlasbridge lab list           — Prompt Lab: list registered scenarios
+  atlasbridge policy explain     — Full policy explain (all rules, risk, alternatives)
+  atlasbridge risk assess        — Deterministic risk classification
+  atlasbridge replay session     — Replay a session with a policy
+  atlasbridge replay diff        — Compare two policies against a session
 """
 
 from __future__ import annotations
@@ -99,6 +103,8 @@ from atlasbridge.cli._enterprise import cloud_group, edition_cmd, features_cmd  
 from atlasbridge.cli._lab import lab_group  # noqa: E402
 from atlasbridge.cli._logs import logs_cmd  # noqa: E402
 from atlasbridge.cli._policy_cmd import policy_group  # noqa: E402
+from atlasbridge.cli._replay import replay_group  # noqa: E402
+from atlasbridge.cli._risk import risk_group  # noqa: E402
 from atlasbridge.cli._run import run_cmd  # noqa: E402
 from atlasbridge.cli._sessions import sessions_group  # noqa: E402
 from atlasbridge.cli._setup import setup_cmd  # noqa: E402
@@ -133,6 +139,8 @@ cli.add_command(resume_cmd)
 cli.add_command(lab_group)
 cli.add_command(dashboard_group)
 cli.add_command(console_cmd)
+cli.add_command(replay_group)
+cli.add_command(risk_group)
 
 
 # ---------------------------------------------------------------------------

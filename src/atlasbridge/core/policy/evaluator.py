@@ -38,6 +38,7 @@ from atlasbridge.core.policy.model import (
     RequireHumanAction,
     confidence_from_str,
 )
+from atlasbridge.core.risk import RiskClassifier, RiskInput
 
 if TYPE_CHECKING:
     from atlasbridge.core.policy.model_v1 import MatchCriteriaV1, PolicyRuleV1, PolicyV1
@@ -399,6 +400,36 @@ def _evaluate_rule_v1(
 # ---------------------------------------------------------------------------
 
 
+def _compute_risk(
+    prompt_type: str,
+    action_type: str,
+    confidence: str,
+    branch: str = "",
+    ci_status: str = "",
+    file_scope: str = "",
+    command_pattern: str = "",
+    environment: str = "",
+) -> tuple[int, str, list[dict]]:
+    """Compute risk assessment and return (score, category, factors_list)."""
+    assessment = RiskClassifier.classify(
+        RiskInput(
+            prompt_type=prompt_type,
+            action_type=action_type,
+            confidence=confidence,
+            branch=branch,
+            ci_status=ci_status,
+            file_scope=file_scope,
+            command_pattern=command_pattern,
+            environment=environment,
+        )
+    )
+    factors = [
+        {"name": f.name, "weight": f.weight, "description": f.description}
+        for f in assessment.factors
+    ]
+    return assessment.score, assessment.category.value, factors
+
+
 def evaluate(
     policy: Policy | PolicyV1,
     prompt_text: str,
@@ -411,11 +442,17 @@ def evaluate(
     session_tag: str = "",
     session_state: str = "",
     channel_message: bool = False,
+    branch: str = "",
+    ci_status: str = "",
+    file_scope: str = "",
+    command_pattern: str = "",
+    environment: str = "",
 ) -> PolicyDecision:
     """
     Evaluate the policy against a prompt event. First-match-wins.
 
     Dispatches to v0 or v1 evaluation based on the policy type.
+    Computes a deterministic risk assessment for every decision.
 
     Args:
         policy:       Validated Policy (v0) or PolicyV1 (v1) instance.
@@ -429,9 +466,14 @@ def evaluate(
         session_tag:  Session label (v1 only; used for session_tag rule matching).
         session_state: Current conversation state (v1 only; e.g. "idle", "running").
         channel_message: Whether message originated from a channel (v1 only).
+        branch:       Git branch name (for risk classification).
+        ci_status:    CI status: passing, failing, unknown, "" (for risk classification).
+        file_scope:   File sensitivity: general, config, infrastructure, secrets.
+        command_pattern: Command text for destructive pattern detection.
+        environment:  Runtime environment: dev, staging, production.
 
     Returns:
-        :class:`PolicyDecision` with matched rule, action, and explanation.
+        :class:`PolicyDecision` with matched rule, action, explanation, and risk assessment.
     """
     from atlasbridge.core.policy.model_v1 import PolicyV1
 
@@ -473,7 +515,23 @@ def evaluate(
                     r.lstrip("✓ ").lstrip("✗ ") for r in result.reasons if r.startswith("✓")
                 )
             )
-            logger.debug("policy_match", rule_id=rule.id, action=rule.action.type)
+            risk_score, risk_cat, risk_factors = _compute_risk(
+                prompt_type=prompt_type,
+                action_type=rule.action.type,
+                confidence=confidence,
+                branch=branch,
+                ci_status=ci_status,
+                file_scope=file_scope,
+                command_pattern=command_pattern,
+                environment=environment,
+            )
+            logger.debug(
+                "policy_match",
+                rule_id=rule.id,
+                action=rule.action.type,
+                risk_score=risk_score,
+                risk_category=risk_cat,
+            )
             return PolicyDecision(
                 prompt_id=prompt_id,
                 session_id=session_id,
@@ -484,6 +542,9 @@ def evaluate(
                 confidence=confidence,
                 prompt_type=prompt_type,
                 autonomy_mode=autonomy_mode,
+                risk_score=risk_score,
+                risk_category=risk_cat,
+                risk_factors=risk_factors,
             )
 
     # No rule matched — apply defaults
@@ -503,7 +564,17 @@ def evaluate(
             message="No policy rule matched — human input required"
         )
 
-    logger.debug("policy_no_match", fallback=fallback)
+    risk_score, risk_cat, risk_factors = _compute_risk(
+        prompt_type=prompt_type,
+        action_type=fallback_action.type,
+        confidence=confidence,
+        branch=branch,
+        ci_status=ci_status,
+        file_scope=file_scope,
+        command_pattern=command_pattern,
+        environment=environment,
+    )
+    logger.debug("policy_no_match", fallback=fallback, risk_score=risk_score)
     return PolicyDecision(
         prompt_id=prompt_id,
         session_id=session_id,
@@ -514,4 +585,7 @@ def evaluate(
         confidence=confidence,
         prompt_type=prompt_type,
         autonomy_mode=autonomy_mode,
+        risk_score=risk_score,
+        risk_category=risk_cat,
+        risk_factors=risk_factors,
     )
