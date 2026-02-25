@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.7] — 2026-02-25
+
+### Fixed
+- **"No active session" on Telegram reply** — conversation binding now created at dispatch time so the gate resolves the session on the very first reply to any prompt (#336, #339)
+- **Telegram polling conflict** — `atlasbridge run` now auto-stops any existing standalone daemon to prevent two processes competing for the Telegram long-poll (#339)
+- 7 new tests (2388 total)
+
+---
+
 ## [1.1.6] — 2026-02-25
 
 ### Added
@@ -651,6 +660,7 @@ AtlasBridge v1.0.0 is the first stable release. All 8 contract surfaces are froz
 ---
 
 [Unreleased]: https://github.com/abdulraoufatia/atlasbridge/compare/v1.1.6...HEAD
+[1.1.7]: https://github.com/abdulraoufatia/atlasbridge/compare/v1.1.6...v1.1.7
 [1.1.6]: https://github.com/abdulraoufatia/atlasbridge/compare/v1.1.5...v1.1.6
 [1.1.5]: https://github.com/abdulraoufatia/atlasbridge/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/abdulraoufatia/atlasbridge/compare/v1.1.3...v1.1.4
