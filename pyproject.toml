@@ -158,6 +158,7 @@ ignore = [
 "src/atlasbridge/dashboard/**/*.py" = ["ANN", "UP017"]
 "tests/console/**/*.py" = ["S101", "ANN", "E501"]
 "tests/policy/**/*.py" = ["S101", "ANN", "E501", "B017", "F841"]
+"scripts/**/*.py" = ["ANN", "E501", "S", "I", "UP"]
 
 [tool.mypy]
 python_version = "3.11"
