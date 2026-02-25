@@ -422,6 +422,7 @@ See [CHANGELOG.md](CHANGELOG.md) for full version history.
 | v0.9.8 | Released | Conversation UX v2 — interaction pipeline, ML classifier protocol, session binding, output router |
 | v0.9.9 | Released | Chat mode UX — per-plan escalation, folder trust detection, no more "arrow keys" messages |
 | v0.10.0 | Released | Full conversational agent mode — streaming state, plan detection, secret redaction |
+| v1.1.9 | Released | Version bump release |
 | v1.1.8 | Released | Fix "Agent is busy" rejection on valid Telegram replies, session status authority |
 | v1.1.7 | Released | Fix "No active session" Telegram reply bug, auto-stop daemon on `run` |
 | v1.1.6 | Released | GA core runtime — risk classification, policy explain, session replay, Telegram dedup |
