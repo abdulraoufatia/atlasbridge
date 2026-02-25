@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.1] — 2026-02-25
+
+### Fixed
+- **FOLDER_TRUST normalization** — ML-classified FOLDER_TRUST interactions now correctly normalize "yes" → "1" and "no" → "2", matching NUMBERED_CHOICE behavior. Previously, the normalization guard only checked for NUMBERED_CHOICE, so FOLDER_TRUST replies were injected raw (#342)
+- **Dashboard static path** — fixed `static.ts` dist path resolution to correctly find built assets (#342)
+- **Old repo name reference** — removed stale `atlasbridge-cli` reference in automation docs (#342)
+- **Favicon** — replaced Replit favicon with AtlasBridge brand favicon (#342)
+
+### Added
+- 2 new tests for FOLDER_TRUST normalization with mocked fuser (2413 total)
+
+---
+
 ## [1.2.0] — 2026-02-25
 
 ### Fixed

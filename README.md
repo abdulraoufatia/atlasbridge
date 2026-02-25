@@ -422,6 +422,7 @@ See [CHANGELOG.md](CHANGELOG.md) for full version history.
 | v0.9.8 | Released | Conversation UX v2 — interaction pipeline, ML classifier protocol, session binding, output router |
 | v0.9.9 | Released | Chat mode UX — per-plan escalation, folder trust detection, no more "arrow keys" messages |
 | v0.10.0 | Released | Full conversational agent mode — streaming state, plan detection, secret redaction |
+| v1.2.1 | Released | Fix FOLDER_TRUST normalization, dashboard path, favicon |
 | v1.2.0 | Released | Fix trust prompt reply semantics, choices fallback, expanded synonyms |
 | v1.1.9 | Released | Version bump release |
 | v1.1.8 | Released | Fix "Agent is busy" rejection on valid Telegram replies, session status authority |
