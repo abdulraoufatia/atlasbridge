@@ -72,6 +72,15 @@ AtlasBridge enforces singleton polling via an OS-level file lock. If a process c
 3. View logs: `atlasbridge logs --tail`
 4. Check the bot token is valid: re-run `atlasbridge setup --channel telegram`
 
+### Responding to workspace trust prompts from your phone
+
+When Claude Code (or another tool) asks to **trust this workspace**, AtlasBridge forwards the prompt to Telegram. You can respond in several ways:
+
+- **Reply with text:** `yes`, `y`, `1` (trust) or `no`, `n`, `2` (don’t trust / exit).
+- **Tap the inline buttons** (e.g. **1** or **2**) if the message shows them.
+
+The relay presents this as a **workspace trust confirmation** and strips terminal-only hints (e.g. “Enter to confirm”) so the message is phone-friendly. If you see “No active session” after replying, ensure you’re replying in the same chat where the prompt appeared and that the session is still running (`atlasbridge status`).
+
 ---
 
 ## Doctor Issues

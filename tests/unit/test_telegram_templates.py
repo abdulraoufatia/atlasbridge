@@ -92,7 +92,8 @@ class TestFormatPromptResponseInstructions:
         text = TelegramChannel._format_prompt(
             _event(PromptType.TYPE_MULTIPLE_CHOICE, choices=["a", "b"])
         )
-        assert "Tap a numbered option below" in text
+        assert "Reply" in text and ("1" in text or "2" in text)
+        assert "tap a button" in text
 
     def test_free_text_instruction(self) -> None:
         text = TelegramChannel._format_prompt(_event(PromptType.TYPE_FREE_TEXT))
