@@ -638,6 +638,81 @@ class TestSpamPrevention:
         assert s.session_id not in router._session_dispatch_counts
 
     @pytest.mark.asyncio
+    async def test_dispatch_creates_conversation_binding(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+    ) -> None:
+        """Dispatching a prompt binds the channel thread to the session."""
+        from atlasbridge.core.conversation.session_binding import (
+            ConversationRegistry,
+            ConversationState,
+        )
+
+        registry = ConversationRegistry()
+        s = _session()
+        session_manager.register(s)
+
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},
+            store=_mock_store(),
+            conversation_registry=registry,
+        )
+
+        event = _event(s.session_id)
+        await router.route_event(event)
+
+        # The binding should exist for the allowed identity's thread
+        binding = registry.get_binding("telegram", "12345")
+        assert binding is not None
+        assert binding.session_id == s.session_id
+        assert binding.state == ConversationState.AWAITING_INPUT
+
+    @pytest.mark.asyncio
+    async def test_dispatch_binding_allows_gate_pass(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+        mock_adapter: AsyncMock,
+    ) -> None:
+        """A free-text reply passes the gate after dispatch creates the binding."""
+        from atlasbridge.core.conversation.session_binding import ConversationRegistry
+
+        registry = ConversationRegistry()
+        s = _session()
+        session_manager.register(s)
+
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={s.session_id: mock_adapter},
+            store=_mock_store(),
+            conversation_registry=registry,
+        )
+
+        event = _event(s.session_id)
+        await router.route_event(event)
+
+        # Free-text reply (like typing "yes" in Telegram)
+        from datetime import datetime
+
+        reply = Reply(
+            prompt_id="",
+            session_id="",
+            value="y",
+            nonce="test-nonce",
+            channel_identity="telegram:12345",
+            timestamp=datetime.now(UTC).isoformat(),
+            thread_id="12345",
+        )
+        await router.handle_reply(reply)
+
+        # Should have been injected (gate passed, resolved to active prompt)
+        mock_adapter.inject_reply.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_dedup_allows_after_resolution(
         self,
         session_manager: SessionManager,

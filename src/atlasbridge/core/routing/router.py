@@ -206,6 +206,23 @@ class PromptRouter:
                         event.prompt_id, event.session_id, ch_name, ident, message_id or ""
                     )
 
+            # Bind conversation threads so the gate can resolve session on first reply.
+            # Without this, the first reply to a freshly-dispatched prompt has no
+            # conversation binding and the gate rejects with "No active session".
+            if self._conversation_registry is not None and hasattr(
+                self._channel, "get_allowed_identities"
+            ):
+                for ident in self._channel.get_allowed_identities():
+                    parts = ident.split(":", 1)
+                    if len(parts) == 2:
+                        ch_name_bind, thread_id = parts
+                        self._conversation_registry.bind(ch_name_bind, thread_id, event.session_id)
+                        self._conversation_registry.update_state(
+                            ch_name_bind,
+                            thread_id,
+                            ConversationState.AWAITING_INPUT,
+                        )
+
             # Store message_id for later editing (e.g. resolved, expired)
             session = self._sessions.get_or_none(event.session_id)
             if session:

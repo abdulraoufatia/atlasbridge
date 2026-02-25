@@ -147,6 +147,12 @@ async def _run_async(
 ) -> None:
     from atlasbridge.core.daemon.manager import DaemonManager
 
+    # Stop any existing daemon to prevent two processes competing for
+    # the Telegram long-poll.  ``atlasbridge run`` starts its own daemon
+    # internally, so a standalone daemon would silently intercept replies
+    # and reject them with "No active session".
+    _stop_existing_daemon()
+
     # Convert AtlasBridgeConfig to the dict format DaemonManager expects
     cfg_dict = _config_to_dict(
         tool=tool,
@@ -160,6 +166,47 @@ async def _run_async(
 
     manager = DaemonManager(cfg_dict)
     await manager.start()
+
+
+def _stop_existing_daemon() -> None:
+    """Stop an existing AtlasBridge daemon if one is running.
+
+    ``atlasbridge run`` includes its own daemon, so a standalone daemon
+    would compete for the Telegram long-poll and intercept replies meant
+    for the agent session.
+    """
+    import os
+    import signal
+    import time
+
+    from atlasbridge.cli._daemon import _pid_alive, _read_pid
+
+    pid = _read_pid()
+    if pid is None or not _pid_alive(pid):
+        return
+
+    # Don't kill ourselves
+    if pid == os.getpid():
+        return
+
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except (ProcessLookupError, PermissionError):
+        return
+
+    # Wait briefly for graceful shutdown
+    for _ in range(10):
+        time.sleep(0.2)
+        if not _pid_alive(pid):
+            console.print("[dim]Stopped existing daemon to avoid polling conflict.[/dim]")
+            return
+
+    # Force kill if still alive
+    try:
+        os.kill(pid, signal.SIGKILL)
+        console.print("[dim]Force-stopped existing daemon.[/dim]")
+    except (ProcessLookupError, PermissionError):
+        pass
 
 
 def _config_to_dict(
