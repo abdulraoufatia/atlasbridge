@@ -535,7 +535,8 @@ class TelegramChannel(BaseChannel):
                     choice = choice.replace("folder", "workspace")
                     lines.append(f"{i}. {choice or i}")
 
-            return f"<pre>{'\n'.join(lines)}</pre>"
+            joined = "\n".join(lines)
+            return f"<pre>{joined}</pre>"
 
         # Generic path: strip terminal-only hints but keep the raw question.
         clean_lines: list[str] = []
@@ -549,11 +550,11 @@ class TelegramChannel(BaseChannel):
             "use ↑/↓",
         )
         for line in excerpt.splitlines():
-            l = line.strip()
-            if not l:
+            stripped = line.strip()
+            if not stripped:
                 clean_lines.append(line)
                 continue
-            if any(phrase in l.lower() for phrase in terminal_phrases):
+            if any(phrase in stripped.lower() for phrase in terminal_phrases):
                 continue
             clean_lines.append(line)
 
