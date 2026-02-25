@@ -119,6 +119,11 @@ class PromptRouter:
         if len(timestamps) >= _FAILSAFE_MAX_DISPATCHES:
             log.warning("failsafe_routing_paused", dispatches_in_window=len(timestamps))
             self._session_dispatch_counts[event.session_id] = timestamps
+            if self._channel is not None:
+                await self._channel.notify(
+                    f"Rate limit: {len(timestamps)} prompts in 60s. Check console.",
+                    session_id=event.session_id,
+                )
             return
         timestamps.append(now)
         self._session_dispatch_counts[event.session_id] = timestamps
@@ -165,10 +170,41 @@ class PromptRouter:
 
         try:
             sm.transition(PromptStatus.ROUTED, "dispatching to channel")
+
+            # Delivery dedup: skip if already delivered (survives daemon restarts)
+            if self._store is not None and hasattr(self._store, "was_delivered"):
+                ch_name = getattr(self._channel, "channel_name", "unknown")
+                identities = (
+                    list(self._channel.get_allowed_identities())
+                    if hasattr(self._channel, "get_allowed_identities")
+                    else []
+                )
+                if identities and all(
+                    self._store.was_delivered(event.prompt_id, ch_name, ident)
+                    for ident in identities
+                ):
+                    log.info("prompt_already_delivered", prompt_id=event.prompt_id)
+                    sm.transition(PromptStatus.AWAITING_REPLY, "already delivered")
+                    self._sessions.mark_awaiting_reply(event.session_id, event.prompt_id)
+                    return
+
             message_id = await self._channel.send_prompt(event)
 
             sm.transition(PromptStatus.AWAITING_REPLY, "channel delivered prompt")
             self._sessions.mark_awaiting_reply(event.session_id, event.prompt_id)
+
+            # Record delivery for idempotent resend protection
+            if self._store is not None and hasattr(self._store, "record_delivery"):
+                ch_name = getattr(self._channel, "channel_name", "unknown")
+                identities = (
+                    list(self._channel.get_allowed_identities())
+                    if hasattr(self._channel, "get_allowed_identities")
+                    else []
+                )
+                for ident in identities:
+                    self._store.record_delivery(
+                        event.prompt_id, event.session_id, ch_name, ident, message_id or ""
+                    )
 
             # Store message_id for later editing (e.g. resolved, expired)
             session = self._sessions.get_or_none(event.session_id)
@@ -343,6 +379,12 @@ class PromptRouter:
                             session_id=sm.event.session_id,
                         )
 
+            # Send acknowledgement to channel
+            if self._channel is not None:
+                val_display = effective_reply.value[:40]
+                ack = f'Sent: "{val_display}"\nSession: {sm.event.session_id[:8]}'
+                await self._channel.notify(ack, session_id=sm.event.session_id)
+
             # Reset failsafe counter — successful reply means the prompt cycle completed
             self._session_dispatch_counts.pop(sm.event.session_id, None)
 
@@ -367,6 +409,11 @@ class PromptRouter:
         except Exception as exc:  # noqa: BLE001
             sm.transition(PromptStatus.FAILED, str(exc))
             log.error("reply_injection_failed", error=str(exc))
+            if self._channel is not None:
+                await self._channel.notify(
+                    "Reply failed. Try again.",
+                    session_id=sm.event.session_id,
+                )
 
     def _evaluate_gate(self, reply: Reply) -> GateDecision | None:
         """Build a GateContext and evaluate the channel message gate.

@@ -249,6 +249,52 @@ class Database:
         ).fetchall()
 
     # ------------------------------------------------------------------
+    # Delivery tracking
+    # ------------------------------------------------------------------
+
+    def record_delivery(
+        self,
+        prompt_id: str,
+        session_id: str,
+        channel: str,
+        channel_identity: str,
+        message_id: str = "",
+    ) -> bool:
+        """Record that a prompt was delivered to a channel identity.
+
+        Returns True if newly recorded, False if already delivered (duplicate).
+        Uses INSERT OR IGNORE on the UNIQUE(prompt_id, channel, channel_identity)
+        constraint as the idempotency guard.
+        """
+        cur = self._db.execute(
+            """
+            INSERT OR IGNORE INTO prompt_deliveries
+                (prompt_id, session_id, channel, channel_identity, message_id)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (prompt_id, session_id, channel, channel_identity, message_id),
+        )
+        self._db.commit()
+        return cur.rowcount == 1
+
+    def was_delivered(
+        self,
+        prompt_id: str,
+        channel: str,
+        channel_identity: str,
+    ) -> bool:
+        """Check if a prompt was already delivered to this channel+identity."""
+        row = self._db.execute(
+            """
+            SELECT 1 FROM prompt_deliveries
+             WHERE prompt_id = ? AND channel = ? AND channel_identity = ?
+             LIMIT 1
+            """,
+            (prompt_id, channel, channel_identity),
+        ).fetchone()
+        return row is not None
+
+    # ------------------------------------------------------------------
     # Audit log
     # ------------------------------------------------------------------
 

@@ -182,3 +182,120 @@ class TestBuildKeyboard:
         event = _event(PromptType.TYPE_FREE_TEXT)
         kb = ch._build_keyboard(event)
         assert kb == []
+
+
+class TestCallbackDataSizing:
+    """All generated callback_data must fit in Telegram's 64-byte limit."""
+
+    def test_yes_no_within_64_bytes(self) -> None:
+        ch = _channel()
+        event = _event(PromptType.TYPE_YES_NO)
+        kb = ch._build_keyboard(event)
+        for btn in kb[0]:
+            assert len(btn["callback_data"].encode()) <= 64
+
+    def test_confirm_enter_within_64_bytes(self) -> None:
+        ch = _channel()
+        event = _event(PromptType.TYPE_CONFIRM_ENTER)
+        kb = ch._build_keyboard(event)
+        for btn in kb[0]:
+            assert len(btn["callback_data"].encode()) <= 64
+
+    def test_multiple_choice_within_64_bytes(self) -> None:
+        ch = _channel()
+        event = _event(PromptType.TYPE_MULTIPLE_CHOICE, choices=["A", "B", "C", "D"])
+        kb = ch._build_keyboard(event)
+        for btn in kb[0]:
+            assert len(btn["callback_data"].encode()) <= 64
+
+
+class TestCallbackRefFallback:
+    """When full callback data exceeds 64 bytes, ref format is used."""
+
+    def test_ref_format_used_when_too_long(self) -> None:
+        ch = _channel()
+        # Use a very long session_id to force ref fallback
+        event = _event(PromptType.TYPE_YES_NO)
+        event.session_id = "a" * 80  # Much longer than normal UUID
+        kb = ch._build_keyboard(event)
+        # At least one button should use ref: format
+        data_values = [btn["callback_data"] for btn in kb[0]]
+        assert any(d.startswith("ref:") for d in data_values)
+
+    def test_ref_roundtrip(self) -> None:
+        ch = _channel()
+        pid = "abcdef1234567890abcdef12"
+        sid = "12345678-1234-1234-1234-123456789abc"
+        nonce = "deadbeef01234567"
+        value = "y"
+
+        data = ch._make_callback_data(pid, sid, nonce, value)
+
+        # Parse the callback data back
+        if data.startswith("ref:"):
+            parts = data.split(":", 2)
+            assert len(parts) == 3
+            ref_key = parts[1]
+            parsed_value = parts[2]
+            assert parsed_value == value
+            ref = ch._callback_refs.get(ref_key)
+            assert ref is not None
+            ref_data, _ = ref
+            assert ref_data["prompt_id"] == pid
+            assert ref_data["session_id"] == sid
+            assert ref_data["nonce"] == nonce
+        else:
+            # Full format — verify it parses
+            assert data.startswith("ans:")
+            _, parsed_pid, parsed_sid, parsed_nonce, parsed_value = data.split(":", 4)
+            assert parsed_pid == pid
+            assert parsed_sid == sid
+            assert parsed_nonce == nonce
+            assert parsed_value == value
+
+    def test_ref_within_64_bytes(self) -> None:
+        ch = _channel()
+        # Force ref format with long IDs
+        data = ch._make_callback_data("a" * 30, "b" * 40, "c" * 20, "y")
+        assert len(data.encode()) <= 64
+
+
+class TestReplyAliases:
+    """Common reply aliases are normalized before creating Reply."""
+
+    def test_yes_normalizes_to_y(self) -> None:
+        from atlasbridge.channels.telegram.channel import _REPLY_ALIASES
+
+        assert _REPLY_ALIASES["yes"] == "y"
+
+    def test_nope_normalizes_to_n(self) -> None:
+        from atlasbridge.channels.telegram.channel import _REPLY_ALIASES
+
+        assert _REPLY_ALIASES["nope"] == "n"
+
+    def test_yeah_normalizes_to_y(self) -> None:
+        from atlasbridge.channels.telegram.channel import _REPLY_ALIASES
+
+        assert _REPLY_ALIASES["yeah"] == "y"
+
+    def test_nah_normalizes_to_n(self) -> None:
+        from atlasbridge.channels.telegram.channel import _REPLY_ALIASES
+
+        assert _REPLY_ALIASES["nah"] == "n"
+
+    def test_non_alias_not_in_map(self) -> None:
+        from atlasbridge.channels.telegram.channel import _REPLY_ALIASES
+
+        assert "maybe" not in _REPLY_ALIASES
+
+
+class TestGetAllowedIdentities:
+    def test_returns_formatted_identities(self) -> None:
+        ch = _channel()
+        ids = ch.get_allowed_identities()
+        assert ids == ["telegram:12345"]
+
+    def test_multiple_users(self) -> None:
+        ch = TelegramChannel(bot_token=_VALID_TOKEN, allowed_user_ids=[999, 111, 555])
+        ids = ch.get_allowed_identities()
+        assert ids == ["telegram:111", "telegram:555", "telegram:999"]

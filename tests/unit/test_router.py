@@ -18,6 +18,14 @@ def _session(tool: str = "claude") -> Session:
     return Session(session_id=str(uuid.uuid4()), tool=tool)
 
 
+def _mock_store() -> MagicMock:
+    """Create a store mock with delivery tracking methods properly configured."""
+    store = MagicMock()
+    store.was_delivered.return_value = False
+    store.record_delivery.return_value = True
+    return store
+
+
 def _event(
     session_id: str,
     confidence: Confidence = Confidence.HIGH,
@@ -55,6 +63,9 @@ def mock_channel() -> AsyncMock:
     channel.send_prompt.return_value = "msg-100"
     # is_allowed is a sync method — use MagicMock so it doesn't return a coroutine
     channel.is_allowed = MagicMock(return_value=True)
+    # get_allowed_identities is sync — use MagicMock
+    channel.get_allowed_identities = MagicMock(return_value=["telegram:12345"])
+    channel.channel_name = "telegram"
     return channel
 
 
@@ -76,7 +87,7 @@ def router(session_manager: SessionManager, mock_channel: AsyncMock) -> PromptRo
         session_manager=session_manager,
         channel=mock_channel,
         adapter_map={},
-        store=MagicMock(),
+        store=_mock_store(),
     )
 
 
@@ -239,7 +250,7 @@ class TestInteractionEngineIntegration:
             session_manager=session_manager,
             channel=mock_channel,
             adapter_map={},
-            store=MagicMock(),
+            store=_mock_store(),
             interaction_engine=mock_engine,
         )
 
@@ -273,7 +284,7 @@ class TestInteractionEngineIntegration:
             session_manager=session_manager,
             channel=mock_channel,
             adapter_map={},
-            store=MagicMock(),
+            store=_mock_store(),
             interaction_engine=mock_engine,
         )
 
@@ -306,7 +317,7 @@ class TestInteractionEngineIntegration:
             session_manager=session_manager,
             channel=mock_channel,
             adapter_map={},
-            store=MagicMock(),
+            store=_mock_store(),
             interaction_engine=mock_engine,
         )
 
@@ -339,7 +350,7 @@ class TestChatModeHandler:
             session_manager=session_manager,
             channel=mock_channel,
             adapter_map={},
-            store=MagicMock(),
+            store=_mock_store(),
             chat_mode_handler=chat_handler,
         )
 
@@ -373,7 +384,7 @@ class TestChatModeHandler:
             session_manager=session_manager,
             channel=mock_channel,
             adapter_map={session.session_id: mock_adapter},
-            store=MagicMock(),
+            store=_mock_store(),
             chat_mode_handler=chat_handler,
         )
 
@@ -458,7 +469,7 @@ class TestPlanResponse:
             session_manager=session_manager,
             channel=mock_channel,
             adapter_map={},
-            store=MagicMock(),
+            store=_mock_store(),
         )
         s = _session()
         session_manager.register(s)
@@ -476,7 +487,7 @@ class TestPlanResponse:
             session_manager=session_manager,
             channel=mock_channel,
             adapter_map={},
-            store=MagicMock(),
+            store=_mock_store(),
         )
         s = _session()
         session_manager.register(s)
@@ -495,7 +506,7 @@ class TestPlanResponse:
             session_manager=session_manager,
             channel=mock_channel,
             adapter_map={},
-            store=MagicMock(),
+            store=_mock_store(),
             chat_mode_handler=chat_handler,
         )
         s = _session()
@@ -516,7 +527,7 @@ class TestPlanResponse:
             session_manager=session_manager,
             channel=mock_channel,
             adapter_map={},
-            store=MagicMock(),
+            store=_mock_store(),
         )
         s = _session()
         session_manager.register(s)
@@ -608,7 +619,7 @@ class TestSpamPrevention:
             session_manager=session_manager,
             channel=mock_channel,
             adapter_map={s.session_id: mock_adapter},
-            store=MagicMock(),
+            store=_mock_store(),
         )
 
         # Dispatch 3 events
@@ -641,7 +652,7 @@ class TestSpamPrevention:
             session_manager=session_manager,
             channel=mock_channel,
             adapter_map={s.session_id: mock_adapter},
-            store=MagicMock(),
+            store=_mock_store(),
         )
 
         # First event
