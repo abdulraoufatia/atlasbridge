@@ -110,8 +110,10 @@ class InteractionEngine:
         plan = build_plan(ic)
 
         # Normalize reply for binary semantic menus (e.g., "yes" → "1")
+        # FOLDER_TRUST is an ML-only refinement of NUMBERED_CHOICE — same
+        # underlying prompt structure (numbered options), same normalization.
         injection_value = reply.value
-        if ic == InteractionClass.NUMBERED_CHOICE:
+        if ic in (InteractionClass.NUMBERED_CHOICE, InteractionClass.FOLDER_TRUST):
             menu = detect_binary_menu(event.excerpt)
             if menu is None and event.choices:
                 menu = build_binary_menu_from_choices(event.choices)
