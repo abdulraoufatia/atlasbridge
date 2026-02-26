@@ -13,6 +13,7 @@ import {
   ArrowUpRight, ArrowDownRight, Minus, Lightbulb,
   CheckCircle, XCircle, ChevronRight, Zap, Target, Eye, FileCheck
 } from "lucide-react";
+import { OperatorPanel } from "@/components/operator-panel";
 
 function AnimatedRing({ value, max, size = 64, stroke = 5, color = "hsl(var(--primary))", trackColor = "hsl(var(--muted))", label, animate = true }: {
   value: number; max: number; size?: number; stroke?: number; color?: string; trackColor?: string; label?: string; animate?: boolean;
@@ -500,6 +501,8 @@ export default function OverviewPage() {
           </CardContent>
         </Card>
       </div>
+
+      <OperatorPanel currentMode={data.autonomyMode} />
     </div>
   );
 }

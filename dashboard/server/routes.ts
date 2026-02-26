@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { registerOperatorRoutes } from "./routes/operator";
 import { WebSocketServer, WebSocket } from "ws";
 import { repo } from "./atlasbridge-repo";
 import { storage } from "./storage";
@@ -561,6 +562,11 @@ export async function registerRoutes(
     const bundle = generateEvidenceJSON();
     res.json(bundle.integrityReport);
   });
+
+  // ---------------------------------------------------------------------------
+  // Operator write actions (kill switch, autonomy mode, audit log)
+  // ---------------------------------------------------------------------------
+  registerOperatorRoutes(app);
 
   return httpServer;
 }

@@ -114,9 +114,48 @@ dashboardSqlite.exec(`
     categories TEXT NOT NULL,
     suggestions TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS operator_audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+    method TEXT NOT NULL,
+    path TEXT NOT NULL,
+    action TEXT NOT NULL,
+    body TEXT NOT NULL DEFAULT '{}',
+    result TEXT NOT NULL DEFAULT 'ok',
+    error TEXT
+  );
 `);
 
 export const db = drizzle(dashboardSqlite, { schema });
+
+export function insertOperatorAuditLog(entry: {
+  method: string;
+  path: string;
+  action: string;
+  body: Record<string, unknown>;
+  result: "ok" | "error";
+  error?: string;
+}): void {
+  dashboardSqlite
+    .prepare(
+      `INSERT INTO operator_audit_log (method, path, action, body, result, error)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      entry.method,
+      entry.path,
+      entry.action,
+      JSON.stringify(entry.body),
+      entry.result,
+      entry.error ?? null,
+    );
+}
+
+export function queryOperatorAuditLog(limit = 100): unknown[] {
+  return dashboardSqlite
+    .prepare(`SELECT * FROM operator_audit_log ORDER BY id DESC LIMIT ?`)
+    .all(limit);
+}
 
 // AtlasBridge operational DB (read-only) — sessions, prompts, audit
 let _abDb: Database.Database | null = null;
