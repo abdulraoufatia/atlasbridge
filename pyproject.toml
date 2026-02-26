@@ -190,6 +190,9 @@ module = [
     "atlasbridge.cli._debug",
     "atlasbridge.cli._autopilot",
     "atlasbridge.cli._chat",
+    "atlasbridge.cli._workspace",
+    "atlasbridge.cli._providers",
+    "atlasbridge.cli._session_control",
 ]
 disallow_untyped_defs = false
 disallow_incomplete_defs = false

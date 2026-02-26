@@ -108,6 +108,7 @@ from atlasbridge.cli._lab import lab_group  # noqa: E402
 from atlasbridge.cli._logs import logs_cmd  # noqa: E402
 from atlasbridge.cli._policy_cmd import policy_group  # noqa: E402
 from atlasbridge.cli._profile import profile_group  # noqa: E402
+from atlasbridge.cli._providers import providers_group  # noqa: E402
 from atlasbridge.cli._replay import replay_group  # noqa: E402
 from atlasbridge.cli._risk import risk_group  # noqa: E402
 from atlasbridge.cli._run import run_cmd  # noqa: E402
@@ -116,6 +117,7 @@ from atlasbridge.cli._setup import setup_cmd  # noqa: E402
 from atlasbridge.cli._status import status_cmd  # noqa: E402
 from atlasbridge.cli._trace_cmd import trace_group  # noqa: E402
 from atlasbridge.cli._version import version_cmd  # noqa: E402
+from atlasbridge.cli._workspace import workspace_group  # noqa: E402
 
 cli.add_command(setup_cmd)
 cli.add_command(start_cmd)
@@ -143,6 +145,8 @@ cli.add_command(console_cmd)
 cli.add_command(replay_group)
 cli.add_command(risk_group)
 cli.add_command(chat_cmd)
+cli.add_command(workspace_group)
+cli.add_command(providers_group)
 
 
 # ---------------------------------------------------------------------------

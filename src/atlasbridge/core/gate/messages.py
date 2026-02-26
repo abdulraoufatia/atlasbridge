@@ -17,13 +17,19 @@ _ACCEPT_MESSAGES: dict[AcceptType, str] = {
 
 # Reject headline messages — short, phone-readable.
 _REJECT_HEADLINES: dict[GateRejectReason, str] = {
-    GateRejectReason.REJECT_BUSY_STREAMING: ("\u23f3 Agent is working. Message not sent."),
-    GateRejectReason.REJECT_BUSY_RUNNING: ("\u23f3 Agent is busy. Message not sent."),
-    GateRejectReason.REJECT_NO_ACTIVE_SESSION: ("No active session. Message not sent."),
-    GateRejectReason.REJECT_NOT_AWAITING_INPUT: (
-        "Agent is not waiting for input. Message not sent."
+    GateRejectReason.REJECT_BUSY_STREAMING: (
+        "\u23f3 Queued \u2014 I\u2019ll respond after the current step completes."
     ),
-    GateRejectReason.REJECT_TTL_EXPIRED: ("This prompt has expired. Message not sent."),
+    GateRejectReason.REJECT_BUSY_RUNNING: (
+        "\u23f3 Queued \u2014 I\u2019ll respond after the current step completes."
+    ),
+    GateRejectReason.REJECT_NO_ACTIVE_SESSION: ("No active session. Start one from the dashboard."),
+    GateRejectReason.REJECT_NOT_AWAITING_INPUT: (
+        "\u23f3 Queued \u2014 I\u2019ll respond after the current step completes."
+    ),
+    GateRejectReason.REJECT_TTL_EXPIRED: (
+        "This prompt has expired. It may have already been answered."
+    ),
     GateRejectReason.REJECT_POLICY_DENY: ("Policy does not allow this action. Message not sent."),
     GateRejectReason.REJECT_IDENTITY_NOT_ALLOWLISTED: ("You are not authorized for this session."),
     GateRejectReason.REJECT_INVALID_CHOICE: ("Invalid response. Message not sent."),
@@ -35,12 +41,10 @@ _REJECT_HEADLINES: dict[GateRejectReason, str] = {
 
 # Next-action copy — brief, actionable.
 _REJECT_NEXT_ACTIONS: dict[GateRejectReason, str] = {
-    GateRejectReason.REJECT_BUSY_STREAMING: (
-        "Wait for the current operation to finish, then try again."
-    ),
-    GateRejectReason.REJECT_BUSY_RUNNING: ("Wait for the agent to finish or request input."),
-    GateRejectReason.REJECT_NO_ACTIVE_SESSION: ("Start a session first: atlasbridge run claude"),
-    GateRejectReason.REJECT_NOT_AWAITING_INPUT: ("Wait for a prompt to appear."),
+    GateRejectReason.REJECT_BUSY_STREAMING: "",
+    GateRejectReason.REJECT_BUSY_RUNNING: "",
+    GateRejectReason.REJECT_NO_ACTIVE_SESSION: ("Open the dashboard to start a new session."),
+    GateRejectReason.REJECT_NOT_AWAITING_INPUT: "",
     GateRejectReason.REJECT_TTL_EXPIRED: ("A new prompt will appear if the agent needs input."),
     GateRejectReason.REJECT_POLICY_DENY: (
         "Check your policy configuration or contact the operator."

@@ -96,6 +96,10 @@ class TelegramChannel(BaseChannel):
         # Server-side callback reference store (Telegram limits callback_data to 64 bytes)
         self._callback_refs: dict[str, tuple[dict[str, str], float]] = {}
         self._callback_seq: int = 0
+        # In-memory message dedup: bounded set of recently processed message_ids
+        # Prevents double-handling of retried/duplicate Telegram messages.
+        self._seen_message_ids: set[int] = set()
+        self._seen_message_ids_max = 2000  # Keep last N IDs to bound memory
 
     async def start(self) -> None:
         try:
@@ -413,9 +417,23 @@ class TelegramChannel(BaseChannel):
         user_id = msg.get("from", {}).get("id")
         chat_id = msg.get("chat", {}).get("id")
         text = msg.get("text", "").strip()
+        message_id: int | None = msg.get("message_id")
 
         if not text:
             return
+
+        # Idempotency: skip messages we have already processed.
+        if message_id is not None:
+            if message_id in self._seen_message_ids:
+                logger.debug("telegram_message_deduplicated", message_id=message_id)
+                return
+            self._seen_message_ids.add(message_id)
+            # Bound the set to avoid unbounded memory growth
+            if len(self._seen_message_ids) > self._seen_message_ids_max:
+                # Drop the smallest IDs (oldest messages)
+                excess = len(self._seen_message_ids) - self._seen_message_ids_max
+                for old_id in sorted(self._seen_message_ids)[:excess]:
+                    self._seen_message_ids.discard(old_id)
 
         if text.startswith("/"):
             if not self.is_allowed(f"telegram:{user_id}"):
@@ -433,7 +451,7 @@ class TelegramChannel(BaseChannel):
         if not self.is_allowed(f"telegram:{user_id}"):
             return
 
-        # Free-text reply: nonce is derived from message_id for idempotency
+        # Use message_id as the nonce seed when available for cross-restart idempotency
         nonce = secrets.token_hex(8)
         reply = Reply(
             prompt_id="",  # Router resolves the active prompt for this session

@@ -412,13 +412,20 @@ class TestBoundaryMessageTemplates:
             assert reason in _REJECT_NEXT_ACTIONS, f"Missing next action for {reason.name}"
 
     @pytest.mark.safety
-    def test_no_active_session_message_includes_start_command(self) -> None:
-        """The 'no active session' boundary message must tell users how to start."""
-        from atlasbridge.core.gate.engine import GateRejectReason
-        from atlasbridge.core.gate.messages import _REJECT_NEXT_ACTIONS
+    def test_no_active_session_message_includes_start_guidance(self) -> None:
+        """The 'no active session' boundary message must tell users how to start.
 
+        Updated for dashboard-first UX: users start sessions from the dashboard,
+        not via CLI command from the channel.
+        """
+        from atlasbridge.core.gate.engine import GateRejectReason
+        from atlasbridge.core.gate.messages import _REJECT_HEADLINES, _REJECT_NEXT_ACTIONS
+
+        # Either the headline or the next_action must guide users to start a session
+        headline = _REJECT_HEADLINES[GateRejectReason.REJECT_NO_ACTIVE_SESSION]
         action = _REJECT_NEXT_ACTIONS[GateRejectReason.REJECT_NO_ACTIVE_SESSION]
-        assert "atlasbridge run" in action
+        combined = headline + " " + action
+        assert "dashboard" in combined.lower() or "start" in combined.lower()
 
     @pytest.mark.safety
     def test_boundary_messages_have_no_button_references(self) -> None:
