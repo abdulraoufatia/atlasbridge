@@ -118,20 +118,15 @@ Avoid ultra-light weights (100, 200). Minimum weight is 400 for body text.
 |------|---------|
 | 16x16 | Browser tab |
 | 32x32 | Browser tab (HiDPI) |
-| 48x48 | Taskbar / bookmarks |
 | 180x180 | Apple Touch Icon |
-| 512x512 | PWA / social sharing |
 
 ### Asset Locations
 
 ```
-assets/brand/
-  logo/         # Full wordmark (placeholder until designed)
-  icon/         # Icon-only mark (placeholder until designed)
-  favicon/      # Generated favicon set
+assets/
+  logo/         # Banner and logo files
+  favicon/      # Favicon set for dashboard
 ```
-
-To replace placeholders: drop final artwork into `assets/brand/icon/` and run the favicon generation script (see `assets/brand/README.md`).
 
 ---
 

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/brand/logo/banner.png" alt="AtlasBridge — Controlled Autonomy for AI Agents" width="100%">
+  <img src="assets/logo/banner.png" alt="AtlasBridge — Controlled Autonomy for AI Agents" width="100%">
 </p>
 
 > **v1.1 — Local Governance Runtime for AI CLI Agents**
