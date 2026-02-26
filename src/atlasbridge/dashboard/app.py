@@ -231,6 +231,8 @@ def create_app(
 
     templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
     templates.env.filters["timeago"] = _timeago
+    templates.env.globals["edition"] = edition.value
+    templates.env.globals["authority_mode"] = authority_mode.value
     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
     repo = DashboardRepo(db_path, trace_path)

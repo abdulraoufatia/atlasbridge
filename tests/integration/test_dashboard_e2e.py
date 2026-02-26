@@ -151,7 +151,7 @@ class TestDashboardE2EServer:
     def test_home_returns_200(self, e2e_server):
         resp = httpx.get(f"{e2e_server}/", timeout=5.0)
         assert resp.status_code == 200
-        assert "READ-ONLY GOVERNANCE VIEW" in resp.text
+        assert "READ-ONLY" in resp.text
 
     def test_api_stats_returns_json(self, e2e_server):
         resp = httpx.get(f"{e2e_server}/api/stats", timeout=5.0)

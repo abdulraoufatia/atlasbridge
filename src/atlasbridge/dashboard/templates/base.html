@@ -11,7 +11,11 @@
 </head>
 <body>
     <header>
-        <div class="banner">READ-ONLY GOVERNANCE VIEW &mdash; LOCAL EXECUTION ONLY</div>
+        <div class="banner">
+            <span class="badge badge-readonly">READ-ONLY</span>
+            <span class="badge badge-local">LOCAL ONLY</span>
+            <span class="badge badge-edition badge-edition-{{ edition }}">{{ edition|upper }}</span>
+        </div>
         <nav>
             <a href="/" class="brand">AtlasBridge</a>
             <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation">&#9776;</button>
@@ -20,6 +24,9 @@
                 <a href="/traces">Traces</a>
                 <a href="/integrity">Integrity</a>
                 <a href="/settings">Settings</a>
+                {% if edition == "enterprise" %}
+                <a href="/enterprise/settings">Enterprise Settings</a>
+                {% endif %}
                 <button id="theme-toggle" class="nav-btn" title="Toggle light/dark theme">Theme</button>
             </div>
         </nav>

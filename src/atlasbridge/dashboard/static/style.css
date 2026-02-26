@@ -78,6 +78,44 @@ body {
     font-weight: 600;
     letter-spacing: 0.1em;
     color: var(--ab-warning);
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.badge-readonly {
+    background: rgba(30, 126, 52, 0.15);
+    color: var(--ab-success);
+    border: 1px solid var(--ab-success);
+}
+
+.badge-local {
+    background: rgba(31, 138, 140, 0.15);
+    color: var(--ab-accent);
+    border: 1px solid var(--ab-accent);
+}
+
+.badge-edition {
+    border: 1px solid var(--ab-warning);
+    color: var(--ab-warning);
+    background: rgba(199, 125, 0, 0.15);
+}
+
+.badge-edition-enterprise {
+    border-color: var(--ab-accent);
+    color: var(--ab-accent);
+    background: rgba(31, 138, 140, 0.15);
 }
 
 /* ----------------------------------------------------------------

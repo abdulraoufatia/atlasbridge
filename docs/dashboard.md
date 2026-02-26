@@ -9,9 +9,6 @@ AtlasBridge ships a **local, read-only governance dashboard** for viewing sessio
 ## Quick Start
 
 ```bash
-# Install dashboard dependencies (if not already)
-pip install 'atlasbridge[dashboard]'
-
 # Start the dashboard (opens browser automatically)
 atlasbridge dashboard start
 
@@ -25,7 +22,55 @@ atlasbridge dashboard status
 atlasbridge dashboard start --port 9090
 ```
 
-The dashboard binds to `127.0.0.1:8787` by default — only accessible from your local machine.
+The dashboard binds to `127.0.0.1:3737` by default — only accessible from your local machine.
+
+---
+
+## Dashboard Editions
+
+The dashboard supports two editions: **Core** and **Enterprise**.
+
+| Feature | Core | Enterprise |
+|---------|------|------------|
+| Sessions, prompts, traces | Yes | Yes |
+| Integrity verification | Yes | Yes |
+| Session export (JSON/HTML) | Yes | Yes |
+| Settings view | Yes | Yes |
+| Edition badge in header | CORE | ENTERPRISE |
+| Enterprise Settings page | No | Yes |
+| Extended capability views | No | Yes |
+
+Both editions show invariant badges (**READ-ONLY**, **LOCAL ONLY**) on every page.
+
+### Selecting an edition
+
+Edition is resolved in order: CLI flag > environment variable > default (`core`).
+
+```bash
+# Explicit edition via CLI flag
+atlasbridge dashboard start --edition enterprise
+
+# Via environment variable
+export ATLASBRIDGE_EDITION=enterprise
+atlasbridge dashboard start
+
+# Default (core) — no flag needed
+atlasbridge dashboard start
+```
+
+### What changes between editions
+
+**Core** is the default. The dashboard shows sessions, prompts, decision traces, integrity checks, and settings. No enterprise-specific language or navigation appears.
+
+**Enterprise** adds an Enterprise Settings page (`/enterprise/settings`) and shows the enterprise navigation link. Enterprise routes are gated by the capability registry — requesting `/enterprise/settings` on a core edition dashboard returns a 404 JSON response.
+
+### Runtime capabilities API
+
+The dashboard exposes a `/runtime/capabilities` endpoint that returns the current edition, authority mode, and which capabilities are enabled:
+
+```bash
+curl http://localhost:3737/runtime/capabilities | python3 -m json.tool
+```
 
 ---
 
@@ -37,27 +82,27 @@ The safest way to access the dashboard from another device (phone, tablet, lapto
 
 ```bash
 # On the remote machine (your laptop, phone via Termux, etc.):
-ssh -L 8787:localhost:8787 user@your-server
+ssh -L 3737:localhost:3737 user@your-server
 
-# Then open http://localhost:8787 in your browser
+# Then open http://localhost:3737 in your browser
 ```
 
 ### Persistent tunnel
 
 ```bash
 # Background tunnel that reconnects automatically:
-ssh -f -N -L 8787:localhost:8787 user@your-server
+ssh -f -N -L 8787:localhost:3737 user@your-server
 ```
 
 ### From an iPad / mobile
 
 Use an SSH client app (e.g., Termius, Blink Shell) to set up a local port forward:
 
-- **Local port:** 8787
+- **Local port:** 3737
 - **Remote host:** localhost
-- **Remote port:** 8787
+- **Remote port:** 3737
 
-Then open `http://localhost:8787` in the mobile browser.
+Then open `http://localhost:3737` in the mobile browser.
 
 ---
 
@@ -84,7 +129,7 @@ server {
     auth_basic_user_file /etc/nginx/.htpasswd;
 
     location / {
-        proxy_pass http://127.0.0.1:8787;
+        proxy_pass http://127.0.0.1:3737;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
     }
@@ -106,7 +151,7 @@ dashboard.internal {
     basicauth {
         admin $2a$14$... # bcrypt hash from `caddy hash-password`
     }
-    reverse_proxy 127.0.0.1:8787
+    reverse_proxy 127.0.0.1:3737
 }
 ```
 
@@ -118,7 +163,7 @@ caddy hash-password
 
 ### Binding to Non-Loopback Addresses
 
-By default, AtlasBridge refuses to bind to non-loopback addresses. If your reverse proxy runs on the same machine, you don't need to change this — proxy to `127.0.0.1:8787`.
+By default, AtlasBridge refuses to bind to non-loopback addresses. If your reverse proxy runs on the same machine, you don't need to change this — proxy to `127.0.0.1:3737`.
 
 If you must bind to all interfaces (e.g., Docker networking):
 
@@ -155,7 +200,7 @@ atlasbridge dashboard export --session sess-001 --format html --output report.ht
 While the dashboard is running, you can also fetch the export via HTTP:
 
 ```bash
-curl http://localhost:8787/api/sessions/sess-001/export | python3 -m json.tool
+curl http://localhost:3737/api/sessions/sess-001/export | python3 -m json.tool
 ```
 
 ### What's Included
@@ -205,7 +250,7 @@ For mobile access, use an SSH tunnel (see above) — this keeps the dashboard se
 
 ```bash
 # Check what's using port 8787
-lsof -i :8787
+lsof -i :3737
 
 # Use a different port
 atlasbridge dashboard start --port 9090
@@ -232,7 +277,7 @@ atlasbridge run claude
 Verify the dashboard is running on the remote machine:
 
 ```bash
-ssh user@your-server "curl -s http://localhost:8787/api/stats"
+ssh user@your-server "curl -s http://localhost:3737/api/stats"
 ```
 
 If that returns JSON, the dashboard is running. Check your SSH tunnel configuration.

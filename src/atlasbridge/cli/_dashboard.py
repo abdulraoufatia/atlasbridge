@@ -245,6 +245,12 @@ def _start_legacy_dashboard(
     help="Do not open browser automatically",
 )
 @click.option(
+    "--edition",
+    type=click.Choice(["core", "enterprise"], case_sensitive=False),
+    default=None,
+    help="Dashboard edition (default: core). Enterprise adds extended views.",
+)
+@click.option(
     "--legacy",
     is_flag=True,
     default=False,
@@ -258,10 +264,21 @@ def _start_legacy_dashboard(
     help="Allow binding to non-loopback addresses (DANGEROUS)",
 )
 def dashboard_start(
-    host: str, port: int, no_browser: bool, legacy: bool, i_understand_risk: bool
+    host: str,
+    port: int,
+    no_browser: bool,
+    edition: str | None,
+    legacy: bool,
+    i_understand_risk: bool,
 ) -> None:
     """Start the local dashboard server."""
     from atlasbridge.dashboard.sanitize import is_loopback
+
+    # Edition resolution: CLI flag > env var > default ("core")
+    if edition is not None:
+        os.environ["ATLASBRIDGE_EDITION"] = edition
+    elif not os.environ.get("ATLASBRIDGE_EDITION"):
+        os.environ["ATLASBRIDGE_EDITION"] = "core"
 
     if not is_loopback(host) and not i_understand_risk:
         click.echo(

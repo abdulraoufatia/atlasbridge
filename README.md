@@ -361,24 +361,24 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history, or [GitHub Releas
 
 ---
 
-## Editions (Experimental)
+## Editions
 
-AtlasBridge follows an **open-source** model (MIT license):
+AtlasBridge ships two editions, both open source (MIT license):
 
-- **Community** — policy engine, PTY supervisor, prompt detection, channel relay, audit log, hash-chained decision trace. Fully functional. Always free.
-- **Pro** — deterministic risk classifier, decision trace v2, policy pinning, RBAC. Phase A — extended local features, shipping now.
-- **Enterprise** (experimental, open source) — multi-tenant policy management, web dashboard. Phase B is scaffolding only; Phase C is design only.
+- **Core** — policy engine, PTY supervisor, prompt detection, channel relay, audit log, decision traces, local dashboard, session export. Fully functional. The default.
+- **Enterprise** — everything in Core plus extended settings views, capability-gated routes, and additional dashboard features.
 
-| Feature | Edition | Maturity |
-|---------|---------|----------|
-| Policy DSL v1 | Community | Stable |
-| Autopilot engine | Community | Stable |
-| Hash-chained decision trace | Community | Stable |
-| Hash-chained audit log | Community | Stable |
-| Deterministic risk classifier | Pro | Experimental |
-| Policy pinning (session-level) | Pro | Experimental |
-| RBAC (local) | Pro | Experimental |
-| Web dashboard | Enterprise | Design only |
+| Feature | Core | Enterprise |
+|---------|------|------------|
+| Policy DSL v1 | Yes | Yes |
+| Autopilot engine | Yes | Yes |
+| Hash-chained audit log | Yes | Yes |
+| Decision traces | Yes | Yes |
+| Local dashboard | Yes | Yes |
+| Session export (JSON/HTML) | Yes | Yes |
+| Deterministic risk classifier | Yes | Yes |
+| Enterprise Settings page | No | Yes |
+| Extended capability views | No | Yes |
 
 **Key principles:**
 
@@ -387,8 +387,8 @@ AtlasBridge follows an **open-source** model (MIT license):
 - **Offline-first.** The runtime works without any network dependency.
 
 ```bash
-atlasbridge edition       # Show current edition (community/pro/enterprise)
-atlasbridge features      # List all feature flags
+atlasbridge core          # Show core edition info
+atlasbridge enterprise    # Show enterprise edition info
 ```
 
 See [Enterprise Architecture](docs/enterprise-architecture.md) for details.
