@@ -26,56 +26,6 @@ The dashboard binds to `127.0.0.1:3737` by default — only accessible from your
 
 ---
 
-## Dashboard Editions
-
-The dashboard supports two editions: **Core** and **Enterprise**.
-
-| Feature | Core | Enterprise |
-|---------|------|------------|
-| Home (sessions + stats) | Yes | Yes |
-| Session detail | Yes | Yes |
-| Settings (runtime, config, diagnostics) | Yes | Yes |
-| Decision Traces (list + detail) | No | Yes |
-| Integrity Verification | No | Yes |
-| Session Export (JSON/HTML) | No | Yes |
-| Capabilities table in Settings | No | Yes |
-| Enterprise Settings page | No | Yes |
-| Edition badge in header | CORE | ENTERPRISE |
-
-Both editions show invariant badges (**READ-ONLY**, **LOCAL ONLY**) on every page.
-
-### Selecting an edition
-
-Edition is resolved in order: CLI flag > environment variable > default (`core`).
-
-```bash
-# Explicit edition via CLI flag
-atlasbridge dashboard start --edition enterprise
-
-# Via environment variable
-export ATLASBRIDGE_EDITION=enterprise
-atlasbridge dashboard start
-
-# Default (core) — no flag needed
-atlasbridge dashboard start
-```
-
-### What changes between editions
-
-**Core** is the default. The dashboard shows sessions, basic stats, and settings (runtime info, config paths, dashboard binding, diagnostics). Core nav shows Home and Settings only.
-
-**Enterprise** adds decision trace browsing, integrity verification, session export, and the full capabilities table in settings. Enterprise nav shows Home, Traces, Integrity, Settings, and Enterprise Settings. Enterprise-only routes return a 404 JSON response when accessed on a core edition dashboard.
-
-### Runtime capabilities API
-
-The dashboard exposes a `/runtime/capabilities` endpoint that returns the current edition, authority mode, and which capabilities are enabled:
-
-```bash
-curl http://localhost:3737/runtime/capabilities | python3 -m json.tool
-```
-
----
-
 ## Remote Access via SSH Tunnel (Recommended)
 
 The safest way to access the dashboard from another device (phone, tablet, laptop) is an SSH tunnel. No firewall changes, no exposure.

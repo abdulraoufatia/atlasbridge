@@ -27,9 +27,6 @@ Commands:
   atlasbridge cloud edition       — Show current edition
   atlasbridge cloud features      — Show feature flags
   atlasbridge cloud status        — Show cloud integration status
-  atlasbridge community [tool]    — Launch in Community edition (dashboard + runtime)
-  atlasbridge core [tool]         — Launch in Core edition (dashboard + runtime)
-  atlasbridge enterprise [tool]   — Launch in Enterprise edition (dashboard + runtime)
 """
 
 from __future__ import annotations
@@ -106,7 +103,6 @@ from atlasbridge.cli._dashboard import dashboard_group  # noqa: E402
 from atlasbridge.cli._db import db_group  # noqa: E402
 from atlasbridge.cli._debug import debug_group  # noqa: E402
 from atlasbridge.cli._doctor import doctor_cmd  # noqa: E402
-from atlasbridge.cli._edition_cmd import community_cmd, core_cmd, enterprise_cmd  # noqa: E402
 from atlasbridge.cli._enterprise import cloud_group  # noqa: E402
 from atlasbridge.cli._lab import lab_group  # noqa: E402
 from atlasbridge.cli._logs import logs_cmd  # noqa: E402
@@ -147,9 +143,6 @@ cli.add_command(console_cmd)
 cli.add_command(replay_group)
 cli.add_command(risk_group)
 cli.add_command(chat_cmd)
-cli.add_command(community_cmd)
-cli.add_command(core_cmd)
-cli.add_command(enterprise_cmd)
 
 
 # ---------------------------------------------------------------------------

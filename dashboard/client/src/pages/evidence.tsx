@@ -367,13 +367,14 @@ function CompliancePacksPanel() {
 export default function EvidencePage() {
   const { data: score, isLoading: scoreLoading } = useQuery<GovernanceScore>({ queryKey: ["/api/evidence/score"] });
   const { data: integrityReport, isLoading: integrityLoading } = useQuery<IntegrityReport>({ queryKey: ["/api/evidence/integrity"] });
+  const { data: sessions } = useQuery<{ id: string; tool: string; status: string }[]>({ queryKey: ["/api/sessions"] });
   const [sessionFilter, setSessionFilter] = useState<string>("");
   const [activeTab, setActiveTab] = useState("overview");
 
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">Compliance Evidence</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Governance Evidence</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Export verifiable governance evidence from local decision data
         </p>
@@ -413,16 +414,23 @@ export default function EvidencePage() {
             </CardHeader>
             <CardContent>
               <p className="text-xs text-muted-foreground mb-3">Session IDs available for evidence export and replay reconstruction.</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                {["sess-a1b2c3d4", "sess-e5f6g7h8", "sess-i9j0k1l2", "sess-m3n4o5p6", "sess-q7r8s9t0", "sess-u1v2w3x4", "sess-y5z6a7b8", "sess-c9d0e1f2"].map(sid => (
-                  <div key={sid} className="flex items-center gap-2 p-2 rounded-md bg-muted/50 text-xs" data-testid={`replay-ref-${sid}`}>
-                    <code className="font-mono text-[10px] truncate flex-1">{sid}</code>
-                    <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => navigator.clipboard.writeText(sid)} data-testid={`copy-session-${sid}`}>
-                      <Copy className="w-2.5 h-2.5" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
+              {(!sessions || sessions.length === 0) ? (
+                <p className="text-xs text-muted-foreground py-2 text-center">No sessions recorded yet.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                  {sessions.map(s => (
+                    <div key={s.id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50 text-xs" data-testid={`replay-ref-${s.id}`}>
+                      <div className="min-w-0 flex-1">
+                        <code className="font-mono text-[10px] truncate block">{s.id}</code>
+                        <span className="text-[9px] text-muted-foreground truncate block">{s.tool} · {s.status}</span>
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => navigator.clipboard.writeText(s.id)} data-testid={`copy-session-${s.id}`}>
+                        <Copy className="w-2.5 h-2.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -433,16 +441,14 @@ export default function EvidencePage() {
               <div className="flex items-center gap-3 flex-wrap">
                 <label className="text-xs font-medium text-muted-foreground">Filter by session (optional):</label>
                 <Select value={sessionFilter} onValueChange={setSessionFilter}>
-                  <SelectTrigger className="w-56 h-8 text-xs" data-testid="select-session-filter">
+                  <SelectTrigger className="w-64 h-8 text-xs" data-testid="select-session-filter">
                     <SelectValue placeholder="All sessions" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All sessions</SelectItem>
-                    <SelectItem value="sess-a1b2c3d4">sess-a1b2c3d4 (GitHub Actions)</SelectItem>
-                    <SelectItem value="sess-e5f6g7h8">sess-e5f6g7h8 (Terraform)</SelectItem>
-                    <SelectItem value="sess-m3n4o5p6">sess-m3n4o5p6 (kubectl)</SelectItem>
-                    <SelectItem value="sess-q7r8s9t0">sess-q7r8s9t0 (AWS CLI)</SelectItem>
-                    <SelectItem value="sess-u1v2w3x4">sess-u1v2w3x4 (Ansible)</SelectItem>
+                    {sessions?.map(s => (
+                      <SelectItem key={s.id} value={s.id}>{s.id} ({s.tool})</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

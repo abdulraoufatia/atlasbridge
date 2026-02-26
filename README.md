@@ -368,18 +368,18 @@ AtlasBridge ships two editions, both open source (MIT license):
 - **Core** — policy engine, PTY supervisor, prompt detection, channel relay, audit log, local dashboard (sessions + settings). Fully functional. The default.
 - **Enterprise** — everything in Core plus decision trace browsing, integrity verification, session export, capability views, and extended settings.
 
-| Feature | Core | Enterprise |
-|---------|------|------------|
-| Policy DSL v1 | Yes | Yes |
-| Autopilot engine | Yes | Yes |
-| Hash-chained audit log | Yes | Yes |
-| Dashboard (sessions + settings) | Yes | Yes |
-| Deterministic risk classifier | Yes | Yes |
-| Decision trace browsing | No | Yes |
-| Integrity verification | No | Yes |
-| Session export (JSON/HTML) | No | Yes |
-| Capabilities view | No | Yes |
-| Enterprise Settings page | No | Yes |
+| Feature | Available |
+|---------|-----------|
+| Policy DSL v1 | Yes |
+| Autopilot engine | Yes |
+| Hash-chained audit log | Yes |
+| Dashboard (sessions, traces, settings) | Yes |
+| Deterministic risk classifier | Yes |
+| Decision trace browsing | Yes |
+| Integrity verification | Yes |
+| Session export (JSON/HTML) | Yes |
+| Governance Evidence export | Yes |
+| Governance score + bundle manifest | Yes |
 
 **Key principles:**
 
@@ -388,11 +388,10 @@ AtlasBridge ships two editions, both open source (MIT license):
 - **Offline-first.** The runtime works without any network dependency.
 
 ```bash
-atlasbridge core          # Show core edition info
-atlasbridge enterprise    # Show enterprise edition info
+atlasbridge dashboard start
 ```
 
-See [Enterprise Architecture](docs/enterprise-architecture.md) for details.
+The dashboard includes a **Governance Evidence** page for exporting verifiable audit artefacts (decisions, escalations, integrity report, policy snapshot) as JSON, CSV, or a hash-verified bundle. See [docs/governance-evidence.md](docs/governance-evidence.md) for details.
 
 ---
 
