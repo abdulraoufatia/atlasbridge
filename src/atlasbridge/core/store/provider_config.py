@@ -215,7 +215,9 @@ def validate_key(provider: str, conn: sqlite3.Connection) -> dict[str, str]:
                 (error_msg, provider),
             )
             conn.commit()
-            logger.warning("provider_validation_failed", provider=provider, status=response.status_code)
+            logger.warning(
+                "provider_validation_failed", provider=provider, status=response.status_code
+            )
             return {"status": "invalid", "error": error_msg}
 
     except Exception as exc:

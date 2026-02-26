@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -894,3 +894,372 @@ class TestSpamPrevention:
         e2 = _event(s.session_id, excerpt="Continue? [y/N]")
         await router.route_event(e2)
         assert mock_channel.send_prompt.call_count == 2
+
+
+# ---------------------------------------------------------------------------
+# Workspace trust helpers
+# ---------------------------------------------------------------------------
+
+
+def _folder_trust_event(session_id: str) -> PromptEvent:
+    return PromptEvent.create(
+        session_id=session_id,
+        prompt_type=PromptType.TYPE_YES_NO,
+        confidence=Confidence.HIGH,
+        excerpt="Trust this folder? (yes/no)",
+    )
+
+
+class TestIsFolderTrustEvent:
+    def test_trust_and_folder_returns_true(self, session: Session) -> None:
+        event = _folder_trust_event(session.session_id)
+        assert PromptRouter._is_folder_trust_event(event) is True
+
+    def test_trust_only_returns_false(self, session: Session) -> None:
+        event = _event(session.session_id, excerpt="Do you trust this?")
+        assert PromptRouter._is_folder_trust_event(event) is False
+
+    def test_folder_only_returns_false(self, session: Session) -> None:
+        event = _event(session.session_id, excerpt="Open this folder?")
+        assert PromptRouter._is_folder_trust_event(event) is False
+
+    def test_regular_yes_no_returns_false(self, session: Session) -> None:
+        event = _event(session.session_id, excerpt="Continue? [y/N]")
+        assert PromptRouter._is_folder_trust_event(event) is False
+
+    def test_case_insensitive(self, session: Session) -> None:
+        event = _event(session.session_id, excerpt="TRUST THIS FOLDER?")
+        assert PromptRouter._is_folder_trust_event(event) is True
+
+
+class TestTryAutoInjectWorkspaceTrust:
+    @pytest.mark.asyncio
+    async def test_no_store_returns_false(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+        session: Session,
+    ) -> None:
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},
+            store=None,
+        )
+        event = _folder_trust_event(session.session_id)
+        event.cwd = "/tmp/test"
+        log = MagicMock()
+        result = await router._try_auto_inject_workspace_trust(event, log)
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_store_without_conn_returns_false(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+        session: Session,
+    ) -> None:
+        store = MagicMock(spec=[])  # no _conn attribute
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},
+            store=store,
+        )
+        event = _folder_trust_event(session.session_id)
+        event.cwd = "/tmp/test"
+        log = MagicMock()
+        result = await router._try_auto_inject_workspace_trust(event, log)
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_untrusted_workspace_returns_false(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+        session: Session,
+    ) -> None:
+        store = MagicMock()
+        store._conn = MagicMock()
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},
+            store=store,
+        )
+        event = _folder_trust_event(session.session_id)
+        event.cwd = "/tmp/not-trusted"
+        log = MagicMock()
+
+
+        with patch(
+            "atlasbridge.core.store.workspace_trust.get_trust", return_value=False
+        ):
+            result = await router._try_auto_inject_workspace_trust(event, log)
+
+        assert result is False
+        mock_channel.send_prompt.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_trusted_workspace_no_adapter_returns_false(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+        session: Session,
+    ) -> None:
+        store = MagicMock()
+        store._conn = MagicMock()
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},  # no adapter
+            store=store,
+        )
+        event = _folder_trust_event(session.session_id)
+        event.cwd = "/tmp/trusted"
+        log = MagicMock()
+
+
+        with patch(
+            "atlasbridge.core.store.workspace_trust.get_trust", return_value=True
+        ):
+            result = await router._try_auto_inject_workspace_trust(event, log)
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_trusted_workspace_with_adapter_schedules_inject(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+        mock_adapter: AsyncMock,
+        session: Session,
+    ) -> None:
+        store = MagicMock()
+        store._conn = MagicMock()
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={session.session_id: mock_adapter},
+            store=store,
+        )
+        event = _folder_trust_event(session.session_id)
+        event.cwd = "/tmp/trusted"
+        log = MagicMock()
+
+
+        with patch(
+            "atlasbridge.core.store.workspace_trust.get_trust", return_value=True
+        ):
+            result = await router._try_auto_inject_workspace_trust(event, log)
+
+        assert result is True
+        # Channel send_prompt must NOT be called (auto-inject path)
+        mock_channel.send_prompt.assert_not_called()
+        log.info.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_get_trust_exception_returns_false(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+        session: Session,
+    ) -> None:
+        store = MagicMock()
+        store._conn = MagicMock()
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},
+            store=store,
+        )
+        event = _folder_trust_event(session.session_id)
+        event.cwd = "/tmp/error"
+        log = MagicMock()
+
+
+        with patch(
+            "atlasbridge.core.store.workspace_trust.get_trust",
+            side_effect=Exception("db error"),
+        ):
+            result = await router._try_auto_inject_workspace_trust(event, log)
+
+        assert result is False
+
+
+class TestRecordWorkspaceTrust:
+    def test_no_trust_path_in_constraints_is_noop(
+        self,
+        router: PromptRouter,
+        session: Session,
+    ) -> None:
+        event = _event(session.session_id)
+        # constraints has no workspace_trust_path
+        reply = _reply(event.prompt_id, session.session_id, value="y")
+        router._record_workspace_trust(event, "1", reply)  # must not raise
+
+    def test_no_store_conn_is_noop(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+        session: Session,
+    ) -> None:
+        store = MagicMock(spec=[])  # no _conn
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},
+            store=store,
+        )
+        event = _event(session.session_id)
+        event.constraints["workspace_trust_path"] = "/tmp/test"
+        reply = _reply(event.prompt_id, session.session_id, value="y")
+        router._record_workspace_trust(event, "1", reply)  # must not raise
+
+    def test_injected_yes_calls_grant_trust(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+        session: Session,
+    ) -> None:
+        store = MagicMock()
+        store._conn = MagicMock()
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},
+            store=store,
+        )
+        event = _event(session.session_id)
+        event.constraints["workspace_trust_path"] = "/tmp/grant-me"
+        reply = _reply(event.prompt_id, session.session_id, value="y")
+
+
+        with patch("atlasbridge.core.store.workspace_trust.grant_trust") as mock_grant, patch(
+            "atlasbridge.core.store.workspace_trust.revoke_trust"
+        ) as mock_revoke:
+            router._record_workspace_trust(event, "1", reply)
+
+        mock_grant.assert_called_once()
+        mock_revoke.assert_not_called()
+
+    def test_injected_no_calls_revoke_trust(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+        session: Session,
+    ) -> None:
+        store = MagicMock()
+        store._conn = MagicMock()
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},
+            store=store,
+        )
+        event = _event(session.session_id)
+        event.constraints["workspace_trust_path"] = "/tmp/deny-me"
+        reply = _reply(event.prompt_id, session.session_id, value="n")
+
+
+        with patch("atlasbridge.core.store.workspace_trust.grant_trust") as mock_grant, patch(
+            "atlasbridge.core.store.workspace_trust.revoke_trust"
+        ) as mock_revoke:
+            router._record_workspace_trust(event, "2", reply)
+
+        mock_revoke.assert_called_once()
+        mock_grant.assert_not_called()
+
+    def test_unknown_value_calls_neither(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+        session: Session,
+    ) -> None:
+        store = MagicMock()
+        store._conn = MagicMock()
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},
+            store=store,
+        )
+        event = _event(session.session_id)
+        event.constraints["workspace_trust_path"] = "/tmp/unknown"
+        reply = _reply(event.prompt_id, session.session_id, value="maybe")
+
+
+        with patch("atlasbridge.core.store.workspace_trust.grant_trust") as mock_grant, patch(
+            "atlasbridge.core.store.workspace_trust.revoke_trust"
+        ) as mock_revoke:
+            router._record_workspace_trust(event, "maybe", reply)
+
+        mock_grant.assert_not_called()
+        mock_revoke.assert_not_called()
+
+
+class TestAutoInjectTrustedWorkspace:
+    @pytest.mark.asyncio
+    async def test_injection_succeeds(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+        mock_adapter: AsyncMock,
+        session: Session,
+    ) -> None:
+        from atlasbridge.core.prompt.state import PromptStateMachine
+
+        store = MagicMock()
+        store._conn = MagicMock()
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={session.session_id: mock_adapter},
+            store=store,
+        )
+        event = _folder_trust_event(session.session_id)
+        event.cwd = "/tmp/auto-inject"
+        sm = PromptStateMachine(event=event)
+        sm.transition(PromptStatus.ROUTED, "test")
+        log = MagicMock()
+
+        with patch("asyncio.sleep", new=AsyncMock()):
+            await router._auto_inject_trusted_workspace(event, mock_adapter, sm, log)
+
+        mock_adapter.inject_reply.assert_called_once()
+        call_kwargs = mock_adapter.inject_reply.call_args
+        assert call_kwargs.kwargs.get("value") == "1" or (
+            call_kwargs.args and "1" in str(call_kwargs.args)
+        )
+
+    @pytest.mark.asyncio
+    async def test_injection_failure_notifies_channel(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+        session: Session,
+    ) -> None:
+        from atlasbridge.core.prompt.state import PromptStateMachine
+
+        store = MagicMock()
+        store._conn = MagicMock()
+        failing_adapter = AsyncMock()
+        failing_adapter.inject_reply.side_effect = RuntimeError("inject failed")
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={session.session_id: failing_adapter},
+            store=store,
+        )
+        event = _folder_trust_event(session.session_id)
+        event.cwd = "/tmp/fail-inject"
+        sm = PromptStateMachine(event=event)
+        sm.transition(PromptStatus.ROUTED, "test")
+        log = MagicMock()
+
+        with patch("asyncio.sleep", new=AsyncMock()):
+            await router._auto_inject_trusted_workspace(event, failing_adapter, sm, log)
+
+        mock_channel.notify.assert_called_once()
+        call_args = mock_channel.notify.call_args[0][0]
+        assert "auto-confirm failed" in call_args

@@ -358,7 +358,7 @@ def sessions_start(
 
     try:
         # Detach: new process group, stdin/out/err redirected to /dev/null
-        with open(os.devnull, "r") as devnull_r, open(os.devnull, "w") as devnull_w:
+        with open(os.devnull) as devnull_r, open(os.devnull, "w") as devnull_w:
             proc = subprocess.Popen(
                 args,
                 stdin=devnull_r,

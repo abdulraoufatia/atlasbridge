@@ -73,7 +73,7 @@ def providers_list(as_json: bool = False) -> None:
         table.add_column("Key prefix", style="dim")
         table.add_column("Validated", style="dim")
 
-        _STATUS_STYLE = {
+        status_style = {
             "configured": "yellow",
             "validated": "green",
             "invalid": "red",
@@ -81,7 +81,7 @@ def providers_list(as_json: bool = False) -> None:
 
         for row in rows:
             status = row.get("status", "")
-            style = _STATUS_STYLE.get(status, "")
+            style = status_style.get(status, "")
             validated = (row.get("validated_at") or "")[:19] or "-"
             table.add_row(
                 row.get("provider", ""),

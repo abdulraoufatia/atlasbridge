@@ -40,7 +40,9 @@ class TestBusyGateMessages:
     @pytest.mark.parametrize("word", TERMINAL_WORDS)
     def test_busy_message_no_terminal_semantics(self, reason: GateRejectReason, word: str) -> None:
         text = _reject_msg(reason)
-        assert word not in text, f"Gate message for {reason!r} contains terminal word {word!r}: {text!r}"
+        assert word not in text, (
+            f"Gate message for {reason!r} contains terminal word {word!r}: {text!r}"
+        )
 
 
 class TestNoSessionMessage:
