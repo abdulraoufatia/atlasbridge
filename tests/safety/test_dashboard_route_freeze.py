@@ -124,3 +124,34 @@ class TestDashboardRouteFreezeEnterprise:
         assert len(actual) == len(ALL_ROUTES), (
             f"Enterprise route count drift: expected {len(ALL_ROUTES)}, got {len(actual)}"
         )
+
+
+class TestNoUnintendedMethodExposure:
+    """Neither edition may expose OPTIONS, TRACE, or CONNECT methods."""
+
+    def _get_all_methods(self, app) -> set[tuple[str, str]]:
+        routes = set()
+        for route in app.routes:
+            if hasattr(route, "methods") and hasattr(route, "path"):
+                for method in route.methods:
+                    routes.add((method, route.path))
+        return routes
+
+    def test_no_unexpected_methods_on_core(self) -> None:
+        pytest.importorskip("fastapi")
+        from atlasbridge.dashboard.app import create_app
+
+        app = create_app()
+        all_routes = self._get_all_methods(app)
+        unexpected = {(m, p) for (m, p) in all_routes if m in ("OPTIONS", "TRACE", "CONNECT")}
+        assert not unexpected, f"Unexpected methods on Core: {unexpected}"
+
+    def test_no_unexpected_methods_on_enterprise(self, monkeypatch) -> None:
+        pytest.importorskip("fastapi")
+        monkeypatch.setenv("ATLASBRIDGE_EDITION", "enterprise")
+        from atlasbridge.dashboard.app import create_app
+
+        app = create_app()
+        all_routes = self._get_all_methods(app)
+        unexpected = {(m, p) for (m, p) in all_routes if m in ("OPTIONS", "TRACE", "CONNECT")}
+        assert not unexpected, f"Unexpected methods on Enterprise: {unexpected}"

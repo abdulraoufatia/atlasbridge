@@ -15,7 +15,6 @@ import pytest
 
 pytest.importorskip("fastapi")
 
-from starlette.testclient import TestClient  # noqa: E402
 
 from tests.safety.test_dashboard_route_freeze import (  # noqa: E402
     ALL_ROUTES,
@@ -77,8 +76,7 @@ class TestCoreEditionContract:
     def test_core_routes_exactly_match_frozen_set(self, core_app) -> None:
         actual = _get_app_routes(core_app)
         assert actual == CORE_ROUTES, (
-            f"Core route mismatch. Extra: {actual - CORE_ROUTES}. "
-            f"Missing: {CORE_ROUTES - actual}."
+            f"Core route mismatch. Extra: {actual - CORE_ROUTES}. Missing: {CORE_ROUTES - actual}."
         )
 
     def test_enterprise_routes_not_present_on_core(self, core_app) -> None:
@@ -147,6 +145,4 @@ class TestAuthorityCapabilities:
         for cap_id, spec in CAPABILITIES.items():
             if spec.capability_class == CapabilityClass.TOOLING:
                 decision = FeatureRegistry.is_allowed(edition, authority_mode, cap_id)
-                assert decision.allowed, (
-                    f"TOOLING capability {cap_id!r} must be allowed on CORE"
-                )
+                assert decision.allowed, f"TOOLING capability {cap_id!r} must be allowed on CORE"

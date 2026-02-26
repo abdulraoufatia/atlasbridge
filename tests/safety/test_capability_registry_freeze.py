@@ -64,8 +64,7 @@ class TestCapabilityRegistryFreeze:
             if spec.capability_class == CapabilityClass.AUTHORITY:
                 decision = FeatureRegistry.is_allowed(edition, authority_mode, cap_id)
                 assert not decision.allowed, (
-                    f"AUTHORITY capability {cap_id!r} should be denied on CORE "
-                    f"but got allowed=True"
+                    f"AUTHORITY capability {cap_id!r} should be denied on CORE but got allowed=True"
                 )
                 assert decision.reason_code == "EDITION_DENY", (
                     f"Expected EDITION_DENY for {cap_id!r} on CORE, got {decision.reason_code}"
@@ -93,8 +92,8 @@ class TestCapabilityRegistryFreeze:
             if spec.capability_class == CapabilityClass.AUTHORITY:
                 decision = FeatureRegistry.is_allowed(edition, authority_mode, cap_id)
                 assert decision.allowed, (
-                    f"AUTHORITY capability {cap_id!r} should be allowed in ENTERPRISE+WRITE_ENABLED "
-                    f"but got reason_code: {decision.reason_code}"
+                    f"AUTHORITY capability {cap_id!r} should be allowed in "
+                    f"ENTERPRISE+WRITE_ENABLED but got reason_code: {decision.reason_code}"
                 )
 
     def test_capability_decision_includes_guard_metadata(self) -> None:

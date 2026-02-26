@@ -24,9 +24,9 @@ def _get_app_routes(app) -> set[tuple[str, str]]:
 
 def _make_app(tmp_path, edition: str, name: str = "test.db"):
     pytest.importorskip("fastapi")
-    from atlasbridge.dashboard.app import create_app
-
     import os
+
+    from atlasbridge.dashboard.app import create_app
 
     os.environ["ATLASBRIDGE_EDITION"] = edition
 
