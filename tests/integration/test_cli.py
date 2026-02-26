@@ -50,7 +50,7 @@ class TestSetupCommand:
     def test_setup_writes_config(self, runner: CliRunner, tmp_path: Path) -> None:
         result = runner.invoke(
             cli,
-            ["setup", "--token", VALID_TOKEN, "--users", "12345678"],
+            ["setup", "--no-keyring", "--token", VALID_TOKEN, "--users", "12345678"],
             catch_exceptions=False,
             env={"HOME": str(tmp_path)},
         )
