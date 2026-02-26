@@ -79,7 +79,10 @@ This index helps you find the right document fast, whether you are a new user, a
 | [roadmap-90-days.md](roadmap-90-days.md) | Both | Project milestones from v0.1 through v1.0 | To understand project direction | Current |
 | [setup-flow.md](setup-flow.md) | Contributor | Setup command design: flow diagram, pre-flight checks, config collection, validation | When modifying the setup wizard | Current |
 | [setup-noninteractive.md](setup-noninteractive.md) | User | Headless / CI deployment: env vars, `--from-env`, Docker example | When deploying without a TTY | Current |
-| [threat-model.md](threat-model.md) | Contributor | STRIDE-based relay correctness analysis, trust boundaries, threat scenarios | For correctness review or architecture audits | Current |
+| [threat-model.md](threat-model.md) | Contributor | STRIDE-based relay correctness analysis, trust boundaries, threat scenarios (v1.6.x — covers dashboard operator controls, CSRF, rate limiting) | For correctness review or architecture audits | Current |
+| [deployment-profiles.md](deployment-profiles.md) | Both | Deployment profiles: core (default) and high_assurance (stricter defaults for regulated environments) | When deploying in CI/CD or regulated workflows | Current |
+| [audit-export.md](audit-export.md) | Both | Audit export: JSON format, SHA-256 hash chain algorithm, verification workflow, SIEM integration | When exporting audit evidence or verifying integrity | Current |
+| [role-separation.md](role-separation.md) | Both | Role separation: execution, policy author, audit viewer — filesystem enforcement, invariants preserved | When deploying with multiple users or separation of duties | Current |
 | [tool-adapter.md](tool-adapter.md) | Contributor | Adapter abstraction design goals and interface (early design doc) | For historical context on adapter design decisions | Reference |
 | [tool-interception-design.md](tool-interception-design.md) | Contributor | Strategy analysis: wrapper vs PTY interception; rationale for PTY approach | For historical context on interception strategy | Reference |
 | [telegram-setup.md](telegram-setup.md) | User | Step-by-step Telegram bot setup: BotFather, /start, chat_id, verification | During first-time Telegram setup | Current |

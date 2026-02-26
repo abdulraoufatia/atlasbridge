@@ -1,16 +1,16 @@
-# AtlasBridge Implementation Notes: Relay Correctness
+# AtlasBridge Correctness Notes: Relay and Runtime
 
-**Version:** 0.2.0
+**Version:** 1.6.x
 **Status:** Reference
-**Last updated:** 2026-02-20
+**Last updated:** 2026-02-26
 
-> **Important:** AtlasBridge is not a security product. It is a remote interactive prompt relay. The notes below document correctness invariants and potential misuse scenarios for the relay mechanism — not a security posture claim.
+> **Important:** AtlasBridge is not a security product. It is a policy-driven autonomous runtime with a human-in-the-loop relay. The notes below document correctness invariants and known misuse scenarios — not a security posture claim.
 
 ---
 
 ## Overview
 
-This document covers correctness concerns for the AtlasBridge relay: how the system could behave incorrectly, and what implementation measures prevent that.
+This document covers correctness concerns for the AtlasBridge runtime: how the system could behave incorrectly, and what implementation measures prevent that.
 
 It does not claim AtlasBridge is a security firewall or that it protects against any class of attack.
 
@@ -18,7 +18,7 @@ It does not claim AtlasBridge is a security firewall or that it protects against
 
 ## STRIDE analysis (retained for reference)
 
-The original STRIDE analysis below was written when AtlasBridge was positioned as a "CLI firewall". It is retained as an implementation reference but should be read with the understanding that AtlasBridge is a prompt relay, not a security enforcement layer.
+The STRIDE analysis below documents misuse scenarios. It is retained as an implementation reference, not a security certification.
 
 STRIDE = **S**poofing · **T**ampering · **R**epudiation · **I**nformation Disclosure · **D**enial of Service · **E**levation of Privilege
 
@@ -29,13 +29,15 @@ STRIDE = **S**poofing · **T**ampering · **R**epudiation · **I**nformation Dis
 | Asset | Sensitivity | Description |
 |-------|-------------|-------------|
 | Telegram bot token | Critical | Full bot control; allows sending/receiving messages |
+| Slack bot token | Critical | Full Slack workspace access for the bot |
 | Allowed user IDs | High | Defines who can approve operations |
-| Config file | High | Contains bot token and policy paths |
+| Config file | High | Contains bot tokens and policy paths |
 | Policy rules | High | Defines what is allowed/denied/requires approval |
-| Approval decisions | High | Records who approved what and when |
 | Audit log | High | Evidence of all operations; must be tamper-evident |
+| Autopilot state | High | Kill switch and autonomy mode; operator controls |
+| Dashboard session | Medium | Localhost-only; controls runtime via operator write actions |
+| SQLite database | Medium | Prompt history, session state, audit events |
 | Active AI sessions | Medium | Tool calls in progress |
-| SQLite database | Medium | Approval history, session state |
 | Subprocess execution | Critical | Direct code execution on host machine |
 
 ---
@@ -43,25 +45,30 @@ STRIDE = **S**poofing · **T**ampering · **R**epudiation · **I**nformation Dis
 ## Trust Boundaries
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  Trusted: Local machine (user's process space)          │
-│                                                         │
-│  ┌──────────────┐    ┌──────────────┐                  │
-│  │  AI Agent    │    │  AtlasBridge Daemon│                  │
-│  │  (claude)    │    │              │                  │
-│  └──────────────┘    └──────────────┘                  │
-│          │                   │                          │
-│    [Tool call events]  [Policy decisions]               │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-           │ HTTPS                    │ HTTPS
-           │                          │
-┌──────────┴──────────────────────────┴───────────────────┐
-│  Semi-trusted: Telegram API (third-party HTTPS service) │
-└─────────────────────────────────────────────────────────┘
-           │
-┌──────────┴──────────────────────────────────────────────┐
-│  Trusted: User's phone (Telegram client)                │
+┌──────────────────────────────────────────────────────────┐
+│  Trusted: Local machine (user's process space)           │
+│                                                          │
+│  ┌──────────────────┐    ┌───────────────────────────┐  │
+│  │  AI Agent (claude)│    │  AtlasBridge Daemon       │  │
+│  └──────────────────┘    │  + Autopilot Engine        │  │
+│          │               │  + Policy Evaluator        │  │
+│    [PTY output]          │  + Audit Writer            │  │
+│                          └───────────────────────────┘  │
+│                                     │                    │
+│                          ┌──────────┴───────────────┐   │
+│                          │  Dashboard (127.0.0.1)   │   │
+│                          │  + Operator Controls     │   │
+│                          └──────────────────────────┘   │
+└──────────────────────────────────────────────────────────┘
+           │ HTTPS                         │ HTTPS
+           │                               │
+┌──────────┴──────────┐       ┌────────────┴───────────────┐
+│  Telegram API       │       │  Slack API                 │
+│  (third-party HTTPS)│       │  (third-party HTTPS)       │
+└──────────┬──────────┘       └────────────┬───────────────┘
+           │                               │
+┌──────────┴──────────────────────────────┴───────────────┐
+│  Trusted: User's phone / Slack client                   │
 └─────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────┐
@@ -76,54 +83,55 @@ STRIDE = **S**poofing · **T**ampering · **R**epudiation · **I**nformation Dis
 
 ### S — Spoofing
 
-#### S-1: Telegram User Impersonation
+#### S-1: Channel User Impersonation
 
-**Scenario:** An attacker obtains the bot token and sends Telegram messages pretending to be the authorized user to approve malicious operations.
+**Scenario:** An attacker obtains the bot token and sends messages pretending to be the authorised user, approving malicious operations.
 
 **Attack vector:** External (requires bot token)
-**Likelihood:** Low (bot token must be stolen first)
-**Impact:** Critical (can approve arbitrary operations)
+**Likelihood:** Low
+**Impact:** Critical
 
 **Mitigations:**
-- Telegram user ID whitelist (`ATLASBRIDGE_TELEGRAM_ALLOWED_USERS`) — only specific user IDs can interact with the bot
-- Every incoming Telegram message is validated against the whitelist before processing
-- Bot token is stored in `~/.atlasbridge/config.toml` (mode 0600)
+- Allowlisted user IDs (`ATLASBRIDGE_TELEGRAM_ALLOWED_USERS` / Slack user ID allowlist)
+- Every incoming message validated against the allowlist before processing
+- Bot token stored with 0600 permissions
 
-**Residual risk:** Low — whitelist enforcement makes spoofing non-trivial without also compromising the allowed user's Telegram account.
+**Residual risk:** Low — allowlist enforcement makes spoofing non-trivial.
 
 ---
 
-#### S-2: AI Agent Identity Spoofing
+#### S-2: Dashboard Operator Spoofing
 
-**Scenario:** A malicious process (not the actual Claude CLI) connects to the AtlasBridge daemon socket and submits fake tool call events, potentially getting them approved.
+**Scenario:** An attacker on the same machine sends crafted requests to the dashboard operator endpoints (`/api/operator/kill-switch`, `/api/operator/mode`) to change the autopilot state without authorisation.
 
-**Attack vector:** Local (requires code execution on machine)
-**Likelihood:** Medium (trivially done by any local process)
-**Impact:** High (can inject arbitrary "tool calls" for approval)
-
-**Mitigations:**
-- Daemon socket uses process-owner authentication (same UID required)
-- Session tokens generated per `atlasbridge run` invocation, verified on each event
-- Approval notifications include tool call hash; discrepancy would be visible
-
-**Residual risk:** Medium — local code execution is a strong precondition. If attacker has local code exec, the machine is already compromised.
-
----
-
-#### S-3: Config File Spoofing (Symlink Attack)
-
-**Scenario:** Attacker replaces `~/.atlasbridge/config.toml` with a symlink to a malicious config that changes the allowed user list or bot token.
-
-**Attack vector:** Local
+**Attack vector:** Local (loopback only; requires local code execution)
 **Likelihood:** Low
 **Impact:** High
 
 **Mitigations:**
-- Doctor checks file permissions (must be 0600)
-- File is read with `O_NOFOLLOW` to prevent symlink following (implementation detail)
-- Config loaded once at startup; reload via SIGHUP requires same permissions check
+- Dashboard binds to `127.0.0.1` only — no external network access
+- CSRF protection: server sets `csrf-token` cookie; client must echo it in `x-csrf-token` header
+- Rate limiting: 10 operator actions per minute per IP
+- Bare `curl` without cookie/header returns 403
 
-**Residual risk:** Low if file permissions are enforced.
+**Residual risk:** Low — local code execution is the prerequisite; loopback-only eliminates remote attack.
+
+---
+
+#### S-3: AI Agent Identity Spoofing
+
+**Scenario:** A malicious local process submits fake prompt events to the daemon.
+
+**Attack vector:** Local
+**Likelihood:** Medium
+**Impact:** High
+
+**Mitigations:**
+- PTY adapter observes output on its own PTY file descriptor — not a shared socket
+- Session tokens generated per `atlasbridge run` invocation
+- Audit log records every event; detectable in replay
+
+**Residual risk:** Medium — local code execution is the prerequisite.
 
 ---
 
@@ -131,105 +139,95 @@ STRIDE = **S**poofing · **T**ampering · **R**epudiation · **I**nformation Dis
 
 #### T-1: Policy File Tampering
 
-**Scenario:** An attacker (or malicious AI agent output) modifies `~/.atlasbridge/policy.toml` to remove restrictive rules, allowing dangerous operations to proceed without approval.
+**Scenario:** A malicious process modifies the policy file to remove restrictive rules.
 
 **Attack vector:** Local (file write access)
 **Likelihood:** Medium
-**Impact:** Critical (bypasses entire approval layer)
+**Impact:** Critical
 
 **Mitigations:**
-- Policy file should be 0600 (owner-only write)
-- Policy reload via SIGHUP validates schema before applying
-- Doctor checks policy file integrity
-- Future: signed policy files with local key
+- Policy file should be 0600
+- Policy reload validates schema before applying
+- Invalid policy falls back to safe default (`require_human`)
 
-**Residual risk:** Medium — any local process running as the same user can modify the file.
+**Residual risk:** Medium — local write access is sufficient.
 
 ---
 
 #### T-2: Audit Log Tampering
 
-**Scenario:** Attacker modifies the audit log to remove evidence of approved operations or to alter decision records.
-
-**Attack vector:** Local
-**Likelihood:** Low
-**Impact:** Medium (integrity / non-repudiation)
-
-**Mitigations:**
-- Audit log is append-only (file opened with O_APPEND)
-- Each entry includes SHA-256 hash of the previous entry (hash chain)
-- Doctor verifies hash chain integrity on `atlasbridge doctor`
-- Future: external log shipping to immutable store
-
-**Residual risk:** Low for passive tampering; hash chain detects modifications.
-
----
-
-#### T-3: Database Tampering
-
-**Scenario:** Attacker modifies SQLite database to change approval decisions from `denied` to `approved`, or to delete audit records.
+**Scenario:** Attacker modifies stored audit events to remove evidence.
 
 **Attack vector:** Local
 **Likelihood:** Low
 **Impact:** Medium
 
 **Mitigations:**
-- DB file should be 0600
-- Audit log is separate from DB (audit.log file) and cannot be altered without detection
-- Future: DB-level checksums
+- SHA-256 hash chain: each event includes `prev_hash` and its own `hash`
+- `atlasbridge audit verify` re-computes and validates the entire chain
+- Deletion, reordering, payload modification, and phantom insertion are all detectable
 
-**Residual risk:** Medium — DB tampering is possible but does not bypass real-time approval flow (past decisions only).
+**Residual risk:** Low — hash chain detects all in-place modifications.
+
+---
+
+#### T-3: Autopilot State Tampering via Dashboard DB
+
+**Scenario:** Attacker directly modifies `dashboard.db` to flip the autopilot state without using operator controls.
+
+**Attack vector:** Local
+**Likelihood:** Low
+**Impact:** High
+
+**Mitigations:**
+- Operator write actions call `atlasbridge autopilot` CLI → state change audited in `atlasbridge.db`
+- Operator audit log in `dashboard.db` records every write action
+- Runtime reads autopilot state from `atlasbridge.db`, not `dashboard.db`
+
+**Residual risk:** Low — DB-level tampering bypasses the audit trail but not runtime invariants.
 
 ---
 
 #### T-4: Tool Call Argument Injection
 
-**Scenario:** A malicious prompt causes the AI agent to issue tool calls with arguments crafted to bypass policy rules. Example: `write_file` with path `"../../.env"` intending to overwrite a secret file, relying on the policy using a non-normalized path comparison.
+**Scenario:** A malicious prompt causes the AI agent to issue tool calls with crafted arguments designed to bypass policy rules.
 
 **Attack vector:** Via AI agent (prompt injection)
-**Likelihood:** High (prompt injection is a known AI attack)
+**Likelihood:** High
 **Impact:** High
 
 **Mitigations:**
-- Policy engine normalizes all file paths before matching (`os.path.realpath`)
-- Shell command policy rules use regex matching on the full, unexpanded command
-- Critic agent flags unexpected argument patterns
-- All tool arguments are validated against expected schemas before execution
+- Policy engine normalises file paths before matching
+- Shell command rules use regex on full unexpanded command
+- Prompt injection does not change the deterministic policy evaluation result
 
-**Residual risk:** Medium — sophisticated prompt injection may craft arguments that appear legitimate but aren't.
+**Residual risk:** Medium — sophisticated injection may craft arguments that appear legitimate.
 
 ---
 
 ### R — Repudiation
 
-#### R-1: Denial of Approval Action
+#### R-1: Denial of Operator Action
 
-**Scenario:** A user claims they did not approve a destructive operation, but AtlasBridge has a record. The user challenges the audit log.
-
-**Attack vector:** Social
-**Likelihood:** Low
-**Impact:** Medium
+**Scenario:** An operator claims they did not change the autonomy mode.
 
 **Mitigations:**
-- Audit log records Telegram user ID, timestamp, and approval message ID
-- Hash chain prevents after-the-fact record insertion
-- Telegram delivers messages with its own timestamps (separate evidence)
+- Operator audit log in `dashboard.db`: every POST to `/api/operator/*` recorded with timestamp, body, and result
+- Autopilot state changes recorded in `atlasbridge.db` (hash-chained)
+- `atlasbridge autopilot explain --last N` shows full history
 
-**Residual risk:** Low — multiple evidence sources make repudiation implausible.
+**Residual risk:** Low — two independent audit trails.
 
 ---
 
-#### R-2: Denial of Tool Call
+#### R-2: Denial of Approval Action
 
-**Scenario:** AI agent denies issuing a tool call. AtlasBridge must prove the call was made.
-
-**Attack vector:** Social
-**Likelihood:** Low
-**Impact:** Low
+**Scenario:** User claims they did not approve a destructive operation.
 
 **Mitigations:**
-- All tool calls logged with full arguments at interception point
-- Session ID links tool call to specific `atlasbridge run` invocation
+- Audit log records channel identity, timestamp, nonce, and value
+- Hash chain prevents after-the-fact record insertion
+- Telegram/Slack deliver messages with their own timestamps (independent evidence)
 
 **Residual risk:** Low.
 
@@ -239,246 +237,175 @@ STRIDE = **S**poofing · **T**ampering · **R**epudiation · **I**nformation Dis
 
 #### I-1: Secret Exfiltration via Tool Call Arguments
 
-**Scenario:** AI agent issues a `read_file` call on `.env` or a private key file. Even if denied, the file content may appear in logs.
-
-**Attack vector:** Via AI agent
-**Likelihood:** High
-**Impact:** Critical
+**Scenario:** AI agent reads `.env` or a private key; content appears in logs or channel messages.
 
 **Mitigations:**
-- Policy contains default deny rules for `*.env`, `*.pem`, `*.key`, `*credentials*`, `*secret*`
-- Tool call arguments are logged at DEBUG level only (not INFO)
-- File contents are NEVER logged (only path and size)
-- Doctor checks for common secret files in unexpected locations
+- Default policy contains deny rules for `*.env`, `*.pem`, `*.key`, `*credentials*`, `*secret*`
+- `SecretRedactor` strips tokens matching known patterns before audit logging
+- File contents are never logged (only path and size)
+- Audit writer uses `safe_excerpt()` — first 20 chars, token-redacted
 
-**Residual risk:** Medium — policy must be configured correctly; defaults help but don't cover all cases.
+**Residual risk:** Medium — policy must be configured correctly.
 
 ---
 
-#### I-2: Bot Token Exposure in Logs/Environment
+#### I-2: Stack Trace Disclosure in Dashboard
 
-**Scenario:** The Telegram bot token appears in process environment, logs, or shell history.
-
-**Attack vector:** Local log inspection
-**Likelihood:** Medium (common misconfiguration)
-**Impact:** Critical
+**Scenario:** An unhandled error in the dashboard API leaks internal details to clients.
 
 **Mitigations:**
-- Bot token stored in `~/.atlasbridge/config.toml` (0600), not environment by default
-- structlog masks values matching token patterns (regex: `\d+:[A-Za-z0-9_-]{35}`)
-- `.env` in `.gitignore`
-- `atlasbridge config get telegram.bot_token` outputs `***REDACTED***` by default
-- Doctor checks that `.env` is not in the git index
+- Production error handler returns generic `"Internal Server Error"` for all 5xx responses
+- Stack traces and internal error messages not included in responses
+- `err.message` preserved only for 4xx (client errors) where user-facing
+
+**Residual risk:** Very low.
+
+---
+
+#### I-3: Bot Token Exposure in Logs
+
+**Scenario:** Telegram or Slack bot token appears in process environment, logs, or shell history.
+
+**Mitigations:**
+- Tokens stored in config file (0600), not environment by default
+- structlog masks values matching token patterns
+- `atlasbridge config get telegram.bot_token` outputs `***REDACTED***`
 
 **Residual risk:** Low with correct configuration.
 
 ---
 
-#### I-3: Approval Content Visible to Telegram
-
-**Scenario:** Tool call arguments (potentially containing sensitive data) are included in Telegram approval messages sent to Telegram's servers.
-
-**Attack vector:** Third-party service
-**Likelihood:** Medium (by design — needs data for approval decision)
-**Impact:** Medium
-
-**Mitigations:**
-- Approval messages include tool name, path, and operation type — not file contents
-- File contents, secret values, and credential arguments are truncated/redacted before sending
-- Telegram uses end-to-end encryption for secret chats (standard chats are encrypted in transit)
-
-**Residual risk:** Medium — Telegram receives metadata about operations. This is an accepted trade-off for the MVP.
-
----
-
-#### I-4: Audit Log Disclosure
-
-**Scenario:** The audit log, stored on disk, is readable by other processes running as the same user.
-
-**Attack vector:** Local
-**Likelihood:** Low
-**Impact:** Medium
-
-**Mitigations:**
-- Audit log file permissions should be 0600
-- Doctor checks and warns if permissions are wrong
-
-**Residual risk:** Low with correct permissions.
-
----
-
 ### D — Denial of Service
 
-#### D-1: Approval Flood Attack
+#### D-1: Operator Endpoint Abuse
 
-**Scenario:** A malicious AI agent (or runaway prompt) issues thousands of tool calls rapidly, flooding the Telegram channel with approval requests and making the system unusable.
-
-**Attack vector:** Via AI agent
-**Likelihood:** Medium (can happen accidentally with agentic loops)
-**Impact:** Medium
+**Scenario:** Automated script hammers `/api/operator/kill-switch` repeatedly.
 
 **Mitigations:**
-- Rate limiting: max N approvals per minute per session (configurable, default: 10/min)
-- Session-level circuit breaker: after M consecutive denies, session is paused
-- Telegram rate limit: Telegram's own API limits bot messages (30/sec globally, 1/sec per chat)
-- Alert sent to Telegram when rate limit is approaching
-
-**Residual risk:** Low with rate limiting in place.
-
----
-
-#### D-2: Telegram Long-Poll Disruption
-
-**Scenario:** Telegram API is unavailable, causing the daemon to fail and block all operations.
-
-**Attack vector:** External (network/Telegram outage)
-**Likelihood:** Low
-**Impact:** High (all approvals would fail)
-
-**Mitigations:**
-- Configurable timeout action on Telegram unavailability: `deny` (default) or `allow` (dangerous)
-- Exponential backoff on polling failures
-- Local fallback: `atlasbridge approvals approve <id>` via CLI works even without Telegram
-- Daemon continues running; pending approvals are queued for when connectivity returns
-
-**Residual risk:** Medium — Telegram outage blocks mobile approvals but CLI override remains.
-
----
-
-#### D-3: Database Lock Corruption
-
-**Scenario:** AtlasBridge daemon crashes mid-write, leaving the SQLite database in an inconsistent state.
-
-**Attack vector:** Internal failure
-**Likelihood:** Low
-**Impact:** Medium
-
-**Mitigations:**
-- SQLite WAL (Write-Ahead Logging) mode for crash-safe writes
-- Doctor detects DB corruption and suggests repair
-- DB is backed up before migrations
-- Audit log is separate file — DB corruption doesn't affect audit integrity
+- Rate limiter: 10 requests per minute per IP per path
+- CSRF token required — automated scripts without cookie jar blocked at 403
+- 429 response with `Retry-After` header
 
 **Residual risk:** Low.
+
+---
+
+#### D-2: Approval Flood Attack
+
+**Scenario:** Runaway AI agent issues thousands of tool calls, flooding the escalation channel.
+
+**Mitigations:**
+- Rate limiting: max N escalations per minute per session (default 10)
+- Circuit breaker: pause autopilot after M consecutive escalations (default 20)
+- Kill switch: operator can disable autopilot from dashboard or CLI
+
+**Residual risk:** Low with rate limiting and kill switch.
+
+---
+
+#### D-3: Oversized Payload Attack
+
+**Scenario:** Attacker sends a large JSON payload to the dashboard API.
+
+**Mitigations:**
+- `express.json({ limit: "32kb" })` — payloads larger than 32 KB rejected with 413
+- `urlencoded({ limit: "32kb" })` on URL-encoded endpoints
+
+**Residual risk:** Very low.
+
+---
+
+#### D-4: Channel Outage
+
+**Scenario:** Telegram or Slack API unavailable; daemon blocks, all escalations stall.
+
+**Mitigations:**
+- Configurable timeout action: `deny` (default) or `require_human`
+- Exponential backoff on polling failures
+- Local fallback: `atlasbridge autopilot disable` works without channel
+
+**Residual risk:** Medium — channel outage blocks mobile approvals; CLI override remains.
 
 ---
 
 ### E — Elevation of Privilege
 
-#### E-1: Arbitrary Shell Execution from Telegram
+#### E-1: Arbitrary Shell Execution from Channel
 
-**Scenario:** An attacker sends a Telegram message containing a shell command and tricks AtlasBridge into executing it.
-
-**Attack vector:** External via Telegram
-**Likelihood:** Low (requires bot token or whitelisted account)
-**Impact:** Critical
+**Scenario:** Attacker sends a channel message containing a shell command.
 
 **Mitigations:**
-- AtlasBridge NEVER executes arbitrary commands from Telegram messages
-- Only structured responses are accepted: `approve`, `deny` with approval ID
-- All Telegram input is parsed against a strict schema; anything else is rejected
-- No `/exec`, `/run`, or similar commands in the bot
+- AtlasBridge never executes arbitrary commands from channel messages
+- Operator write actions use `execFile` (not `exec`) — no shell interpolation
+- Only structured responses accepted (approve/deny with prompt ID)
 
-**Residual risk:** Very low — this is a design principle, not just a mitigation.
+**Residual risk:** Very low — by design.
 
 ---
 
-#### E-2: PTY Escape from Wrapped Process
+#### E-2: Content-Type Bypass on Operator Endpoints
 
-**Scenario:** The wrapped AI CLI process escapes the PTY sandbox and gains control of the interceptor process.
-
-**Attack vector:** Via AI agent / subprocess
-**Likelihood:** Low (requires PTY vulnerability)
-**Impact:** Critical
+**Scenario:** Attacker bypasses content-type validation and injects a non-JSON body.
 
 **Mitigations:**
-- PTY adapter runs subprocess with restricted environment (no `ATLASBRIDGE_*` vars passed through)
-- Subprocess runs as same user (no privilege escalation possible)
-- Signal handling: SIGTERM/SIGINT from subprocess doesn't kill daemon
-- Future: namespaced execution (Phase 4)
+- Content-type middleware enforces `application/json` on all POST/PUT/PATCH to `/api`
+- Non-JSON content type rejected with 415 before request body is parsed
 
-**Residual risk:** Low.
-
----
-
-#### E-3: Config Injection via Environment Variables
-
-**Scenario:** An attacker sets `ATLASBRIDGE_TELEGRAM_ALLOWED_USERS` in the environment to add themselves as an allowed user.
-
-**Attack vector:** Local (requires ability to set env vars in daemon's environment)
-**Likelihood:** Low
-**Impact:** Critical
-
-**Mitigations:**
-- Environment vars documented as intentional override mechanism (expected behavior)
-- Daemon logs the source of each config value at DEBUG level
-- Running as separate user/service account in hardened deployments
-
-**Residual risk:** Low — local code execution is the prerequisite.
+**Residual risk:** Very low.
 
 ---
 
 ## Risk Summary Matrix
 
-| Threat | Likelihood | Impact | Risk Level | Status |
-|--------|------------|--------|------------|--------|
-| S-1 Telegram user impersonation | Low | Critical | Medium | Mitigated |
-| S-2 AI agent identity spoofing | Medium | High | High | Partially mitigated |
-| S-3 Config symlink attack | Low | High | Low | Mitigated |
+| Threat | Likelihood | Impact | Risk | Status |
+|--------|------------|--------|------|--------|
+| S-1 Channel user impersonation | Low | Critical | Medium | Mitigated |
+| S-2 Dashboard operator spoofing | Low | High | Low | Mitigated |
+| S-3 AI agent identity spoofing | Medium | High | Medium | Partially mitigated |
 | T-1 Policy file tampering | Medium | Critical | High | Partially mitigated |
 | T-2 Audit log tampering | Low | Medium | Low | Mitigated |
-| T-3 Database tampering | Low | Medium | Low | Mitigated |
+| T-3 Autopilot state DB tampering | Low | High | Low | Mitigated |
 | T-4 Tool call argument injection | High | High | **Critical** | Mitigated |
-| R-1 Denial of approval action | Low | Medium | Low | Mitigated |
-| R-2 Denial of tool call | Low | Low | Low | Mitigated |
-| I-1 Secret exfiltration via args | High | Critical | **Critical** | Mitigated |
-| I-2 Bot token in logs/env | Medium | Critical | High | Mitigated |
-| I-3 Data visible to Telegram | Medium | Medium | Medium | Accepted |
-| I-4 Audit log disclosure | Low | Medium | Low | Mitigated |
-| D-1 Approval flood | Medium | Medium | Medium | Mitigated |
-| D-2 Telegram outage | Low | High | Medium | Mitigated |
-| D-3 DB lock corruption | Low | Medium | Low | Mitigated |
-| E-1 Arbitrary shell from Telegram | Low | Critical | Medium | Mitigated |
-| E-2 PTY escape | Low | Critical | Medium | Mitigated |
-| E-3 Config injection via env | Low | Critical | Medium | Accepted |
+| R-1 Denial of operator action | Low | Medium | Low | Mitigated |
+| R-2 Denial of approval | Low | Medium | Low | Mitigated |
+| I-1 Secret exfiltration | High | Critical | **Critical** | Mitigated |
+| I-2 Stack trace disclosure | Low | Low | Very Low | Mitigated |
+| I-3 Bot token in logs | Medium | Critical | High | Mitigated |
+| D-1 Operator endpoint abuse | Low | Medium | Low | Mitigated |
+| D-2 Approval flood | Medium | Medium | Medium | Mitigated |
+| D-3 Oversized payload | Low | Medium | Very Low | Mitigated |
+| D-4 Channel outage | Low | High | Medium | Partially mitigated |
+| E-1 Arbitrary shell from channel | Low | Critical | Medium | Mitigated |
+| E-2 Content-type bypass | Low | Low | Very Low | Mitigated |
 
 ---
 
-## Supply Chain Risks
+## Correctness Invariants (not security features)
 
-| Risk | Mitigation |
-|------|------------|
-| Malicious PyPI package in deps | Pin exact versions in production; use `pip-audit` |
-| Compromised GitHub Actions runner | Use pinned action SHAs (`actions/checkout@v4` → SHA) |
-| Dependabot PR introducing vulnerability | CI runs `bandit` and `pip-audit` on every PR |
-| Typosquatting of `atlasbridge` | Publish to PyPI early to claim namespace |
+These invariants exist to keep the relay working correctly:
 
----
-
-## Concurrency Risks
-
-| Risk | Mitigation |
-|------|------------|
-| Two Telegram responses for same approval | Approvals are processed with database row locking; first response wins |
-| Race between approval and timeout | Atomic status transition in DB; timeout worker checks status before acting |
-| Concurrent writes to audit log | Audit log writer serializes via `asyncio.Lock` |
+| # | Invariant | Implementation |
+|---|-----------|----------------|
+| 1 | No duplicate injection | `decide_prompt()` atomic SQL guard (`nonce_used = 0`) |
+| 2 | No expired injection | `expires_at > datetime('now')` in WHERE clause |
+| 3 | No cross-session injection | `prompt_id + session_id` binding verified |
+| 4 | No unauthorised injection | Allowlisted channel identities only |
+| 5 | No echo loops | 500ms suppression window after every injection |
+| 6 | No lost prompts | Daemon restart reloads pending from SQLite |
+| 7 | Bounded memory | Rolling 4096-byte output buffer |
 
 ---
 
 ## Accepted Risks
 
-1. **I-3 (Telegram receives operation metadata)**: An accepted trade-off for usability. Mitigation: never send file contents.
-2. **E-3 (Config injection via env)**: Documented, intentional behavior for CI/CD and scripting use cases.
-3. **Local privilege (same user)**: AtlasBridge does not protect against a fully compromised user account. The threat model assumes the user's machine and account are not already fully compromised.
+1. **Local privilege (same user):** AtlasBridge does not protect against a fully compromised user account.
+2. **Channel metadata visible to Telegram/Slack:** Accepted trade-off; never send file contents.
+3. **Config injection via env:** Documented, intentional behavior for CI/CD scripting.
 
 ---
 
-## Threat Model Review Schedule
+## Review Schedule
 
-This threat model should be reviewed:
-- Before each major version release
-- When a new channel (WhatsApp) is added
-- When the tool interception mechanism changes
-- When a security incident occurs
+This document should be reviewed before each major version release, when a new channel is added, when operator controls change, or when a security incident occurs.
 
-Next review: v0.2.0 (MVP release)
+Next review: v2.0.0
