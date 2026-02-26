@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [1.6.1] — 2026-02-26
+
+### Fixed
+- **Terminal sandbox** — dashboard terminal (`/terminal`, port 3737) now spawns the shell in `os.tmpdir()` with a minimal clean environment. Previously the shell started in the host user's `$HOME` with all host env vars inherited, exposing directory structure and env to anyone who opened the terminal (#359)
+- **Terminal loopback guard** — WebSocket connections to `/ws/terminal` are now rejected for non-loopback origins (`127.0.0.1` / `::1`) before any shell is spawned, matching the existing guard on the FastAPI dashboard (#359)
+
 ### Added
 - **Agent profiles** — reusable named session presets (`atlasbridge profile create/list/show/delete/set-default`) that bundle session label, policy file, and adapter defaults (#204, #205, #206)
 - **`--profile` flag on `run`** — `atlasbridge run claude --profile ci` applies profile defaults; explicit CLI flags override
