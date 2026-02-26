@@ -18,6 +18,8 @@ from atlasbridge.core.store.provider_config import (
     validate_key,
 )
 
+_KEYCHAIN_RETRIEVE = "atlasbridge.core.store.provider_config._retrieve_from_keychain"
+
 
 @pytest.fixture()
 def conn(tmp_path: Path) -> sqlite3.Connection:
@@ -159,7 +161,7 @@ class TestValidateKey:
             store_key("openai", "sk-valid-key", conn)
 
         mock_client = _mock_httpx_client(200)
-        with patch("atlasbridge.core.store.provider_config._retrieve_from_keychain", return_value="sk-valid-key"):
+        with patch(_KEYCHAIN_RETRIEVE, return_value="sk-valid-key"):
             with patch("httpx.Client", return_value=mock_client):
                 result = validate_key("openai", conn)
 
@@ -173,7 +175,7 @@ class TestValidateKey:
             store_key("openai", "sk-bad-key", conn)
 
         mock_client = _mock_httpx_client(401)
-        with patch("atlasbridge.core.store.provider_config._retrieve_from_keychain", return_value="sk-bad-key"):
+        with patch(_KEYCHAIN_RETRIEVE, return_value="sk-bad-key"):
             with patch("httpx.Client", return_value=mock_client):
                 result = validate_key("openai", conn)
 
@@ -187,7 +189,7 @@ class TestValidateKey:
             store_key("openai", secret_key, conn)
 
         mock_client = _mock_httpx_client(401)
-        with patch("atlasbridge.core.store.provider_config._retrieve_from_keychain", return_value=secret_key):
+        with patch(_KEYCHAIN_RETRIEVE, return_value=secret_key):
             with patch("httpx.Client", return_value=mock_client):
                 result = validate_key("openai", conn)
 

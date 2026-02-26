@@ -17,6 +17,8 @@ from atlasbridge.core.store.provider_config import (
     validate_key,
 )
 
+_KEYCHAIN_RETRIEVE = "atlasbridge.core.store.provider_config._retrieve_from_keychain"
+
 
 @pytest.fixture()
 def conn(tmp_path: Path) -> sqlite3.Connection:
@@ -51,7 +53,7 @@ class TestValidateKeyHappyPath:
             store_key(provider, test_key, conn)
 
         with (
-            patch("atlasbridge.core.store.provider_config._retrieve_from_keychain", return_value=test_key),
+            patch(_KEYCHAIN_RETRIEVE, return_value=test_key),
             patch("httpx.Client", return_value=_mock_httpx_client(200)),
         ):
             result = validate_key(provider, conn)
@@ -70,7 +72,7 @@ class TestValidateKeyErrorPath:
             store_key("openai", "sk-bad", conn)
 
         with (
-            patch("atlasbridge.core.store.provider_config._retrieve_from_keychain", return_value="sk-bad"),
+            patch(_KEYCHAIN_RETRIEVE, return_value="sk-bad"),
             patch("httpx.Client", return_value=_mock_httpx_client(status_code)),
         ):
             result = validate_key("openai", conn)
@@ -85,7 +87,7 @@ class TestValidateKeyErrorPath:
             store_key("openai", secret_key, conn)
 
         with (
-            patch("atlasbridge.core.store.provider_config._retrieve_from_keychain", return_value=secret_key),
+            patch(_KEYCHAIN_RETRIEVE, return_value=secret_key),
             patch("httpx.Client", return_value=_mock_httpx_client(401)),
         ):
             result = validate_key("openai", conn)
@@ -105,7 +107,7 @@ class TestValidateKeyErrorPath:
         mock_client.get = MagicMock(side_effect=httpx.RequestError("connection refused"))
 
         with (
-            patch("atlasbridge.core.store.provider_config._retrieve_from_keychain", return_value="sk-ant-netfail"),
+            patch(_KEYCHAIN_RETRIEVE, return_value="sk-ant-netfail"),
             patch("httpx.Client", return_value=mock_client),
         ):
             result = validate_key("anthropic", conn)
@@ -129,7 +131,7 @@ class TestProviderKeyLifecycle:
                 assert "AIza-lifecycle" not in str(v)
 
         with (
-            patch("atlasbridge.core.store.provider_config._retrieve_from_keychain", return_value="AIza-lifecycle"),
+            patch(_KEYCHAIN_RETRIEVE, return_value="AIza-lifecycle"),
             patch("httpx.Client", return_value=_mock_httpx_client(200)),
         ):
             validate_key("gemini", conn)

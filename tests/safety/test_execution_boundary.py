@@ -419,7 +419,7 @@ class TestBoundaryMessageTemplates:
         not via CLI command from the channel.
         """
         from atlasbridge.core.gate.engine import GateRejectReason
-        from atlasbridge.core.gate.messages import _REJECT_NEXT_ACTIONS, _REJECT_HEADLINES
+        from atlasbridge.core.gate.messages import _REJECT_HEADLINES, _REJECT_NEXT_ACTIONS
 
         # Either the headline or the next_action must guide users to start a session
         headline = _REJECT_HEADLINES[GateRejectReason.REJECT_NO_ACTIVE_SESSION]

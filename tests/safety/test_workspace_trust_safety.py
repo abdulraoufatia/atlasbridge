@@ -19,7 +19,6 @@ import pytest
 from atlasbridge.core.store.database import Database
 from atlasbridge.core.store.migrations import run_migrations
 from atlasbridge.core.store.workspace_trust import (
-    get_trust,
     get_workspace_status,
     grant_trust,
     revoke_trust,
