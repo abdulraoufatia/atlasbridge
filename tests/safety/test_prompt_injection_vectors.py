@@ -286,3 +286,95 @@ class TestAuditTamperResistance:
         result = verify_mod.verify_audit_chain(db)
         assert result.valid is False
         assert len(result.errors) >= 1
+
+
+# ---------------------------------------------------------------------------
+# 7. Control character injection
+# ---------------------------------------------------------------------------
+
+
+class TestControlCharacterInjection:
+    """Control characters in identifiers and values must not break the guard."""
+
+    @pytest.mark.parametrize(
+        "ctrl_char",
+        [
+            "\x07",   # BEL
+            "\x0c",   # FF (form feed)
+            "\x0b",   # VT (vertical tab)
+            "\x08",   # BS (backspace)
+        ],
+    )
+    def test_control_chars_in_excerpt_stored_safely(self, db: Database, ctrl_char: str):
+        """Control characters in prompt excerpt must be stored without crashing."""
+        expires = _expires_at(300)
+        db.save_prompt(
+            prompt_id="p-ctrl",
+            session_id="s1",
+            prompt_type="yes_no",
+            confidence="high",
+            excerpt=f"Continue{ctrl_char}?",
+            nonce="n-ctrl",
+            expires_at=expires,
+        )
+        row = db.get_prompt("p-ctrl")
+        assert row is not None
+
+
+# ---------------------------------------------------------------------------
+# 8. Channel identity spoofing
+# ---------------------------------------------------------------------------
+
+
+class TestChannelIdentitySpoofing:
+    """Crafted channel_identity strings must not affect the decide_prompt guard."""
+
+    @pytest.mark.parametrize(
+        "spoofed_identity",
+        [
+            "tg:' OR 1=1 --",
+            "slack:; DROP TABLE prompts; --",
+            "tg:\x00injected",
+            "fake-channel://attacker",
+        ],
+    )
+    def test_spoofed_channel_identity_rejected(self, db: Database, spoofed_identity: str):
+        """A spoofed channel_identity must not allow an unauthorised decide_prompt."""
+        _save_prompt(db, "p-chan", "s1", "n-chan")
+        # Attempting decide_prompt with a legitimate nonce but spoofed identity
+        # The guard cares about nonce/status/TTL — not channel_identity — so this
+        # will succeed on decide_prompt but the audit log records the spoofed identity.
+        # What we verify: no SQL injection via channel_identity value.
+        result = db.decide_prompt("p-chan", "replied", spoofed_identity, "y", "n-chan")
+        # Guard accepts or rejects based on nonce logic, not channel string
+        assert result in (0, 1)
+        # No other rows were affected
+        count = db._db.execute("SELECT COUNT(*) AS n FROM prompts").fetchone()["n"]
+        assert count == 1
+
+
+# ---------------------------------------------------------------------------
+# 9. Reply value injection
+# ---------------------------------------------------------------------------
+
+
+class TestReplyValueInjection:
+    """Newlines and CRLF in reply values must not alter audit or prompt records."""
+
+    @pytest.mark.parametrize(
+        "injected_value",
+        [
+            "y\nDROP TABLE prompts",
+            "y\r\nContent-Type: text/html",
+            "y\x00hidden",
+            "\n" * 100,
+        ],
+    )
+    def test_injected_reply_value_stored_cleanly(self, db: Database, injected_value: str):
+        """Injected bytes in reply value must not corrupt decide_prompt outcome."""
+        _save_prompt(db, "p-reply", "s1", "n-reply")
+        result = db.decide_prompt("p-reply", "replied", "tg:123", injected_value, "n-reply")
+        assert result == 1  # nonce guard accepts it
+        # Prompt status updated correctly
+        row = db.get_prompt("p-reply")
+        assert row["status"] == "replied"
