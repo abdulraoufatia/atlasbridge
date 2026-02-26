@@ -349,6 +349,30 @@ class Database:
             (session_id, limit),
         ).fetchall()
 
+    def get_audit_events_filtered(
+        self,
+        session_id: str | None = None,
+        since: str | None = None,
+        until: str | None = None,
+    ) -> list[sqlite3.Row]:
+        """Return audit events matching optional filters, ordered chronologically."""
+        clauses: list[str] = []
+        params: list[str] = []
+        if session_id:
+            clauses.append("session_id = ?")
+            params.append(session_id)
+        if since:
+            clauses.append("timestamp >= ?")
+            params.append(since)
+        if until:
+            clauses.append("timestamp <= ?")
+            params.append(until)
+        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+        return self._db.execute(
+            f"SELECT * FROM audit_events{where} ORDER BY timestamp ASC",
+            params,
+        ).fetchall()
+
     def count_audit_events(self) -> int:
         """Return the total number of audit events."""
         row = self._db.execute("SELECT count(*) FROM audit_events").fetchone()

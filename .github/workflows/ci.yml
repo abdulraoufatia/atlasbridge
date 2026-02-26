@@ -106,6 +106,9 @@ jobs:
       - name: atlasbridge audit --help
         run: atlasbridge audit --help
 
+      - name: atlasbridge audit export --help
+        run: atlasbridge audit export --help
+
       - name: atlasbridge replay --help
         run: atlasbridge replay --help
 
