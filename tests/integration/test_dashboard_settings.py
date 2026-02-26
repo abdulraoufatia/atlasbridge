@@ -266,10 +266,7 @@ class TestEditionScopedSettings:
         resp = core_client.get("/enterprise/settings")
         assert resp.status_code == 404
 
-    def test_enterprise_settings_404_is_json(self, core_client):
-        """Enterprise settings 404 should be JSON with capability info."""
+    def test_enterprise_settings_not_found_on_core(self, core_client):
+        """Enterprise settings route does not exist on core edition."""
         resp = core_client.get("/enterprise/settings")
         assert resp.status_code == 404
-        data = resp.json()
-        assert "error" in data
-        assert "authority.enterprise_settings" in data["error"]

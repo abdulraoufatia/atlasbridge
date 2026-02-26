@@ -14,13 +14,11 @@ Usage::
 from __future__ import annotations
 
 import logging
-import sys
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -33,9 +31,6 @@ _access_log = logging.getLogger("atlasbridge.dashboard.access")
 _HERE = Path(__file__).resolve().parent
 _TEMPLATES_DIR = _HERE / "templates"
 _STATIC_DIR = _HERE / "static"
-
-# Integrity verify throttle — 10-second cooldown
-_VERIFY_COOLDOWN_SECONDS = 10.0
 
 
 def _default_db_path() -> Path:
@@ -54,6 +49,8 @@ def _default_trace_path() -> Path:
 
 def _timeago(value: str | None) -> str:
     """Jinja2 filter: convert ISO timestamp to '2h ago' style string."""
+    from datetime import datetime, timezone
+
     if not value:
         return ""
     try:
@@ -103,88 +100,6 @@ class _AccessLogMiddleware(BaseHTTPMiddleware):
         return response
 
 
-def _collect_settings(
-    db_path: Path,
-    trace_path: Path,
-    edition: str = "",
-    authority_mode: str = "",
-) -> dict:
-    """Gather read-only settings data for the settings page."""
-    import atlasbridge
-    from atlasbridge.cli._doctor import (
-        _check_adapters,
-        _check_config,
-        _check_database,
-        _check_platform,
-        _check_ptyprocess,
-        _check_python_version,
-        _check_ui_assets,
-    )
-    from atlasbridge.core.config import _config_file_path, atlasbridge_dir
-    from atlasbridge.core.constants import AUDIT_FILENAME
-    from atlasbridge.enterprise.edition import (
-        detect_authority_mode,
-        detect_edition,
-    )
-    from atlasbridge.enterprise.registry import FeatureRegistry
-
-    ed = detect_edition() if not edition else None
-    am = detect_authority_mode() if not authority_mode else None
-    ed_val = edition or (ed.value if ed else "core")
-    am_val = authority_mode or (am.value if am else "readonly")
-
-    config_dir = atlasbridge_dir()
-    config_file = _config_file_path()
-
-    checks_raw = [
-        _check_python_version(),
-        _check_platform(),
-        _check_ptyprocess(),
-        _check_config(),
-        _check_database(),
-        _check_adapters(),
-        _check_ui_assets(),
-    ]
-    diagnostics = [c for c in checks_raw if c is not None]
-
-    # Resolve edition/authority for registry call
-    from atlasbridge.enterprise.edition import AuthorityMode, Edition
-
-    ed_enum = Edition(ed_val) if ed_val in Edition.__members__.values() else Edition.CORE
-    am_enum = (
-        AuthorityMode(am_val)
-        if am_val in AuthorityMode.__members__.values()
-        else AuthorityMode.READONLY
-    )
-
-    vi = sys.version_info
-    data: dict = {
-        "runtime": {
-            "edition": ed_enum.value,
-            "authority_mode": am_enum.value,
-            "version": atlasbridge.__version__,
-            "python_version": f"{vi.major}.{vi.minor}.{vi.micro}",
-            "platform": sys.platform,
-        },
-        "config_paths": {
-            "config_dir": str(config_dir),
-            "config_file": str(config_file),
-            "db_path": str(db_path),
-            "audit_log": str(config_dir / AUDIT_FILENAME),
-            "trace_file": str(trace_path),
-        },
-        "dashboard": {
-            "host": "127.0.0.1",
-            "port": 8787,
-            "loopback_only": True,
-        },
-        "diagnostics": diagnostics,
-        "capabilities": FeatureRegistry.list_capabilities(ed_enum, am_enum),
-    }
-
-    return data
-
-
 def create_app(
     db_path: Path | None = None,
     trace_path: Path | None = None,
@@ -192,8 +107,7 @@ def create_app(
 ) -> FastAPI:
     """Create the FastAPI dashboard application."""
     from atlasbridge.enterprise.edition import Edition, detect_authority_mode, detect_edition
-    from atlasbridge.enterprise.guard import FeatureUnavailableError, require_capability
-    from atlasbridge.enterprise.registry import CapabilityDecision, FeatureRegistry
+    from atlasbridge.enterprise.guard import FeatureUnavailableError
 
     db_path = db_path or _default_db_path()
     trace_path = trace_path or _default_trace_path()
@@ -238,227 +152,36 @@ def create_app(
     repo = DashboardRepo(db_path, trace_path)
     repo.connect()
 
-    # Module-level throttle state for integrity verify
-    last_verify: dict[str, float] = {"ts": 0.0}
+    # ------------------------------------------------------------------
+    # Mount routers — edition-aware
+    # ------------------------------------------------------------------
 
-    def _require_enterprise() -> None:
-        """Raise FeatureUnavailableError if not enterprise edition."""
-        if edition != Edition.ENTERPRISE:
-            decision = CapabilityDecision(
-                allowed=False,
-                reason_code="EDITION_DENY",
-                capability_class="enterprise",
-                decision_fingerprint="",
+    from atlasbridge.dashboard.routers.core import make_core_router
+
+    app.include_router(
+        make_core_router(
+            repo=repo,
+            templates=templates,
+            db_path=db_path,
+            trace_path=trace_path,
+            edition_value=edition.value,
+            authority_mode_value=authority_mode.value,
+            environment=environment,
+        )
+    )
+
+    if edition == Edition.ENTERPRISE:
+        from atlasbridge.dashboard.routers.enterprise import make_enterprise_router
+
+        app.include_router(
+            make_enterprise_router(
+                repo=repo,
+                templates=templates,
+                db_path=db_path,
+                trace_path=trace_path,
+                edition=edition,
+                authority_mode=authority_mode,
             )
-            raise FeatureUnavailableError(decision, "enterprise_feature")
-
-    # ------------------------------------------------------------------
-    # HTML Routes
-    # ------------------------------------------------------------------
-
-    @app.get("/", response_class=HTMLResponse)
-    async def home(request: Request):
-        status = request.query_params.get("status") or None
-        tool = request.query_params.get("tool") or None
-        q = request.query_params.get("q") or None
-        stats = repo.get_stats()
-        sessions = repo.list_sessions(limit=20, status=status, tool=tool, q=q)
-        return templates.TemplateResponse(
-            request,
-            "home.html",
-            {
-                "stats": stats,
-                "sessions": sessions,
-                "db_available": repo.db_available,
-                "filter_status": status or "",
-                "filter_tool": tool or "",
-                "filter_q": q or "",
-                "environment": environment,
-            },
-        )
-
-    @app.get("/sessions/{session_id}", response_class=HTMLResponse)
-    async def session_detail(request: Request, session_id: str):
-        session = repo.get_session(session_id)
-        prompts = repo.list_prompts_for_session(session_id) if session else []
-        session_traces = repo.trace_entries_for_session(session_id, limit=100) if session else []
-        return templates.TemplateResponse(
-            request,
-            "session_detail.html",
-            {
-                "session": session,
-                "prompts": prompts,
-                "traces": session_traces,
-                "db_available": repo.db_available,
-            },
-        )
-
-    @app.get("/traces", response_class=HTMLResponse)
-    async def traces_list(request: Request):
-        _require_enterprise()
-        page = int(request.query_params.get("page") or 1)
-        per_page = 20
-        action_type = request.query_params.get("action_type") or None
-        confidence = request.query_params.get("confidence") or None
-        entries, total = repo.trace_page(
-            page=page, per_page=per_page, action_type=action_type, confidence=confidence
-        )
-        total_pages = max(1, (total + per_page - 1) // per_page)
-        return templates.TemplateResponse(
-            request,
-            "traces.html",
-            {
-                "entries": entries,
-                "page": page,
-                "total_pages": total_pages,
-                "total": total,
-                "trace_available": repo.trace_available,
-                "filter_action_type": action_type or "",
-                "filter_confidence": confidence or "",
-            },
-        )
-
-    @app.get("/traces/{index}", response_class=HTMLResponse)
-    async def trace_detail(request: Request, index: int):
-        _require_enterprise()
-        entries = repo.trace_tail(index + 1)
-        entry = entries[index] if index < len(entries) else None
-        return templates.TemplateResponse(
-            request,
-            "trace_detail.html",
-            {
-                "entry": entry,
-                "index": index,
-                "trace_available": repo.trace_available,
-            },
-        )
-
-    @app.get("/integrity", response_class=HTMLResponse)
-    async def integrity(request: Request):
-        _require_enterprise()
-        trace_valid, trace_errors = repo.verify_integrity()
-        audit_valid, audit_errors = repo.verify_audit_integrity()
-        audit_events = repo.list_audit_events(limit=50)
-        return templates.TemplateResponse(
-            request,
-            "integrity.html",
-            {
-                "trace_valid": trace_valid,
-                "trace_errors": trace_errors,
-                "audit_valid": audit_valid,
-                "audit_errors": audit_errors,
-                "audit_events": audit_events,
-                "db_available": repo.db_available,
-                "trace_available": repo.trace_available,
-            },
-        )
-
-    @app.get("/settings", response_class=HTMLResponse)
-    async def settings(request: Request):
-        settings_data = _collect_settings(
-            db_path,
-            trace_path,
-            edition=edition.value,
-            authority_mode=authority_mode.value,
-        )
-        return templates.TemplateResponse(
-            request,
-            "settings.html",
-            {"settings": settings_data},
-        )
-
-    @app.get("/enterprise/settings", response_class=HTMLResponse)
-    async def enterprise_settings(request: Request):
-        require_capability(edition, authority_mode, "authority.enterprise_settings")
-        settings_data = _collect_settings(
-            db_path,
-            trace_path,
-            edition=edition.value,
-            authority_mode=authority_mode.value,
-        )
-        return templates.TemplateResponse(
-            request,
-            "settings.html",
-            {"settings": settings_data},
-        )
-
-    # ------------------------------------------------------------------
-    # JSON API Routes
-    # ------------------------------------------------------------------
-
-    @app.get("/api/stats")
-    async def api_stats():
-        stats = repo.get_stats()
-        return JSONResponse(stats)
-
-    @app.get("/api/sessions")
-    async def api_sessions(request: Request):
-        status = request.query_params.get("status") or None
-        tool = request.query_params.get("tool") or None
-        q = request.query_params.get("q") or None
-        sessions = repo.list_sessions(limit=100, status=status, tool=tool, q=q)
-        total = repo.count_sessions(status=status, tool=tool, q=q)
-        return JSONResponse({"sessions": sessions, "total": total})
-
-    @app.get("/api/sessions/{session_id}/export")
-    async def api_session_export(session_id: str):
-        _require_enterprise()
-        from atlasbridge.dashboard.export import export_session_json
-
-        bundle = export_session_json(repo, session_id)
-        if bundle is None:
-            return JSONResponse({"error": "Session not found"}, status_code=404)
-        return JSONResponse(bundle)
-
-    @app.post("/api/integrity/verify")
-    async def api_verify_integrity():
-        _require_enterprise()
-        now = time.monotonic()
-        if now - last_verify["ts"] < _VERIFY_COOLDOWN_SECONDS:
-            return JSONResponse(
-                {"error": "Too many requests. Try again later."},
-                status_code=429,
-            )
-        last_verify["ts"] = now
-        trace_valid, trace_errors = repo.verify_integrity()
-        audit_valid, audit_errors = repo.verify_audit_integrity()
-        return JSONResponse(
-            {
-                "trace": {"valid": trace_valid, "errors": trace_errors},
-                "audit": {"valid": audit_valid, "errors": audit_errors},
-                "verified_at": datetime.now(timezone.utc).isoformat(),
-            }
-        )
-
-    @app.get("/api/settings")
-    async def api_settings():
-        return JSONResponse(
-            _collect_settings(
-                db_path,
-                trace_path,
-                edition=edition.value,
-                authority_mode=authority_mode.value,
-            )
-        )
-
-    @app.get("/runtime/capabilities")
-    async def runtime_capabilities():
-        """Return current runtime edition, authority mode, and capability status."""
-        from atlasbridge.enterprise.registry import REGISTRY_VERSION
-
-        caps = FeatureRegistry.list_capabilities(edition, authority_mode)
-        cap_hash = FeatureRegistry.capabilities_hash(edition, authority_mode)
-
-        return JSONResponse(
-            {
-                "edition": edition.value,
-                "authority_mode": authority_mode.value,
-                "enabled_capabilities": sorted(
-                    cap_id for cap_id, info in caps.items() if info["allowed"]
-                ),
-                "enabled_capabilities_hash": cap_hash,
-                "registry_version": REGISTRY_VERSION,
-            }
         )
 
     return app

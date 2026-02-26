@@ -16,7 +16,7 @@ class TestHomeEndpoint:
 
     def test_home_contains_banner(self, client):
         response = client.get("/")
-        assert "READ-ONLY GOVERNANCE VIEW" in response.text
+        assert "READ-ONLY" in response.text
 
     def test_home_shows_stats(self, client):
         response = client.get("/")
@@ -227,7 +227,8 @@ class TestNoDataState:
         assert response.status_code == 200
         assert "No data yet" in response.text
 
-    def test_traces_with_no_trace_file(self, tmp_path):
+    def test_traces_with_no_trace_file(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("ATLASBRIDGE_EDITION", "enterprise")
         from atlasbridge.dashboard.app import create_app
         from starlette.testclient import TestClient
 
@@ -241,7 +242,7 @@ class TestNoDataState:
 
 
 class TestBannerOnAllPages:
-    """READ-ONLY banner must appear on every page."""
+    """READ-ONLY badge must appear on every page."""
 
     PAGES = ["/", "/integrity", "/traces", "/traces/0", "/sessions/sess-001"]
 
@@ -249,7 +250,7 @@ class TestBannerOnAllPages:
         for page in self.PAGES:
             response = client.get(page)
             assert response.status_code == 200
-            assert "READ-ONLY GOVERNANCE VIEW" in response.text, f"Banner missing on {page}"
+            assert "READ-ONLY" in response.text, f"Banner missing on {page}"
 
 
 class TestNavLinksOnAllPages:

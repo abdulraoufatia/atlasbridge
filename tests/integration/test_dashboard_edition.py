@@ -177,18 +177,12 @@ class TestCoreNoEnterpriseCopy:
 
 
 class TestEnterpriseRouteGating:
-    """Enterprise routes must be gated by edition."""
+    """Enterprise routes must not exist on core edition."""
 
-    def test_enterprise_settings_404_on_core(self, core_client):
-        """Enterprise settings returns 404 on core edition."""
+    def test_enterprise_settings_not_found_on_core(self, core_client):
+        """Enterprise settings route does not exist on core edition."""
         resp = core_client.get("/enterprise/settings")
         assert resp.status_code == 404
-
-    def test_enterprise_settings_404_is_json(self, core_client):
-        """404 response is JSON with capability error info."""
-        resp = core_client.get("/enterprise/settings")
-        data = resp.json()
-        assert "error" in data
 
     def test_traces_404_on_core(self, core_client):
         resp = core_client.get("/traces")
@@ -284,3 +278,68 @@ class TestEditionResolutionCLI:
             if p.name == "edition":
                 assert p.default is None
                 break
+
+
+# ---------------------------------------------------------------------------
+# Authority mode gating — enterprise/settings requires WRITE_ENABLED
+# ---------------------------------------------------------------------------
+
+
+def _make_client_with_mode(tmp_path, edition_env: str, authority_mode_env: str):
+    """Create a test client with specific edition + authority mode."""
+    import sqlite3
+
+    db_path = tmp_path / "test.db"
+    conn = sqlite3.connect(str(db_path))
+    conn.execute(
+        "CREATE TABLE sessions (id TEXT PRIMARY KEY, tool TEXT, command TEXT, "
+        "cwd TEXT, status TEXT, pid INTEGER, started_at TEXT, ended_at TEXT, "
+        "exit_code INTEGER, label TEXT, metadata TEXT)"
+    )
+    conn.execute(
+        "CREATE TABLE prompts (id TEXT PRIMARY KEY, session_id TEXT, "
+        "prompt_type TEXT, confidence TEXT, excerpt TEXT, status TEXT, "
+        "nonce TEXT, nonce_used INTEGER, expires_at TEXT, created_at TEXT, "
+        "resolved_at TEXT, response_normalized TEXT, channel_identity TEXT, "
+        "channel_message_id TEXT, metadata TEXT)"
+    )
+    conn.execute(
+        "CREATE TABLE audit_events (id TEXT PRIMARY KEY, event_type TEXT, "
+        "session_id TEXT, prompt_id TEXT, payload TEXT, timestamp TEXT, "
+        "prev_hash TEXT, hash TEXT)"
+    )
+    conn.commit()
+    conn.close()
+
+    trace_path = tmp_path / "decisions.jsonl"
+    trace_path.write_text("")
+
+    import os
+
+    os.environ["ATLASBRIDGE_EDITION"] = edition_env
+    os.environ["ATLASBRIDGE_AUTHORITY_MODE"] = authority_mode_env
+
+    from atlasbridge.dashboard.app import create_app
+
+    app = create_app(db_path=db_path, trace_path=trace_path)
+    return TestClient(app)
+
+
+class TestAuthorityModeGating:
+    """enterprise/settings requires WRITE_ENABLED authority mode."""
+
+    def test_enterprise_settings_denied_in_readonly_mode(self, tmp_path, monkeypatch):
+        """Enterprise + READONLY → /enterprise/settings returns 404."""
+        monkeypatch.setenv("ATLASBRIDGE_EDITION", "enterprise")
+        monkeypatch.setenv("ATLASBRIDGE_AUTHORITY_MODE", "readonly")
+        client = _make_client_with_mode(tmp_path, "enterprise", "readonly")
+        resp = client.get("/enterprise/settings")
+        assert resp.status_code == 404
+
+    def test_enterprise_settings_allowed_in_write_enabled_mode(self, tmp_path, monkeypatch):
+        """Enterprise + WRITE_ENABLED → /enterprise/settings returns 200."""
+        monkeypatch.setenv("ATLASBRIDGE_EDITION", "enterprise")
+        monkeypatch.setenv("ATLASBRIDGE_AUTHORITY_MODE", "write_enabled")
+        client = _make_client_with_mode(tmp_path, "enterprise", "write_enabled")
+        resp = client.get("/enterprise/settings")
+        assert resp.status_code == 200

@@ -64,7 +64,7 @@ class TestRiskFlag:
         assert "--i-understand-risk" in result.output
 
     def test_allows_non_loopback_with_risk_flag(self):
-        """Non-loopback host with --i-understand-risk should be allowed."""
+        """Non-loopback host with --i-understand-risk should be allowed (legacy mode)."""
         import pytest
 
         pytest.importorskip("fastapi")
@@ -76,7 +76,7 @@ class TestRiskFlag:
         with patch("atlasbridge.dashboard.app.start_server") as mock_start:
             result = runner.invoke(
                 cli,
-                ["dashboard", "start", "--host", "0.0.0.0", "--i-understand-risk"],
+                ["dashboard", "start", "--legacy", "--host", "0.0.0.0", "--i-understand-risk"],
             )
             assert result.exit_code == 0
             mock_start.assert_called_once()
@@ -84,7 +84,7 @@ class TestRiskFlag:
             assert call_kwargs.kwargs.get("allow_non_loopback") is True
 
     def test_loopback_does_not_require_risk_flag(self):
-        """Loopback address should work without --i-understand-risk."""
+        """Loopback address should work without --i-understand-risk (legacy mode)."""
         import pytest
 
         pytest.importorskip("fastapi")
@@ -94,7 +94,7 @@ class TestRiskFlag:
 
         runner = CliRunner()
         with patch("atlasbridge.dashboard.app.start_server") as mock_start:
-            result = runner.invoke(cli, ["dashboard", "start", "--host", "127.0.0.1"])
+            result = runner.invoke(cli, ["dashboard", "start", "--legacy", "--host", "127.0.0.1"])
             assert result.exit_code == 0
             mock_start.assert_called_once()
 

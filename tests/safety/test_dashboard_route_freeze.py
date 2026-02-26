@@ -4,20 +4,15 @@ from __future__ import annotations
 
 import pytest
 
-FROZEN_ROUTES: set[tuple[str, str]] = {
+# Routes present on ALL editions (core + enterprise)
+CORE_ROUTES: set[tuple[str, str]] = {
     # HTML pages
     ("GET", "/"),
     ("GET", "/sessions/{session_id}"),
-    ("GET", "/traces"),
-    ("GET", "/traces/{index}"),
-    ("GET", "/integrity"),
     ("GET", "/settings"),
-    ("GET", "/enterprise/settings"),
     # JSON API
     ("GET", "/api/stats"),
     ("GET", "/api/sessions"),
-    ("GET", "/api/sessions/{session_id}/export"),
-    ("POST", "/api/integrity/verify"),
     ("GET", "/api/settings"),
     # Runtime
     ("GET", "/runtime/capabilities"),
@@ -25,57 +20,138 @@ FROZEN_ROUTES: set[tuple[str, str]] = {
     ("GET", "/openapi.json"),
 }
 
+# Routes only registered on enterprise edition
+ENTERPRISE_ONLY_ROUTES: set[tuple[str, str]] = {
+    ("GET", "/traces"),
+    ("GET", "/traces/{index}"),
+    ("GET", "/integrity"),
+    ("GET", "/enterprise/settings"),
+    ("GET", "/api/sessions/{session_id}/export"),
+    ("POST", "/api/integrity/verify"),
+}
 
-class TestDashboardRouteFreeze:
-    """Dashboard routes must not change without explicit test update."""
+# Full set for enterprise edition
+ALL_ROUTES = CORE_ROUTES | ENTERPRISE_ONLY_ROUTES
 
-    def test_all_frozen_routes_exist(self) -> None:
-        """Every frozen route must exist in the app."""
+
+def _get_app_routes(app) -> set[tuple[str, str]]:
+    """Extract (method, path) tuples from a FastAPI app."""
+    routes = set()
+    for route in app.routes:
+        if hasattr(route, "methods") and hasattr(route, "path"):
+            for method in route.methods:
+                if method in ("GET", "POST", "PUT", "DELETE", "PATCH"):
+                    routes.add((method, route.path))
+    return routes
+
+
+class TestDashboardRouteFreezeCore:
+    """Core edition routes must not change without explicit test update."""
+
+    def test_all_core_routes_exist(self) -> None:
+        """Every core route must exist in the core app."""
         pytest.importorskip("fastapi")
         from atlasbridge.dashboard.app import create_app
 
         app = create_app()
-        actual = set()
-        for route in app.routes:
-            if hasattr(route, "methods") and hasattr(route, "path"):
-                for method in route.methods:
-                    if method in ("GET", "POST", "PUT", "DELETE", "PATCH"):
-                        actual.add((method, route.path))
+        actual = _get_app_routes(app)
 
-        missing = FROZEN_ROUTES - actual
-        assert not missing, f"Frozen routes missing from app: {missing}"
+        missing = CORE_ROUTES - actual
+        assert not missing, f"Core routes missing from app: {missing}"
 
-    def test_no_unexpected_routes(self) -> None:
+    def test_no_enterprise_routes_on_core(self) -> None:
+        """Enterprise-only routes must not exist on core edition."""
+        pytest.importorskip("fastapi")
+        from atlasbridge.dashboard.app import create_app
+
+        app = create_app()
+        actual = _get_app_routes(app)
+
+        leaked = ENTERPRISE_ONLY_ROUTES & actual
+        assert not leaked, f"Enterprise routes leaked into core app: {leaked}"
+
+    def test_core_route_count_matches(self) -> None:
+        """Core route count must match frozen count exactly."""
+        pytest.importorskip("fastapi")
+        from atlasbridge.dashboard.app import create_app
+
+        app = create_app()
+        actual = _get_app_routes(app)
+
+        assert len(actual) == len(CORE_ROUTES), (
+            f"Core route count drift: expected {len(CORE_ROUTES)}, got {len(actual)}"
+        )
+
+
+class TestDashboardRouteFreezeEnterprise:
+    """Enterprise edition routes must not change without explicit test update."""
+
+    def test_all_routes_exist_on_enterprise(self, monkeypatch) -> None:
+        """Every frozen route must exist in the enterprise app."""
+        pytest.importorskip("fastapi")
+        monkeypatch.setenv("ATLASBRIDGE_EDITION", "enterprise")
+        from atlasbridge.dashboard.app import create_app
+
+        app = create_app()
+        actual = _get_app_routes(app)
+
+        missing = ALL_ROUTES - actual
+        assert not missing, f"Frozen routes missing from enterprise app: {missing}"
+
+    def test_no_unexpected_routes_on_enterprise(self, monkeypatch) -> None:
         """No routes may be added without updating the frozen set."""
         pytest.importorskip("fastapi")
+        monkeypatch.setenv("ATLASBRIDGE_EDITION", "enterprise")
         from atlasbridge.dashboard.app import create_app
 
         app = create_app()
-        actual = set()
+        actual = _get_app_routes(app)
+
+        unexpected = actual - ALL_ROUTES
+        assert not unexpected, (
+            f"Unexpected routes found (update frozen sets if intentional): {unexpected}"
+        )
+
+    def test_enterprise_route_count_matches(self, monkeypatch) -> None:
+        """Enterprise route count must match frozen count exactly."""
+        pytest.importorskip("fastapi")
+        monkeypatch.setenv("ATLASBRIDGE_EDITION", "enterprise")
+        from atlasbridge.dashboard.app import create_app
+
+        app = create_app()
+        actual = _get_app_routes(app)
+
+        assert len(actual) == len(ALL_ROUTES), (
+            f"Enterprise route count drift: expected {len(ALL_ROUTES)}, got {len(actual)}"
+        )
+
+
+class TestNoUnintendedMethodExposure:
+    """Neither edition may expose OPTIONS, TRACE, or CONNECT methods."""
+
+    def _get_all_methods(self, app) -> set[tuple[str, str]]:
+        routes = set()
         for route in app.routes:
             if hasattr(route, "methods") and hasattr(route, "path"):
                 for method in route.methods:
-                    if method in ("GET", "POST", "PUT", "DELETE", "PATCH"):
-                        actual.add((method, route.path))
+                    routes.add((method, route.path))
+        return routes
 
-        unexpected = actual - FROZEN_ROUTES
-        assert not unexpected, (
-            f"Unexpected routes found (update FROZEN_ROUTES if intentional): {unexpected}"
-        )
-
-    def test_route_count_matches(self) -> None:
-        """Route count must match frozen count exactly."""
+    def test_no_unexpected_methods_on_core(self) -> None:
         pytest.importorskip("fastapi")
         from atlasbridge.dashboard.app import create_app
 
         app = create_app()
-        actual_count = 0
-        for route in app.routes:
-            if hasattr(route, "methods") and hasattr(route, "path"):
-                for method in route.methods:
-                    if method in ("GET", "POST", "PUT", "DELETE", "PATCH"):
-                        actual_count += 1
+        all_routes = self._get_all_methods(app)
+        unexpected = {(m, p) for (m, p) in all_routes if m in ("OPTIONS", "TRACE", "CONNECT")}
+        assert not unexpected, f"Unexpected methods on Core: {unexpected}"
 
-        assert actual_count == len(FROZEN_ROUTES), (
-            f"Route count drift: expected {len(FROZEN_ROUTES)}, got {actual_count}"
-        )
+    def test_no_unexpected_methods_on_enterprise(self, monkeypatch) -> None:
+        pytest.importorskip("fastapi")
+        monkeypatch.setenv("ATLASBRIDGE_EDITION", "enterprise")
+        from atlasbridge.dashboard.app import create_app
+
+        app = create_app()
+        all_routes = self._get_all_methods(app)
+        unexpected = {(m, p) for (m, p) in all_routes if m in ("OPTIONS", "TRACE", "CONNECT")}
+        assert not unexpected, f"Unexpected methods on Enterprise: {unexpected}"

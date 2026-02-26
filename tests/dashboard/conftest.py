@@ -306,9 +306,10 @@ def repo(db_with_data: Path, trace_file: Path):
 
 
 @pytest.fixture
-def client(db_with_data: Path, trace_file: Path):
-    """Create a FastAPI test client with test data."""
+def client(db_with_data: Path, trace_file: Path, monkeypatch):
+    """Create a FastAPI test client with test data (enterprise edition for full route coverage)."""
     pytest.importorskip("fastapi")
+    monkeypatch.setenv("ATLASBRIDGE_EDITION", "enterprise")
     from atlasbridge.dashboard.app import create_app
 
     app = create_app(db_path=db_with_data, trace_path=trace_file)

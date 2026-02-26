@@ -170,7 +170,7 @@ class TestCapabilitiesHash:
         """CORE hash should only reflect TOOLING caps being enabled."""
         caps = FeatureRegistry.list_capabilities(Edition.CORE, AuthorityMode.READONLY)
         enabled = [k for k, v in caps.items() if v["allowed"]]
-        assert all(CAPABILITIES[c] == CapabilityClass.TOOLING for c in enabled)
+        assert all(CAPABILITIES[c].capability_class == CapabilityClass.TOOLING for c in enabled)
 
 
 class TestRegistryVersion:

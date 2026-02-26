@@ -11,7 +11,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from atlasbridge.enterprise.capability import CAPABILITIES, CapabilityClass
+from atlasbridge.enterprise.capability import CAPABILITIES, CapabilityClass, CapabilitySpec
 from atlasbridge.enterprise.edition import AuthorityMode, Edition
 
 REGISTRY_VERSION = "1.0.0"
@@ -44,6 +44,8 @@ class CapabilityDecision:
     reason_code: str
     capability_class: str  # "tooling" | "authority" | "unknown"
     decision_fingerprint: str  # stable SHA-256 hex
+    guard_location: str  # "router_mount" | "route_handler" | ""
+    test_requirement: str  # canonical test path or ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -51,6 +53,8 @@ class CapabilityDecision:
             "reason_code": self.reason_code,
             "capability_class": self.capability_class,
             "decision_fingerprint": self.decision_fingerprint,
+            "guard_location": self.guard_location,
+            "test_requirement": self.test_requirement,
         }
 
 
@@ -69,6 +73,8 @@ def _compute_fingerprint(
     """Compute a stable SHA-256 fingerprint for a decision.
 
     Deterministic: same inputs always produce the same hash.
+    Note: guard_location and test_requirement are spec metadata and are NOT
+    included in the fingerprint — they do not affect the allow/deny outcome.
     """
     canonical = json.dumps(
         {
@@ -96,6 +102,8 @@ def _make_decision(
     allowed: bool,
     reason_code: str,
     capability_class: str,
+    guard_location: str,
+    test_requirement: str,
 ) -> CapabilityDecision:
     return CapabilityDecision(
         allowed=allowed,
@@ -108,6 +116,8 @@ def _make_decision(
             allowed,
             reason_code,
         ),
+        guard_location=guard_location,
+        test_requirement=test_requirement,
     )
 
 
@@ -134,9 +144,9 @@ class FeatureRegistry:
         context: dict[str, Any] | None = None,
     ) -> CapabilityDecision:
         """Check if a capability is allowed under the given configuration."""
-        cap_class = CAPABILITIES.get(capability_id)
+        spec: CapabilitySpec | None = CAPABILITIES.get(capability_id)
 
-        if cap_class is None:
+        if spec is None:
             return _make_decision(
                 edition,
                 authority_mode,
@@ -144,17 +154,21 @@ class FeatureRegistry:
                 False,
                 ReasonCode.UNKNOWN_CAPABILITY,
                 "unknown",
+                "",
+                "",
             )
 
         # TOOLING — always allowed
-        if cap_class == CapabilityClass.TOOLING:
+        if spec.capability_class == CapabilityClass.TOOLING:
             return _make_decision(
                 edition,
                 authority_mode,
                 capability_id,
                 True,
                 ReasonCode.ALLOWED,
-                cap_class.value,
+                spec.capability_class.value,
+                spec.guard_location,
+                spec.test_requirement,
             )
 
         # AUTHORITY — requires ENTERPRISE edition
@@ -165,7 +179,9 @@ class FeatureRegistry:
                 capability_id,
                 False,
                 ReasonCode.EDITION_DENY,
-                cap_class.value,
+                spec.capability_class.value,
+                spec.guard_location,
+                spec.test_requirement,
             )
 
         # AUTHORITY in ENTERPRISE — requires WRITE_ENABLED
@@ -176,7 +192,9 @@ class FeatureRegistry:
                 capability_id,
                 False,
                 ReasonCode.AUTHORITY_MODE_REQUIRED,
-                cap_class.value,
+                spec.capability_class.value,
+                spec.guard_location,
+                spec.test_requirement,
             )
 
         # AUTHORITY in ENTERPRISE + WRITE_ENABLED — allowed
@@ -186,7 +204,9 @@ class FeatureRegistry:
             capability_id,
             True,
             ReasonCode.ALLOWED,
-            cap_class.value,
+            spec.capability_class.value,
+            spec.guard_location,
+            spec.test_requirement,
         )
 
     @staticmethod

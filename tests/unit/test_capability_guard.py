@@ -134,6 +134,8 @@ class TestFeatureUnavailableError:
             reason_code=ReasonCode.EDITION_DENY,
             capability_class="authority",
             decision_fingerprint="abc123",
+            guard_location="router_mount",
+            test_requirement="",
         )
         err = FeatureUnavailableError(decision, "authority.rbac")
         assert err.decision is decision
@@ -147,6 +149,8 @@ class TestFeatureUnavailableError:
             reason_code=ReasonCode.EDITION_DENY,
             capability_class="authority",
             decision_fingerprint="abc123",
+            guard_location="router_mount",
+            test_requirement="",
         )
         err = FeatureUnavailableError(decision, "authority.rbac")
         assert isinstance(err, Exception)

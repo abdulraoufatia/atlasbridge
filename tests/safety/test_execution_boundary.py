@@ -451,7 +451,14 @@ class TestSaasGateGuard:
         forbidden_prefixes = {"atlasbridge.cloud", "atlasbridge.enterprise"}
         # CLI enterprise module is the stub surface — allowed to import stubs.
         # Dashboard settings page reads detect_edition() for display only.
-        allowed_importers = {"cli/_enterprise.py", "cli/_edition_cmd.py", "dashboard/app.py"}
+        allowed_importers = {
+            "cli/_enterprise.py",
+            "cli/_edition_cmd.py",
+            "dashboard/app.py",
+            "dashboard/_collect.py",
+            "dashboard/routers/core.py",
+            "dashboard/routers/enterprise.py",
+        }
         violations: list[str] = []
 
         for py_file in SRC_ROOT.rglob("*.py"):
