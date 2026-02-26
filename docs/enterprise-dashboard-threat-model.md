@@ -3,7 +3,7 @@
 # Enterprise Dashboard — Threat Model
 
 **Maturity:** Design Document — No Implementation
-**Phase:** C (SaaS Dashboard)
+**Phase:** C (Enterprise Dashboard)
 **Trust model:** Cloud OBSERVES, local EXECUTES.
 **Methodology:** STRIDE per attack surface
 

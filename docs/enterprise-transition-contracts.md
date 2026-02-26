@@ -23,7 +23,7 @@ This document defines the contracts that govern how AtlasBridge components evolv
 |-------|-------|----------------|
 | **Phase A** | Local runtime (current) | Policy DSL, autopilot engine, decision trace, audit log, adapters, channels |
 | **Phase B** | Enterprise local extensions | Cloud client injection points, enhanced trace schema (V2), control message protocol stubs, signed policy support |
-| **Phase C** | Cloud SaaS tier | Cloud Governance API, Web Dashboard, policy signing service, audit aggregation, WebSocket control channel |
+| **Phase C** | Enterprise dashboard tier | Governance API, Web Dashboard, policy signing service, audit aggregation, WebSocket channel |
 
 Each phase is additive. No phase removes functionality from a previous phase. A runtime operating at Phase A continues to work identically if Phase B or Phase C components are unavailable.
 
@@ -146,7 +146,7 @@ Phase B provides the local enterprise extensions described above: cloud client i
 
 ### What Phase C Adds
 
-Phase C implements the cloud SaaS tier. Phase B stubs become real clients.
+Phase C implements the enterprise dashboard tier. Phase B stubs become real clients.
 
 #### 1. Cloud Client Stubs Become Real HTTP Clients
 

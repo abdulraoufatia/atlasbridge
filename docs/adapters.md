@@ -8,7 +8,7 @@
 
 ## 1. Purpose
 
-AtlasBridge is a universal human-in-the-loop control plane. It wraps AI CLI tools in a PTY and routes every interactive prompt to a remote channel so the user can respond from anywhere. The core relay logic — detection, routing, injection, persistence, audit — is tool-agnostic. The *adapter* layer is the thin seam that makes this work for any specific CLI.
+AtlasBridge is an autonomous runtime for AI CLI tools with human oversight. It wraps AI CLI tools in a PTY and routes every interactive prompt to a remote channel so the user can respond from anywhere. The core relay logic — detection, routing, injection, persistence, audit — is tool-agnostic. The *adapter* layer is the thin seam that makes this work for any specific CLI.
 
 ### Vendor-Neutral Philosophy
 

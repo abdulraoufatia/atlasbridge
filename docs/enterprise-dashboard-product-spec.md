@@ -3,7 +3,7 @@
 # Enterprise Dashboard — Product Specification
 
 **Maturity:** Design Document — No Implementation
-**Phase:** C (SaaS Dashboard)
+**Phase:** C (Enterprise Dashboard)
 **Depends on:** Phase A (shipped), Phase B (scaffold only)
 **Trust model:** Cloud OBSERVES, local EXECUTES.
 

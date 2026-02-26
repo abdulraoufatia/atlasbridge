@@ -64,8 +64,8 @@ These features are deferred to the Enterprise Expansion Phase (Post-GA). They wi
 | SSO (OIDC) | H | Integration concern, not governance primitive |
 | Multi-workspace isolation | H | Scaling feature, not core governance |
 | Compliance export packs | H | Consumption feature, requires stable audit chain |
-| Enterprise SaaS layer | Never | Violates local execution principle |
-| Cloud control plane | Never | Violates local execution principle |
+| Remote execution layer | Never | Violates local execution principle |
+| Remote management layer | Never | Violates local execution principle |
 | ML-based classification | Post-GA | Deterministic classification is GA requirement |
 | Dashboard-first features | H | CLI and primitives first |
 

@@ -127,7 +127,7 @@ Phase B connects the local runtime to a cloud governance endpoint. The local run
 
 ---
 
-## Phase C — Full SaaS Governance Platform (Design Only)
+## Phase C — Full Enterprise Platform (Design Only)
 
 **Target:** v1.x (post-GA)
 **Status:** Design Document

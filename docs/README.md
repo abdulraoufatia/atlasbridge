@@ -87,7 +87,7 @@ This index helps you find the right document fast, whether you are a new user, a
 | [upgrade.md](upgrade.md) | User | Upgrading safely: config preservation, migration, verification | Before or after `pip install -U` | Current |
 | [cloud-spec.md](cloud-spec.md) | Contributor | Phase B cloud governance interfaces: auth, transport, protocol, audit stream | When implementing cloud features (Phase B) | Design Only |
 | [enterprise-architecture.md](enterprise-architecture.md) | Contributor | Enterprise architecture overview: editions, RBAC, risk, governance | When working on enterprise features | Experimental |
-| [enterprise-saas-architecture.md](enterprise-saas-architecture.md) | Contributor | Phase C SaaS design: multi-tenant, dashboard, trust boundaries | For future cloud planning | Design Only |
+| [enterprise-saas-architecture.md](enterprise-saas-architecture.md) | Contributor | Phase C enterprise design: multi-tenant, dashboard, trust boundaries | For future enterprise planning | Design Only |
 | [enterprise-transition-contracts.md](enterprise-transition-contracts.md) | Contributor | Phase A→B→C transition contracts and migration paths | When planning phase transitions | Design Only |
 | [enterprise-trust-boundaries.md](enterprise-trust-boundaries.md) | Contributor | 6 trust domains, secret handling, transport security | For security review | Design Only |
 | [enterprise-prompts.md](enterprise-prompts.md) | Contributor | Enterprise prompt patterns and escalation workflows | When working on enterprise escalation | Design Only |
@@ -113,7 +113,7 @@ This index helps you find the right document fast, whether you are a new user, a
 | [product-thesis.md](product-thesis.md) | Both | Product thesis: core identity, governance primitives, competitive positioning | For strategic context | Current |
 | [ga-boundary.md](ga-boundary.md) | Contributor | v1.0 GA scope boundary: six mandatory capabilities, explicit deferrals | Before modifying GA scope | Current |
 | [ga-readiness-checklist.md](ga-readiness-checklist.md) | Contributor | GA readiness audit: contract freeze, coverage, threat model, CI matrix, verdict | Before tagging v1.0 | Current |
-| [saas-alpha-roadmap.md](saas-alpha-roadmap.md) | Contributor | 90-day SaaS Alpha path: stabilization, observe-only cloud, multi-tenant alpha | For post-v1.0 planning | Design Only |
+| [saas-alpha-roadmap.md](saas-alpha-roadmap.md) | Contributor | 90-day enterprise alpha path: stabilization, multi-tenant alpha | For post-v1.0 planning | Design Only |
 | [versioning-policy.md](versioning-policy.md) | Both | SemVer, deprecation policy, breaking change protocol, tag-only releases | Before modifying frozen APIs | Current |
 | [phone-first-interaction.md](phone-first-interaction.md) | Both | Phone-first UX: text-only interaction, synonym normalization, boundary messages, Enter semantics | When understanding mobile operator workflow | Current |
 

@@ -125,7 +125,7 @@ Ranked by contribution to the deterministic governance moat:
 
 These constraints hold across all 12 months:
 
-1. **Local execution only** — no SaaS pivot, no remote control plane
+1. **Local execution only** — no remote execution, no remote management
 2. **No policy bypass** — every action must match a policy rule
 3. **No injection guard weakening** — nonce idempotency, TTL enforcement, cross-session binding
 4. **No audit mutability** — hash chain is append-only, verification always available
@@ -148,7 +148,7 @@ These constraints hold across all 12 months:
 
 ## Deterministic Governance Expansion (Infrastructure Moat)
 
-Advanced capabilities that strengthen the deterministic governance moat. All features are consequences of the core primitives — none introduce probabilistic governance, ML-based scoring, or SaaS dependencies.
+Advanced capabilities that strengthen the deterministic governance moat. All features are consequences of the core primitives — none introduce probabilistic governance, ML-based scoring, or external service dependencies.
 
 ### Pre-GA Must Build
 

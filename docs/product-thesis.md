@@ -35,9 +35,9 @@ Every governance decision is:
 ## What AtlasBridge Is NOT
 
 - Not an AI chat wrapper — it governs agents, not conversations
-- Not a SaaS orchestration platform — local-first, single-operator
+- Not a hosted orchestration platform — local-first, single-operator
 - Not a compliance checklist generator — deterministic enforcement, not checkbox theater
-- Not a remote execution engine — no cloud control plane, no policy bypass
+- Not a remote execution engine — no remote management, no policy bypass
 - Not a dashboard-first product — governance primitives first, visualization second
 
 ## Governance Primitives
@@ -66,7 +66,7 @@ The moat widens with every governance primitive added. Dashboard features, enter
 
 ## Execution Constraints
 
-- All execution is local. No SaaS pivot.
+- All execution is local. No hosted service pivot.
 - No policy bypass paths. No injection guard weakening.
 - No audit mutability. The hash chain is append-only.
 - No probabilistic governance. ML can inform, but decisions are deterministic.
