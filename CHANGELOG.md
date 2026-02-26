@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.0] — 2026-02-26
+
+### Added
+- **Direct LLM chat mode** — new `atlasbridge chat` command lets users talk to LLMs directly via Telegram/Slack, with the policy engine governing tool use (#347)
+- **Provider framework** — `BaseProvider` ABC + `ProviderRegistry` with httpx-only implementations for Anthropic (Claude), OpenAI (GPT-4o), and Google (Gemini) — no SDK dependencies
+- **Built-in tool system** — 5 policy-governed tools: `read_file`, `list_directory`, `search_files` (safe), `write_file` (moderate), `run_command` (dangerous)
+- **ChatEngine** — conversation loop with streaming, tool call handling, and edit-in-place Telegram UX
+- **Policy integration for tool use** — `TOOL_USE` prompt type and `tool_name` match criteria enable targeted tool governance through existing policy evaluator
+- **LLM provider setup** — `atlasbridge setup` wizard now includes provider selection step (pick LLM, enter API key, choose model)
+- **Config support** — `ProviderConfig`, `ChatConfig` in `AtlasBridgeConfig`; env var overrides: `ATLASBRIDGE_LLM_PROVIDER`, `ATLASBRIDGE_LLM_API_KEY`, `ATLASBRIDGE_LLM_MODEL`
+
+---
+
 ## [1.3.2] — 2026-02-26
 
 ### Fixed

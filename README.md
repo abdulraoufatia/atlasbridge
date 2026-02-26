@@ -361,13 +361,13 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history, or [GitHub Releas
 
 ---
 
-## Enterprise Governance (Experimental)
+## Editions (Experimental)
 
 AtlasBridge follows an **open-source** model (MIT license):
 
 - **Community** — policy engine, PTY supervisor, prompt detection, channel relay, audit log, hash-chained decision trace. Fully functional. Always free.
-- **Pro** — deterministic risk classifier, decision trace v2, policy pinning, RBAC. Phase A — local governance, shipping now.
-- **Enterprise** (experimental, open source) — cloud governance, multi-tenant policy management, web dashboard. Phase B is scaffolding only; Phase C is design only.
+- **Pro** — deterministic risk classifier, decision trace v2, policy pinning, RBAC. Phase A — extended local features, shipping now.
+- **Enterprise** (experimental, open source) — multi-tenant policy management, web dashboard. Phase B is scaffolding only; Phase C is design only.
 
 | Feature | Edition | Maturity |
 |---------|---------|----------|
@@ -378,22 +378,20 @@ AtlasBridge follows an **open-source** model (MIT license):
 | Deterministic risk classifier | Pro | Experimental |
 | Policy pinning (session-level) | Pro | Experimental |
 | RBAC (local) | Pro | Experimental |
-| Cloud policy sync | Enterprise | Specification |
 | Web dashboard | Enterprise | Design only |
 
 **Key principles:**
 
-- **Execution stays local.** The AI CLI agent always runs on your machine. Cloud features observe; they never execute.
+- **Execution stays local.** The AI CLI agent always runs on your machine.
 - **Deterministic, not heuristic.** Risk classification uses a fixed decision table. No ML. No guesswork.
-- **Offline-first.** The runtime works without any cloud connection. Cloud features degrade gracefully.
+- **Offline-first.** The runtime works without any network dependency.
 
 ```bash
 atlasbridge edition       # Show current edition (community/pro/enterprise)
 atlasbridge features      # List all feature flags
-atlasbridge cloud status  # Cloud integration status (Phase B: scaffolding only)
 ```
 
-See [Enterprise Architecture](docs/enterprise-architecture.md) and [Enterprise Roadmap](docs/roadmap-enterprise-90-days.md).
+See [Enterprise Architecture](docs/enterprise-architecture.md) for details.
 
 ---
 
@@ -402,13 +400,13 @@ See [Enterprise Architecture](docs/enterprise-architecture.md) and [Enterprise R
 AtlasBridge follows [Semantic Versioning](https://semver.org/). All 8 contract surfaces (Adapter API, Channel API, Policy DSL, CLI, Dashboard, Console, Audit, Config) are frozen and enforced by safety tests in CI. See [versioning-policy.md](docs/versioning-policy.md).
 
 **Invariants** — these hold at all times:
-- **Cloud OBSERVES, local EXECUTES** — all execution happens on your machine
+- All execution happens on your machine
 - No remote execution control
 - Read-only dashboard (localhost-only by default)
 - Deterministic policy evaluation before every injection
 - Append-only, hash-chained audit log
 
-> **Future roadmap** includes multi-tenant governance, authentication, cloud observability, enterprise SSO — but v1.0 is strictly local-first. See [saas-alpha-roadmap.md](docs/saas-alpha-roadmap.md).
+> **Future roadmap** includes multi-tenant management, authentication, and extended dashboard features — but v1.0 is strictly local-first.
 
 ## Status
 
@@ -431,6 +429,7 @@ See [CHANGELOG.md](CHANGELOG.md) for full version history.
 | v0.9.8 | Released | Conversation UX v2 — interaction pipeline, ML classifier protocol, session binding, output router |
 | v0.9.9 | Released | Chat mode UX — per-plan escalation, folder trust detection, no more "arrow keys" messages |
 | v0.10.0 | Released | Full conversational agent mode — streaming state, plan detection, secret redaction |
+| v1.4.0 | Released | Direct LLM chat mode — talk to Claude/GPT-4o/Gemini via Telegram with policy-governed tool use |
 | v1.3.2 | Released | Fix trust prompt detection — Unicode bullet handling in detector and choice extractor |
 | v1.3.1 | Released | Fix "Agent is busy" gate race, accept natural text replies, phone-first prompt UX |
 | v1.3.0 | Released | Automatic update check across CLI, dashboard, and console |
@@ -461,12 +460,11 @@ Key starting points:
 | [architecture.md](docs/architecture.md) | System design, data flow, invariants |
 | [troubleshooting.md](docs/troubleshooting.md) | Common issues and solutions |
 | [ethics-and-safety-guarantees.md](docs/ethics-and-safety-guarantees.md) | Safety invariants and CI enforcement |
-| [enterprise-architecture.md](docs/enterprise-architecture.md) | Enterprise governance overview (Phase A) |
-| [enterprise-dashboard-product-spec.md](docs/enterprise-dashboard-product-spec.md) | Phase C dashboard product spec (design only) |
-| [enterprise-dashboard-ui-map.md](docs/enterprise-dashboard-ui-map.md) | Phase C dashboard UI wireframes (design only) |
-| [enterprise-governance-api-spec.md](docs/enterprise-governance-api-spec.md) | Phase C governance API spec (design only) |
-| [enterprise-data-model.md](docs/enterprise-data-model.md) | Phase C cloud data model (design only) |
-| [enterprise-dashboard-threat-model.md](docs/enterprise-dashboard-threat-model.md) | Phase C dashboard threat model (design only) |
+| [enterprise-architecture.md](docs/enterprise-architecture.md) | Enterprise edition architecture overview |
+| [enterprise-dashboard-product-spec.md](docs/enterprise-dashboard-product-spec.md) | Enterprise dashboard product spec (design only) |
+| [enterprise-dashboard-ui-map.md](docs/enterprise-dashboard-ui-map.md) | Enterprise dashboard UI wireframes (design only) |
+| [enterprise-data-model.md](docs/enterprise-data-model.md) | Enterprise data model (design only) |
+| [enterprise-dashboard-threat-model.md](docs/enterprise-dashboard-threat-model.md) | Enterprise dashboard threat model (design only) |
 
 ---
 
@@ -487,8 +485,7 @@ src/atlasbridge/
   os/systemd/   — Linux systemd user service integration
   adapters/     — CLI tool adapters (Claude Code, OpenAI CLI, Gemini CLI)
   channels/     — notification channels (Telegram, Slack, MultiChannel)
-  enterprise/   — enterprise governance (Phase A: local risk, RBAC, trace v2)
-  cloud/        — cloud integration interfaces (Phase B: spec only, no implementation)
+  enterprise/   — enterprise edition features (Phase A: local risk, RBAC, trace v2)
   cli/          — Click CLI entry point and subcommands
 tests/
   unit/         — pure unit tests (no I/O)
