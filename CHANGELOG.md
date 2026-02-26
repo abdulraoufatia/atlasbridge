@@ -11,6 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.2] — 2026-02-26
+
+### Added
+- **Formal edition contract** — router-level enforcement of Core vs Enterprise edition separation; enterprise routes are never registered in the Core app object, returning 404 by routing absence (not exception handler) (#357)
+- **Router separation** — `routers/core.py` and `routers/enterprise.py` factory modules; `app.py` reduced from 495 to ~170 lines (#357)
+- **`CapabilitySpec` dataclass** — enriches `CAPABILITIES` registry with `edition_allowed`, `guard_location`, and `test_requirement` per capability; `CapabilityDecision.to_dict()` now includes these fields (#357)
+- **Two-layer enforcement** — Layer 1: router mount (enterprise router not included on Core); Layer 2: `require_capability()` guard in enterprise route handlers (#357)
+- **41 new tests** — edition contract, mutation denial, capability audit, capability registry freeze, and E2E enforcement tests across all Python/OS matrix (#357)
+
+### Changed
+- **`app.py`** — now a thin factory delegating to `make_core_router()` / `make_enterprise_router()`; no inline route definitions
+- **`CAPABILITIES` dict** — values are now `CapabilitySpec` instances (was raw `CapabilityClass`); `CapabilitySpec.capability_class` attribute preserves existing semantics
+
+---
+
 ## [1.6.1] — 2026-02-26
 
 ### Fixed

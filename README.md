@@ -430,6 +430,7 @@ See [CHANGELOG.md](CHANGELOG.md) for full version history.
 | v0.9.8 | Released | Conversation UX v2 — interaction pipeline, ML classifier protocol, session binding, output router |
 | v0.9.9 | Released | Chat mode UX — per-plan escalation, folder trust detection, no more "arrow keys" messages |
 | v0.10.0 | Released | Full conversational agent mode — streaming state, plan detection, secret redaction |
+| v1.6.2 | Released | Formal edition contract — router separation, CapabilitySpec enrichment, 41 new enforcement tests |
 | v1.6.1 | Released | Security fix — terminal sandbox, loopback-only WebSocket guard |
 | v1.6.0 | Released | Dashboard edition split — Core/Enterprise editions, badge system, capability-gated routes |
 | v1.5.0 | Released | Q1 Foundations — remove tui/, simplify CLI, doctor LLM check, keyring-first, audit export, environment tagging |
