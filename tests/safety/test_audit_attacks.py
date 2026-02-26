@@ -16,7 +16,6 @@ Acceptance: >=12 vectors per issue #323 acceptance criteria.
 from __future__ import annotations
 
 import hashlib
-import json
 import secrets
 from datetime import UTC, datetime
 
@@ -24,7 +23,6 @@ import pytest
 
 from atlasbridge.core.audit.writer import AuditWriter
 from atlasbridge.core.store.database import Database
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -121,9 +119,7 @@ class TestHashAlgorithm:
         writer = AuditWriter(db)
         writer.prompt_detected("s1", "p1", "yes_no", "high")
         writer.prompt_detected("s1", "p2", "free_text", "low")
-        rows = db._db.execute(
-            "SELECT hash FROM audit_events ORDER BY timestamp ASC"
-        ).fetchall()
+        rows = db._db.execute("SELECT hash FROM audit_events ORDER BY timestamp ASC").fetchall()
         hashes = [r["hash"] for r in rows]
         assert len(set(hashes)) == 2, "Different events must produce different hashes"
 
@@ -190,9 +186,7 @@ class TestGapAttack:
         _write_events(AuditWriter(db), count=5)
         ids = [
             r["id"]
-            for r in db._db.execute(
-                "SELECT id FROM audit_events ORDER BY timestamp ASC"
-            ).fetchall()
+            for r in db._db.execute("SELECT id FROM audit_events ORDER BY timestamp ASC").fetchall()
         ]
         middle_id = ids[2]
         db._db.execute("DELETE FROM audit_events WHERE id = ?", (middle_id,))

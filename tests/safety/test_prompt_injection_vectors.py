@@ -299,10 +299,10 @@ class TestControlCharacterInjection:
     @pytest.mark.parametrize(
         "ctrl_char",
         [
-            "\x07",   # BEL
-            "\x0c",   # FF (form feed)
-            "\x0b",   # VT (vertical tab)
-            "\x08",   # BS (backspace)
+            "\x07",  # BEL
+            "\x0c",  # FF (form feed)
+            "\x0b",  # VT (vertical tab)
+            "\x08",  # BS (backspace)
         ],
     )
     def test_control_chars_in_excerpt_stored_safely(self, db: Database, ctrl_char: str):
