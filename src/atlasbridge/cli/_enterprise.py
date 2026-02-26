@@ -22,7 +22,12 @@ class _CloudConfig:
     stream_audit: bool = False
 
 
-@click.command("edition")
+@click.group("cloud")
+def cloud_group():
+    """[EXPERIMENTAL] Cloud governance integration (Phase B)."""
+
+
+@cloud_group.command("edition")
 @click.option("--json", "as_json", is_flag=True, default=False)
 def edition_cmd(as_json):
     """[EXPERIMENTAL] Show the current AtlasBridge edition."""
@@ -37,7 +42,7 @@ def edition_cmd(as_json):
         console.print(f"AtlasBridge edition: [bold]{ed.value}[/bold]")
 
 
-@click.command("features")
+@cloud_group.command("features")
 @click.option("--json", "as_json", is_flag=True, default=False)
 def features_cmd(as_json):
     """[EXPERIMENTAL] Show all feature flags and their availability."""
@@ -54,11 +59,6 @@ def features_cmd(as_json):
             status = "[green]active[/green]" if info["status"] == "active" else "[dim]locked[/dim]"
             console.print(f"  {name:<28} {status}  (requires: {info['required_edition']})")
         console.print()
-
-
-@click.group("cloud")
-def cloud_group():
-    """[EXPERIMENTAL] Cloud governance integration (Phase B)."""
 
 
 @cloud_group.command("status")

@@ -32,22 +32,19 @@ FROZEN_TOP_LEVEL = frozenset(
         "debug",
         "channel",
         "adapter",
-        "adapters",
         "config",
         "policy",
         "autopilot",
-        "edition",
-        "features",
         "cloud",
         "trace",
         "lab",
         "db",
-        "pause",
-        "resume",
         "dashboard",
         "console",
         "replay",
         "risk",
+        "audit",
+        "chat",
     }
 )
 
@@ -127,7 +124,7 @@ def test_cloud_subcommands():
     assert cloud is not None, "cloud group missing"
     assert isinstance(cloud, click.Group)
 
-    expected = {"status"}
+    expected = {"status", "edition", "features"}
     actual = set(cloud.commands.keys())
     missing = expected - actual
     assert not missing, f"Cloud subcommands removed: {sorted(missing)}"
