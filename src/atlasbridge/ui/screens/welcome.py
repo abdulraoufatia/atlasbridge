@@ -47,8 +47,8 @@ class WelcomeScreen(Screen):
     # ------------------------------------------------------------------
 
     def compose(self) -> ComposeResult:
-        from atlasbridge.tui.services import ConfigService, DaemonService
-        from atlasbridge.tui.state import guidance_message
+        from atlasbridge.ui.services import ConfigService, DaemonService
+        from atlasbridge.ui.state import guidance_message
 
         self._app_state = ConfigService.load_state()
         self._daemon_status = DaemonService.get_status()
@@ -59,7 +59,7 @@ class WelcomeScreen(Screen):
             with Static(id="welcome-grid"):
                 yield Label("AtlasBridge", id="brand-header")
                 yield Label(
-                    "Human-in-the-loop control plane for AI developer agents",
+                    "Autonomous runtime for AI developer agents with human oversight",
                     id="brand-tagline",
                 )
 

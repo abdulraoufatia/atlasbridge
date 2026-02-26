@@ -103,6 +103,9 @@ class MatchCriteriaV1(BaseModel):
     deny_input_types: list[str] | None = None
     """Match when the prompt type is in this list (used for deny rules via channel)."""
 
+    environment: str | None = None
+    """Match only when runtime environment equals this string (dev/staging/production)."""
+
     any_of: list[MatchCriteriaV1] | None = None
     """OR logic: rule matches if ANY sub-criteria block matches."""
 

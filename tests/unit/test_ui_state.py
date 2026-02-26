@@ -1,10 +1,10 @@
-"""Unit tests for TUI wizard state machine — no Textual imports required."""
+"""Unit tests for UI state types — no Textual imports required."""
 
 from __future__ import annotations
 
 import pytest
 
-from atlasbridge.tui.state import (
+from atlasbridge.ui.state import (
     WIZARD_STEPS,
     WIZARD_TOTAL,
     AppState,

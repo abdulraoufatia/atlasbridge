@@ -32,22 +32,19 @@ FROZEN_TOP_LEVEL = frozenset(
         "debug",
         "channel",
         "adapter",
-        "adapters",
         "config",
         "policy",
         "autopilot",
-        "edition",
-        "features",
         "cloud",
         "trace",
         "lab",
         "db",
-        "pause",
-        "resume",
         "dashboard",
         "console",
         "replay",
         "risk",
+        "audit",
+        "chat",
     }
 )
 
@@ -127,7 +124,7 @@ def test_cloud_subcommands():
     assert cloud is not None, "cloud group missing"
     assert isinstance(cloud, click.Group)
 
-    expected = {"status"}
+    expected = {"status", "edition", "features"}
     actual = set(cloud.commands.keys())
     missing = expected - actual
     assert not missing, f"Cloud subcommands removed: {sorted(missing)}"
@@ -145,6 +142,20 @@ def test_db_subcommands():
     actual = set(db.commands.keys())
     missing = expected - actual
     assert not missing, f"DB subcommands removed: {sorted(missing)}"
+
+
+def test_audit_subcommands():
+    """Audit group must have its frozen subcommands."""
+    from atlasbridge.cli.main import cli
+
+    audit = cli.commands.get("audit")
+    assert audit is not None, "audit group missing"
+    assert isinstance(audit, click.Group)
+
+    expected = {"verify", "export"}
+    actual = set(audit.commands.keys())
+    missing = expected - actual
+    assert not missing, f"Audit subcommands removed: {sorted(missing)}"
 
 
 def test_lab_subcommands():

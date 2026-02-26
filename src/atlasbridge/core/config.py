@@ -260,6 +260,27 @@ class ChatConfig(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+_VALID_ENVIRONMENTS = frozenset({"dev", "staging", "production"})
+
+
+class RuntimeConfig(BaseModel):
+    """Runtime behaviour settings."""
+
+    model_config = {"extra": "forbid"}
+
+    environment: str = "dev"
+    """Runtime environment: dev, staging, or production."""
+
+    @field_validator("environment")
+    @classmethod
+    def validate_environment(cls, v: str) -> str:
+        if v not in _VALID_ENVIRONMENTS:
+            raise ValueError(
+                f"Invalid environment {v!r}. Must be one of: {sorted(_VALID_ENVIRONMENTS)}"
+            )
+        return v
+
+
 class AtlasBridgeConfig(BaseModel):
     """Root AtlasBridge configuration model."""
 
@@ -272,6 +293,7 @@ class AtlasBridgeConfig(BaseModel):
     adapters: AdaptersConfig = Field(default_factory=AdaptersConfig)
     streaming: StreamingConfig = Field(default_factory=StreamingConfig)
     chat: ChatConfig = Field(default_factory=ChatConfig)
+    runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)
 
     @model_validator(mode="after")
     def at_least_one_channel(self) -> AtlasBridgeConfig:
@@ -421,6 +443,10 @@ def _apply_env_overrides(data: dict[str, Any]) -> None:
         data.setdefault("chat", {}).setdefault("provider", {})["api_key"] = llm_key
     if llm_model := _env("ATLASBRIDGE_LLM_MODEL"):
         data.setdefault("chat", {}).setdefault("provider", {})["model"] = llm_model
+
+    # Runtime
+    if env := _env("ATLASBRIDGE_ENVIRONMENT"):
+        data.setdefault("runtime", {})["environment"] = env
 
 
 def save_config(

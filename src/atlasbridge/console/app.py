@@ -219,7 +219,7 @@ class ConsoleScreen(Screen):
     def _load_audit_log(self) -> None:
         """Load recent audit log entries with fixed-width columns."""
         try:
-            from atlasbridge.tui.services import LogsService
+            from atlasbridge.ui.services import LogsService
 
             events = LogsService.read_recent(limit=20)
             log_widget = self.query_one("#audit-log", RichLog)
@@ -266,7 +266,7 @@ class ConsoleScreen(Screen):
     def _refresh_doctor(self) -> None:
         """Run doctor checks and update the panel."""
         try:
-            from atlasbridge.tui.services import DoctorService
+            from atlasbridge.ui.services import DoctorService
 
             checks = DoctorService.run_checks()
             self._doctor_results = checks

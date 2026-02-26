@@ -523,6 +523,173 @@ def _check_adapters() -> dict:
         return {"name": "Adapters", "status": "fail", "detail": str(exc)}
 
 
+def _check_llm_provider() -> dict | None:
+    """Check that the configured LLM provider API key is valid."""
+    try:
+        from atlasbridge.core.config import load_config
+
+        cfg_path = _config_path()
+        if not cfg_path.exists():
+            return None
+        cfg = load_config(cfg_path)
+        provider_cfg = cfg.chat.provider
+        if not provider_cfg.name:
+            return None  # No provider configured — skip silently
+        if not provider_cfg.api_key:
+            return {
+                "name": "LLM provider",
+                "status": "warn",
+                "detail": f"{provider_cfg.name} configured but no API key set",
+            }
+
+        api_key = provider_cfg.api_key.get_secret_value()
+        # Resolve keyring placeholder
+        if api_key.startswith("keyring:"):
+            try:
+                import keyring as kr
+
+                parts = api_key.split(":", 2)
+                api_key = kr.get_password(parts[1], parts[2]) or ""
+            except Exception:  # noqa: BLE001
+                return {
+                    "name": "LLM provider",
+                    "status": "warn",
+                    "detail": f"{provider_cfg.name} key uses keyring but keyring unavailable",
+                }
+            if not api_key:
+                return {
+                    "name": "LLM provider",
+                    "status": "warn",
+                    "detail": f"{provider_cfg.name} keyring entry is empty",
+                }
+
+        model = provider_cfg.model or "(default)"
+        name = provider_cfg.name
+        # Minimal API validation — 1-token call
+        import httpx
+
+        if name == "anthropic":
+            resp = httpx.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": provider_cfg.model or "claude-sonnet-4-20250514",
+                    "max_tokens": 1,
+                    "messages": [{"role": "user", "content": "ping"}],
+                },
+                timeout=10.0,
+            )
+        elif name == "openai":
+            resp = httpx.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": provider_cfg.model or "gpt-4o-mini",
+                    "max_tokens": 1,
+                    "messages": [{"role": "user", "content": "ping"}],
+                },
+                timeout=10.0,
+            )
+        elif name == "google":
+            model_id = provider_cfg.model or "gemini-2.0-flash"
+            resp = httpx.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent",
+                headers={"Content-Type": "application/json"},
+                params={"key": api_key},
+                json={
+                    "contents": [{"parts": [{"text": "ping"}]}],
+                    "generationConfig": {"maxOutputTokens": 1},
+                },
+                timeout=10.0,
+            )
+        else:
+            return {
+                "name": "LLM provider",
+                "status": "warn",
+                "detail": f"unknown provider {name!r} — cannot validate",
+            }
+
+        if resp.status_code in (200, 201):
+            return {
+                "name": "LLM provider",
+                "status": "pass",
+                "detail": f"{name} (model: {model}) — API key valid",
+            }
+        return {
+            "name": "LLM provider",
+            "status": "warn",
+            "detail": f"{name} API returned {resp.status_code}: {resp.text[:80]}",
+        }
+    except Exception as exc:  # noqa: BLE001
+        provider_name = ""
+        try:
+            provider_name = provider_cfg.name
+        except Exception:  # noqa: BLE001
+            pass
+        if provider_name:
+            return {
+                "name": "LLM provider",
+                "status": "warn",
+                "detail": f"{provider_name} check failed: {exc}",
+            }
+        return None
+
+
+def _check_plaintext_tokens() -> dict | None:
+    """Warn if plaintext tokens exist in config and keyring is available."""
+    try:
+        from atlasbridge.core.keyring_store import is_keyring_available, is_keyring_placeholder
+    except ImportError:
+        return None
+
+    if not is_keyring_available():
+        return None
+
+    try:
+        import tomllib
+
+        cfg_path = _config_path()
+        if not cfg_path.exists():
+            return None
+        with open(cfg_path, "rb") as f:
+            data = tomllib.load(f)
+    except Exception:  # noqa: BLE001
+        return None
+
+    plaintext_fields: list[str] = []
+    for section, key in [("telegram", "bot_token"), ("slack", "bot_token"), ("slack", "app_token")]:
+        val = data.get(section, {}).get(key, "")
+        if val and not is_keyring_placeholder(val):
+            plaintext_fields.append(f"{section}.{key}")
+
+    # Check nested chat.provider.api_key
+    api_key = data.get("chat", {}).get("provider", {}).get("api_key", "")
+    if api_key and not is_keyring_placeholder(api_key):
+        plaintext_fields.append("chat.provider.api_key")
+
+    if plaintext_fields:
+        return {
+            "name": "Token storage",
+            "status": "warn",
+            "detail": (
+                f"plaintext tokens in config: {', '.join(plaintext_fields)}. "
+                "Re-run `atlasbridge setup` to migrate to OS keyring"
+            ),
+        }
+    return {
+        "name": "Token storage",
+        "status": "pass",
+        "detail": "all tokens stored in OS keyring",
+    }
+
+
 def cmd_doctor(fix: bool, as_json: bool, console: Console) -> None:
     if fix:
         _fix_config(console)
@@ -539,6 +706,8 @@ def cmd_doctor(fix: bool, as_json: bool, console: Console) -> None:
         _check_telegram_reachability(),
         _check_database(),
         _check_adapters(),
+        _check_llm_provider(),
+        _check_plaintext_tokens(),
         _check_ui_assets(),
         _check_stale_pid(),
         _check_permissions(),

@@ -162,6 +162,14 @@ def _match_channel_message(criterion: bool | None, channel_message: bool) -> tup
     )
 
 
+def _match_environment(criterion: str | None, environment: str) -> tuple[bool, str]:
+    if criterion is None:
+        return True, "environment: not specified (always matches)"
+    if criterion == environment:
+        return True, f"environment: {criterion!r} == {environment!r}"
+    return False, f"environment: {criterion!r} != {environment!r}"
+
+
 def _match_deny_input_types(criterion: list[str] | None, prompt_type: str) -> tuple[bool, str]:
     if criterion is None:
         return True, "deny_input_types: not specified (always matches)"
@@ -300,6 +308,7 @@ def _eval_criteria_block(
     session_tag: str,
     session_state: str = "",
     channel_message: bool = False,
+    environment: str = "",
     short_circuit: bool = True,
 ) -> tuple[bool, list[str]]:
     """
@@ -324,6 +333,7 @@ def _eval_criteria_block(
                 session_tag,
                 session_state,
                 channel_message,
+                environment=environment,
                 short_circuit=short_circuit,
             )
             reasons.append(f"any_of[{i}]: {'✓ matched' if sub_matched else '✗ no match'}")
@@ -347,6 +357,7 @@ def _eval_criteria_block(
         _match_session_state(m.session_state, session_state),
         _match_channel_message(m.channel_message, channel_message),
         _match_deny_input_types(m.deny_input_types, prompt_type),
+        _match_environment(m.environment, environment),
     ]
 
     all_pass = True
@@ -370,6 +381,7 @@ def _evaluate_rule_v1(
     session_tag: str,
     session_state: str = "",
     channel_message: bool = False,
+    environment: str = "",
     short_circuit: bool = True,
 ) -> RuleMatchResult:
     """
@@ -393,6 +405,7 @@ def _evaluate_rule_v1(
         session_tag,
         session_state,
         channel_message,
+        environment=environment,
         short_circuit=short_circuit,
     )
     reasons.extend(primary_reasons)
@@ -417,6 +430,7 @@ def _evaluate_rule_v1(
                 session_tag,
                 session_state,
                 channel_message,
+                environment=environment,
                 short_circuit=short_circuit,
             )
             if sub_matched:
@@ -533,6 +547,7 @@ def evaluate(
                 session_tag=session_tag,
                 session_state=session_state,
                 channel_message=channel_message,
+                environment=environment,
             )
         else:
             result = _evaluate_rule(

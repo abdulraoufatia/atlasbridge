@@ -1,9 +1,7 @@
 """Safety tests: module import boundary enforcement.
 
-Prevents import sprawl of the deprecated ``atlasbridge.tui`` package
-into modules that should only use the canonical ``atlasbridge.ui``.
-
-Part of issue #96 acceptance criteria.
+Verifies that the deprecated ``atlasbridge.tui`` package has been fully removed
+and no source or test code imports from it.
 """
 
 from __future__ import annotations
@@ -32,87 +30,70 @@ def _collect_imports(filepath: Path) -> list[str]:
     return imports
 
 
-def test_tui_not_imported_by_cli() -> None:
-    """cli/ must not import from atlasbridge.tui — use atlasbridge.ui instead."""
+def test_tui_package_removed() -> None:
+    """The tui/ directory must no longer exist in src/."""
+    tui_dir = SRC / "tui"
+    assert not tui_dir.exists(), "src/atlasbridge/tui/ still exists — it should have been removed"
+
+
+def test_no_tui_imports_in_src() -> None:
+    """No source file should import from atlasbridge.tui."""
     violations: list[str] = []
-    cli_dir = SRC / "cli"
-    for pyfile in cli_dir.rglob("*.py"):
-        for imp in _collect_imports(pyfile):
-            if imp.startswith("atlasbridge.tui"):
-                violations.append(f"{pyfile.relative_to(ROOT)}: {imp}")
-
-    assert not violations, "cli/ must not import from atlasbridge.tui (deprecated):\n" + "\n".join(
-        f"  - {v}" for v in violations
-    )
-
-
-def test_tui_not_imported_by_core() -> None:
-    """core/ must not import from atlasbridge.tui."""
-    violations: list[str] = []
-    core_dir = SRC / "core"
-    for pyfile in core_dir.rglob("*.py"):
-        for imp in _collect_imports(pyfile):
-            if imp.startswith("atlasbridge.tui"):
-                violations.append(f"{pyfile.relative_to(ROOT)}: {imp}")
-
-    assert not violations, "core/ must not import from atlasbridge.tui (deprecated):\n" + "\n".join(
-        f"  - {v}" for v in violations
-    )
-
-
-def test_tui_not_imported_by_adapters() -> None:
-    """adapters/ must not import from atlasbridge.tui."""
-    violations: list[str] = []
-    adapters_dir = SRC / "adapters"
-    for pyfile in adapters_dir.rglob("*.py"):
-        for imp in _collect_imports(pyfile):
-            if imp.startswith("atlasbridge.tui"):
-                violations.append(f"{pyfile.relative_to(ROOT)}: {imp}")
-
-    assert not violations, (
-        "adapters/ must not import from atlasbridge.tui (deprecated):\n"
-        + "\n".join(f"  - {v}" for v in violations)
-    )
-
-
-def test_tui_not_imported_by_channels() -> None:
-    """channels/ must not import from atlasbridge.tui."""
-    violations: list[str] = []
-    channels_dir = SRC / "channels"
-    for pyfile in channels_dir.rglob("*.py"):
-        for imp in _collect_imports(pyfile):
-            if imp.startswith("atlasbridge.tui"):
-                violations.append(f"{pyfile.relative_to(ROOT)}: {imp}")
-
-    assert not violations, (
-        "channels/ must not import from atlasbridge.tui (deprecated):\n"
-        + "\n".join(f"  - {v}" for v in violations)
-    )
-
-
-def test_only_ui_and_console_import_tui() -> None:
-    """Only ui/ and console/ may import from atlasbridge.tui (shared service layer)."""
-    allowed_dirs = {SRC / "ui", SRC / "tui", SRC / "console"}
-    violations: list[str] = []
-
     for pyfile in SRC.rglob("*.py"):
-        # Skip files inside ui/ and tui/ themselves
-        if any(pyfile.is_relative_to(d) for d in allowed_dirs):
-            continue
         for imp in _collect_imports(pyfile):
             if imp.startswith("atlasbridge.tui"):
                 violations.append(f"{pyfile.relative_to(ROOT)}: {imp}")
 
-    assert not violations, "Only ui/ may import from atlasbridge.tui (deprecated):\n" + "\n".join(
+    assert not violations, "Found imports from atlasbridge.tui in src/:\n" + "\n".join(
         f"  - {v}" for v in violations
     )
 
 
-def test_claude_md_documents_canonical_ui_module() -> None:
-    """CLAUDE.md must document which UI module is canonical."""
-    claude_md = (ROOT / "CLAUDE.md").read_text()
-    assert "ui module architecture" in claude_md.lower() or "canonical" in claude_md.lower(), (
-        "CLAUDE.md must document which UI module is canonical"
+def test_no_tui_imports_in_tests() -> None:
+    """No test file should import from atlasbridge.tui."""
+    tests_dir = ROOT / "tests"
+    violations: list[str] = []
+    for pyfile in tests_dir.rglob("*.py"):
+        for imp in _collect_imports(pyfile):
+            if imp.startswith("atlasbridge.tui"):
+                violations.append(f"{pyfile.relative_to(ROOT)}: {imp}")
+
+    assert not violations, "Found imports from atlasbridge.tui in tests/:\n" + "\n".join(
+        f"  - {v}" for v in violations
     )
-    assert "tui/" in claude_md, "CLAUDE.md must mention tui/ (legacy)"
-    assert "ui/" in claude_md, "CLAUDE.md must mention ui/ (canonical)"
+
+
+def test_ui_state_defines_core_types() -> None:
+    """ui/state.py must define (not re-export) the core state types."""
+    from atlasbridge.ui.state import (
+        AppState,
+        ChannelStatus,
+        ConfigStatus,
+        DaemonStatus,
+        WizardState,
+        guidance_message,
+    )
+
+    assert AppState
+    assert ChannelStatus
+    assert ConfigStatus
+    assert DaemonStatus
+    assert WizardState
+    assert callable(guidance_message)
+
+
+def test_ui_services_defines_service_classes() -> None:
+    """ui/services.py must define all service classes."""
+    from atlasbridge.ui.services import (
+        ConfigService,
+        DaemonService,
+        DoctorService,
+        LogsService,
+        SessionService,
+    )
+
+    assert ConfigService
+    assert DaemonService
+    assert DoctorService
+    assert LogsService
+    assert SessionService

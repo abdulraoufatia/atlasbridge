@@ -50,7 +50,7 @@ class TestSetupCommand:
     def test_setup_writes_config(self, runner: CliRunner, tmp_path: Path) -> None:
         result = runner.invoke(
             cli,
-            ["setup", "--token", VALID_TOKEN, "--users", "12345678"],
+            ["setup", "--no-keyring", "--token", VALID_TOKEN, "--users", "12345678"],
             catch_exceptions=False,
             env={"HOME": str(tmp_path)},
         )
@@ -188,68 +188,43 @@ class TestAdapterList:
 
 
 # ---------------------------------------------------------------------------
-# adapters (top-level shortcut)
+# adapter list
 # ---------------------------------------------------------------------------
 
 
-class TestAdaptersCommand:
-    def test_help_includes_adapters(self, runner: CliRunner) -> None:
+class TestAdapterListCommand:
+    def test_help_includes_adapter(self, runner: CliRunner) -> None:
         result = runner.invoke(cli, ["--help"], catch_exceptions=False)
         assert result.exit_code == 0
-        assert "adapters" in result.output
+        assert "adapter" in result.output
 
-    def test_adapters_exits_zero(self, runner: CliRunner) -> None:
-        result = runner.invoke(cli, ["adapters"], catch_exceptions=False)
+    def test_adapter_list_exits_zero(self, runner: CliRunner) -> None:
+        result = runner.invoke(cli, ["adapter", "list"], catch_exceptions=False)
         assert result.exit_code == 0
-        # Must print at least one adapter (built-ins are always registered)
         assert "claude" in result.output.lower()
 
-    def test_adapters_lists_all_builtins(self, runner: CliRunner) -> None:
-        result = runner.invoke(cli, ["adapters"], catch_exceptions=False)
+    def test_adapter_list_shows_all_builtins(self, runner: CliRunner) -> None:
+        result = runner.invoke(cli, ["adapter", "list"], catch_exceptions=False)
         assert result.exit_code == 0
         output = result.output.lower()
         for name in ("claude", "openai", "gemini"):
-            assert name in output, f"expected {name!r} in adapters output"
+            assert name in output, f"expected {name!r} in adapter list output"
 
-    def test_adapters_shows_count(self, runner: CliRunner) -> None:
-        result = runner.invoke(cli, ["adapters"], catch_exceptions=False)
-        assert "adapter(s) registered" in result.output
-
-    def test_adapters_json_valid(self, runner: CliRunner) -> None:
-        result = runner.invoke(cli, ["adapters", "--json"], catch_exceptions=False)
+    def test_adapter_list_json_valid(self, runner: CliRunner) -> None:
+        result = runner.invoke(cli, ["adapter", "list", "--json"], catch_exceptions=False)
         assert result.exit_code == 0
         import json
 
         data = json.loads(result.output)
-        assert "adapters" in data
-        assert "count" in data
-        assert isinstance(data["adapters"], list)
-        assert data["count"] >= 5  # claude, claude-code, openai, gemini, custom
+        assert isinstance(data, list)
+        assert len(data) >= 3
 
-    def test_adapters_json_fields(self, runner: CliRunner) -> None:
-        result = runner.invoke(cli, ["adapters", "--json"], catch_exceptions=False)
+    def test_adapter_list_json_claude_present(self, runner: CliRunner) -> None:
+        result = runner.invoke(cli, ["adapter", "list", "--json"], catch_exceptions=False)
         import json
 
         data = json.loads(result.output)
-        required_fields = {"name", "kind", "enabled", "source", "tool_name", "description"}
-        for adapter in data["adapters"]:
-            missing = required_fields - set(adapter.keys())
-            assert not missing, f"adapter {adapter.get('name')} missing fields: {missing}"
-
-    def test_adapters_json_claude_present(self, runner: CliRunner) -> None:
-        result = runner.invoke(cli, ["adapters", "--json"], catch_exceptions=False)
-        import json
-
-        data = json.loads(result.output)
-        assert any(a["name"] == "claude" for a in data["adapters"])
-
-    def test_adapters_json_sorted(self, runner: CliRunner) -> None:
-        result = runner.invoke(cli, ["adapters", "--json"], catch_exceptions=False)
-        import json
-
-        data = json.loads(result.output)
-        names = [a["name"] for a in data["adapters"]]
-        assert names == sorted(names), "JSON output should be sorted by name"
+        assert any(a["name"] == "claude" for a in data)
 
 
 # ---------------------------------------------------------------------------

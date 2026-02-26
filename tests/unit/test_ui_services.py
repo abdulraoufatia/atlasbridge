@@ -1,4 +1,4 @@
-"""Unit tests for TUI service layer — verifies delegation and error isolation."""
+"""Unit tests for UI service layer — verifies delegation and error isolation."""
 
 from __future__ import annotations
 
@@ -7,14 +7,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from atlasbridge.tui.services import (
+from atlasbridge.ui.services import (
     ConfigService,
     DaemonService,
     DoctorService,
     LogsService,
     SessionService,
 )
-from atlasbridge.tui.state import ConfigStatus, DaemonStatus
+from atlasbridge.ui.state import ConfigStatus, DaemonStatus
 
 # ---------------------------------------------------------------------------
 # ConfigService

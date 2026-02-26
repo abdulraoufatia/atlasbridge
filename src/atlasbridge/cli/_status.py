@@ -59,12 +59,16 @@ def cmd_status(as_json: bool, console: Console) -> None:
         daemon_status = "not running"
         daemon_running = False
 
+    # Environment
+    environment = ""
+
     # Session + prompt data from DB
     active_sessions: list[dict] = []
     pending_prompts = 0
 
     try:
         config = load_config()
+        environment = config.runtime.environment
         db_path = config.db_path
         if db_path.exists():
             from atlasbridge.core.store.database import Database
@@ -87,6 +91,7 @@ def cmd_status(as_json: bool, console: Console) -> None:
         data = {
             "daemon": daemon_status,
             "daemon_running": daemon_running,
+            "environment": environment,
             "active_sessions": len(active_sessions),
             "pending_prompts": pending_prompts,
             "sessions": active_sessions,
@@ -95,6 +100,11 @@ def cmd_status(as_json: bool, console: Console) -> None:
         return
 
     console.print("[bold]AtlasBridge Status[/bold]\n")
+
+    # Environment
+    if environment:
+        env_color = {"production": "red", "staging": "yellow"}.get(environment, "green")
+        console.print(f"  Environment: [{env_color}]{environment}[/{env_color}]")
 
     # Daemon row
     if daemon_running:

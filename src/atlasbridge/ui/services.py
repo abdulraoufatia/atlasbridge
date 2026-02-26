@@ -1,5 +1,5 @@
 """
-TUI service layer — thin wrappers over existing application functions.
+UI service layer — thin wrappers over existing application functions.
 
 No business logic lives here; every method delegates to the same
 functions used by the CLI subcommands (single source of truth).
@@ -7,7 +7,7 @@ functions used by the CLI subcommands (single source of truth).
 
 from __future__ import annotations
 
-from atlasbridge.tui.state import AppState, ChannelStatus, ConfigStatus, DaemonStatus
+from atlasbridge.ui.state import AppState, ChannelStatus, ConfigStatus, DaemonStatus
 
 
 class ConfigService:
@@ -60,6 +60,7 @@ class DoctorService:
         from atlasbridge.cli._doctor import (
             _check_bot_token,
             _check_config,
+            _check_llm_provider,
             _check_platform,
             _check_poller_lock,
             _check_ptyprocess,
@@ -72,6 +73,7 @@ class DoctorService:
             _check_ptyprocess(),
             _check_config(),
             _check_bot_token(),
+            _check_llm_provider(),
             _check_poller_lock(),
         ]
         return [c for c in checks_raw if c is not None]
