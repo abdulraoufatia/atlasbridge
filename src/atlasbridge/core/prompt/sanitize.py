@@ -35,8 +35,9 @@ _ANSI_RE = re.compile(
 # ---------------------------------------------------------------------------
 
 # Numbered choices: "1) Fast", "2. Balanced", "3: Thorough"
+# Also handles Unicode bullets/arrows before digits: "❯ 1. Yes, I trust this folder"
 _NUMBERED_CHOICE_RE = re.compile(
-    r"^\s*(\d+)\s*[).\]:]\s+(.+?)$",
+    r"^\s*\S?\s*(\d+)\s*[).\]:]\s+(.+?)$",
     re.MULTILINE,
 )
 

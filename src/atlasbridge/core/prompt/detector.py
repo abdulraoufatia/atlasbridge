@@ -66,11 +66,14 @@ _MULTIPLE_CHOICE_PATTERNS: list[Pattern[str]] = [
         r"[\(\[]\s*\d+\s*[-–]\s*\d+\s*[\)\]]",
         re.IGNORECASE,
     ),
-    re.compile(r"(?:^|\n)\s*1[\)\.]\s+\S.+\n\s*2[\)\.]\s+\S", re.DOTALL),
+    # Numbered items — allow Unicode bullets/arrows (❯, ▶, >, etc.) before digits
+    re.compile(r"(?:^|\n)\s*\S?\s*1[\)\.]\s+\S.+\n\s*\S?\s*2[\)\.]\s+\S", re.DOTALL),
     re.compile(r"(?:^|\n)\s*\[A\].+\[B\]", re.DOTALL | re.IGNORECASE),
-    # Folder trust prompt — "trust ... folder" followed by numbered items
+    # Folder trust prompt — "trust" and "folder" in same text, followed by numbered items.
+    # Claude Code's safety message puts ~134 chars between "trust" and "folder",
+    # so allow up to 200 chars gap.
     re.compile(
-        r"trust.{0,80}folder.{0,200}?\n\s*1[\)\.]\s+",
+        r"trust.{0,200}folder.{0,400}?\n\s*\S?\s*1[\)\.]\s+",
         re.DOTALL | re.IGNORECASE,
     ),
 ]
