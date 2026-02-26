@@ -31,33 +31,38 @@ def cloud_group():
 @click.option("--json", "as_json", is_flag=True, default=False)
 def edition_cmd(as_json):
     """[EXPERIMENTAL] Show the current AtlasBridge edition."""
-    from atlasbridge.enterprise import detect_edition
+    from atlasbridge.enterprise.edition import detect_authority_mode, detect_edition
 
     ed = detect_edition()
+    am = detect_authority_mode()
     if as_json:
         import json
 
-        click.echo(json.dumps({"edition": ed.value}))
+        click.echo(json.dumps({"edition": ed.value, "authority_mode": am.value}))
     else:
         console.print(f"AtlasBridge edition: [bold]{ed.value}[/bold]")
+        console.print(f"Authority mode: [bold]{am.value}[/bold]")
 
 
 @cloud_group.command("features")
 @click.option("--json", "as_json", is_flag=True, default=False)
 def features_cmd(as_json):
-    """[EXPERIMENTAL] Show all feature flags and their availability."""
-    from atlasbridge.enterprise import list_features
+    """[EXPERIMENTAL] Show all capabilities and their availability."""
+    from atlasbridge.enterprise.edition import detect_authority_mode, detect_edition
+    from atlasbridge.enterprise.registry import FeatureRegistry
 
-    features = list_features()
+    ed = detect_edition()
+    am = detect_authority_mode()
+    caps = FeatureRegistry.list_capabilities(ed, am)
     if as_json:
         import json
 
-        click.echo(json.dumps(features, indent=2))
+        click.echo(json.dumps(caps, indent=2))
     else:
-        console.print("\n[bold]Feature Flags[/bold]\n")
-        for name, info in features.items():
-            status = "[green]active[/green]" if info["status"] == "active" else "[dim]locked[/dim]"
-            console.print(f"  {name:<28} {status}  (requires: {info['required_edition']})")
+        console.print("\n[bold]Capabilities[/bold]\n")
+        for name, info in caps.items():
+            status = "[green]active[/green]" if info["allowed"] else "[dim]locked[/dim]"
+            console.print(f"  {name:<40} {status}  ({info['capability_class']})")
         console.print()
 
 

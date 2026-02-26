@@ -261,6 +261,28 @@ class AuditWriter:
             prompt_id=prompt_id or "",
         )
 
+    def capability_denied(
+        self,
+        *,
+        capability_id: str,
+        reason_code: str,
+        capability_class: str,
+        decision_fingerprint: str,
+        edition: str = "",
+        authority_mode: str = "",
+    ) -> None:
+        self._write(
+            "capability.denied",
+            {
+                "capability_id": capability_id,
+                "reason_code": reason_code,
+                "capability_class": capability_class,
+                "decision_fingerprint": decision_fingerprint,
+                "edition": edition,
+                "authority_mode": authority_mode,
+            },
+        )
+
     def channel_message_rejected(
         self,
         *,

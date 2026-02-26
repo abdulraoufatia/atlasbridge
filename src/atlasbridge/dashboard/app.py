@@ -103,7 +103,12 @@ class _AccessLogMiddleware(BaseHTTPMiddleware):
         return response
 
 
-def _collect_settings(db_path: Path, trace_path: Path) -> dict:
+def _collect_settings(
+    db_path: Path,
+    trace_path: Path,
+    edition: str = "",
+    authority_mode: str = "",
+) -> dict:
     """Gather read-only settings data for the settings page."""
     import atlasbridge
     from atlasbridge.cli._doctor import (
@@ -117,9 +122,17 @@ def _collect_settings(db_path: Path, trace_path: Path) -> dict:
     )
     from atlasbridge.core.config import _config_file_path, atlasbridge_dir
     from atlasbridge.core.constants import AUDIT_FILENAME
-    from atlasbridge.enterprise import detect_edition, list_features
+    from atlasbridge.enterprise.edition import (
+        detect_authority_mode,
+        detect_edition,
+    )
+    from atlasbridge.enterprise.registry import FeatureRegistry
 
-    edition = detect_edition()
+    ed = detect_edition() if not edition else None
+    am = detect_authority_mode() if not authority_mode else None
+    ed_val = edition or (ed.value if ed else "core")
+    am_val = authority_mode or (am.value if am else "readonly")
+
     config_dir = atlasbridge_dir()
     config_file = _config_file_path()
 
@@ -134,10 +147,21 @@ def _collect_settings(db_path: Path, trace_path: Path) -> dict:
     ]
     diagnostics = [c for c in checks_raw if c is not None]
 
+    # Resolve edition/authority for registry call
+    from atlasbridge.enterprise.edition import AuthorityMode, Edition
+
+    ed_enum = Edition(ed_val) if ed_val in Edition.__members__.values() else Edition.CORE
+    am_enum = (
+        AuthorityMode(am_val)
+        if am_val in AuthorityMode.__members__.values()
+        else AuthorityMode.READONLY
+    )
+
     vi = sys.version_info
     data: dict = {
         "runtime": {
-            "edition": edition.value,
+            "edition": ed_enum.value,
+            "authority_mode": am_enum.value,
             "version": atlasbridge.__version__,
             "python_version": f"{vi.major}.{vi.minor}.{vi.micro}",
             "platform": sys.platform,
@@ -155,11 +179,8 @@ def _collect_settings(db_path: Path, trace_path: Path) -> dict:
             "loopback_only": True,
         },
         "diagnostics": diagnostics,
+        "capabilities": FeatureRegistry.list_capabilities(ed_enum, am_enum),
     }
-
-    # Core and Enterprise editions include feature flags
-    if edition.value in ("core", "enterprise"):
-        data["features"] = list_features()
 
     return data
 
@@ -170,8 +191,16 @@ def create_app(
     environment: str = "",
 ) -> FastAPI:
     """Create the FastAPI dashboard application."""
+    from atlasbridge.enterprise.edition import detect_authority_mode, detect_edition
+    from atlasbridge.enterprise.guard import FeatureUnavailableError, require_capability
+    from atlasbridge.enterprise.registry import FeatureRegistry
+
     db_path = db_path or _default_db_path()
     trace_path = trace_path or _default_trace_path()
+
+    # Resolve edition and authority mode once at startup
+    edition = detect_edition()
+    authority_mode = detect_authority_mode()
 
     app = FastAPI(
         title="AtlasBridge Dashboard",
@@ -179,6 +208,24 @@ def create_app(
         docs_url=None,
         redoc_url=None,
     )
+
+    # Store on app state for route handlers
+    app.state.edition = edition
+    app.state.authority_mode = authority_mode
+
+    # Exception handler: FeatureUnavailableError → 404 JSON
+    @app.exception_handler(FeatureUnavailableError)
+    async def _feature_unavailable_handler(
+        request: Request,
+        exc: FeatureUnavailableError,
+    ) -> JSONResponse:
+        return JSONResponse(
+            {
+                "error": f"Capability unavailable: {exc.capability_id}",
+                "reason": exc.decision.reason_code,
+            },
+            status_code=404,
+        )
 
     app.add_middleware(_AccessLogMiddleware)
 
@@ -292,7 +339,12 @@ def create_app(
 
     @app.get("/settings", response_class=HTMLResponse)
     async def settings(request: Request):
-        settings_data = _collect_settings(db_path, trace_path)
+        settings_data = _collect_settings(
+            db_path,
+            trace_path,
+            edition=edition.value,
+            authority_mode=authority_mode.value,
+        )
         return templates.TemplateResponse(
             request,
             "settings.html",
@@ -301,14 +353,13 @@ def create_app(
 
     @app.get("/enterprise/settings", response_class=HTMLResponse)
     async def enterprise_settings(request: Request):
-        from atlasbridge.enterprise import Edition, detect_edition
-
-        if detect_edition() != Edition.ENTERPRISE:
-            return JSONResponse(
-                {"error": "Enterprise settings require Enterprise edition"},
-                status_code=404,
-            )
-        settings_data = _collect_settings(db_path, trace_path)
+        require_capability(edition, authority_mode, "authority.enterprise_settings")
+        settings_data = _collect_settings(
+            db_path,
+            trace_path,
+            edition=edition.value,
+            authority_mode=authority_mode.value,
+        )
         return templates.TemplateResponse(
             request,
             "settings.html",
@@ -363,7 +414,34 @@ def create_app(
 
     @app.get("/api/settings")
     async def api_settings():
-        return JSONResponse(_collect_settings(db_path, trace_path))
+        return JSONResponse(
+            _collect_settings(
+                db_path,
+                trace_path,
+                edition=edition.value,
+                authority_mode=authority_mode.value,
+            )
+        )
+
+    @app.get("/runtime/capabilities")
+    async def runtime_capabilities():
+        """Return current runtime edition, authority mode, and capability status."""
+        from atlasbridge.enterprise.registry import REGISTRY_VERSION
+
+        caps = FeatureRegistry.list_capabilities(edition, authority_mode)
+        cap_hash = FeatureRegistry.capabilities_hash(edition, authority_mode)
+
+        return JSONResponse(
+            {
+                "edition": edition.value,
+                "authority_mode": authority_mode.value,
+                "enabled_capabilities": sorted(
+                    cap_id for cap_id, info in caps.items() if info["allowed"]
+                ),
+                "enabled_capabilities_hash": cap_hash,
+                "registry_version": REGISTRY_VERSION,
+            }
+        )
 
     return app
 
