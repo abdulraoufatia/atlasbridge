@@ -60,6 +60,7 @@ class DoctorService:
         from atlasbridge.cli._doctor import (
             _check_bot_token,
             _check_config,
+            _check_llm_provider,
             _check_platform,
             _check_poller_lock,
             _check_ptyprocess,
@@ -72,6 +73,7 @@ class DoctorService:
             _check_ptyprocess(),
             _check_config(),
             _check_bot_token(),
+            _check_llm_provider(),
             _check_poller_lock(),
         ]
         return [c for c in checks_raw if c is not None]

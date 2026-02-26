@@ -523,6 +523,125 @@ def _check_adapters() -> dict:
         return {"name": "Adapters", "status": "fail", "detail": str(exc)}
 
 
+def _check_llm_provider() -> dict | None:
+    """Check that the configured LLM provider API key is valid."""
+    try:
+        from atlasbridge.core.config import load_config
+
+        cfg_path = _config_path()
+        if not cfg_path.exists():
+            return None
+        cfg = load_config(cfg_path)
+        provider_cfg = cfg.chat.provider
+        if not provider_cfg.name:
+            return None  # No provider configured — skip silently
+        if not provider_cfg.api_key:
+            return {
+                "name": "LLM provider",
+                "status": "warn",
+                "detail": f"{provider_cfg.name} configured but no API key set",
+            }
+
+        api_key = provider_cfg.api_key.get_secret_value()
+        # Resolve keyring placeholder
+        if api_key.startswith("keyring:"):
+            try:
+                import keyring as kr
+
+                parts = api_key.split(":", 2)
+                api_key = kr.get_password(parts[1], parts[2]) or ""
+            except Exception:  # noqa: BLE001
+                return {
+                    "name": "LLM provider",
+                    "status": "warn",
+                    "detail": f"{provider_cfg.name} key uses keyring but keyring unavailable",
+                }
+            if not api_key:
+                return {
+                    "name": "LLM provider",
+                    "status": "warn",
+                    "detail": f"{provider_cfg.name} keyring entry is empty",
+                }
+
+        model = provider_cfg.model or "(default)"
+        name = provider_cfg.name
+        # Minimal API validation — 1-token call
+        import httpx
+
+        if name == "anthropic":
+            resp = httpx.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": provider_cfg.model or "claude-sonnet-4-20250514",
+                    "max_tokens": 1,
+                    "messages": [{"role": "user", "content": "ping"}],
+                },
+                timeout=10.0,
+            )
+        elif name == "openai":
+            resp = httpx.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": provider_cfg.model or "gpt-4o-mini",
+                    "max_tokens": 1,
+                    "messages": [{"role": "user", "content": "ping"}],
+                },
+                timeout=10.0,
+            )
+        elif name == "google":
+            model_id = provider_cfg.model or "gemini-2.0-flash"
+            resp = httpx.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent",
+                headers={"Content-Type": "application/json"},
+                params={"key": api_key},
+                json={
+                    "contents": [{"parts": [{"text": "ping"}]}],
+                    "generationConfig": {"maxOutputTokens": 1},
+                },
+                timeout=10.0,
+            )
+        else:
+            return {
+                "name": "LLM provider",
+                "status": "warn",
+                "detail": f"unknown provider {name!r} — cannot validate",
+            }
+
+        if resp.status_code in (200, 201):
+            return {
+                "name": "LLM provider",
+                "status": "pass",
+                "detail": f"{name} (model: {model}) — API key valid",
+            }
+        return {
+            "name": "LLM provider",
+            "status": "warn",
+            "detail": f"{name} API returned {resp.status_code}: {resp.text[:80]}",
+        }
+    except Exception as exc:  # noqa: BLE001
+        provider_name = ""
+        try:
+            provider_name = provider_cfg.name  # type: ignore[possibly-undefined]
+        except Exception:  # noqa: BLE001
+            pass
+        if provider_name:
+            return {
+                "name": "LLM provider",
+                "status": "warn",
+                "detail": f"{provider_name} check failed: {exc}",
+            }
+        return None
+
+
 def cmd_doctor(fix: bool, as_json: bool, console: Console) -> None:
     if fix:
         _fix_config(console)
@@ -539,6 +658,7 @@ def cmd_doctor(fix: bool, as_json: bool, console: Console) -> None:
         _check_telegram_reachability(),
         _check_database(),
         _check_adapters(),
+        _check_llm_provider(),
         _check_ui_assets(),
         _check_stale_pid(),
         _check_permissions(),
