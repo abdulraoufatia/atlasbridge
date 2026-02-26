@@ -24,6 +24,7 @@ Commands:
   atlasbridge risk assess        — Deterministic risk classification
   atlasbridge replay session     — Replay a session with a policy
   atlasbridge replay diff        — Compare two policies against a session
+  atlasbridge chat               — Start a chat session with an LLM provider
 """
 
 from __future__ import annotations
@@ -50,7 +51,7 @@ from atlasbridge import __version__
 @click.option("--log-json", is_flag=True, default=False, hidden=True, help="Emit JSON log lines.")
 @click.pass_context
 def cli(ctx: click.Context, log_level: str, log_json: bool) -> None:
-    """AtlasBridge — universal human-in-the-loop control plane for AI developer agents."""
+    """AtlasBridge — autonomous runtime for AI developer agents with human oversight."""
     from atlasbridge.core.logging import configure_logging
 
     configure_logging(level=log_level, json_output=log_json)
@@ -92,6 +93,7 @@ from atlasbridge.cli._adapter import adapter_group, adapters_cmd  # noqa: E402
 from atlasbridge.cli._audit_cmd import audit_group  # noqa: E402
 from atlasbridge.cli._autopilot import autopilot_group, pause_cmd, resume_cmd  # noqa: E402
 from atlasbridge.cli._channel import channel_group  # noqa: E402
+from atlasbridge.cli._chat import chat_cmd  # noqa: E402
 from atlasbridge.cli._config_cmd import config_group  # noqa: E402
 from atlasbridge.cli._console import console_cmd  # noqa: E402
 from atlasbridge.cli._daemon import start_cmd, stop_cmd  # noqa: E402
@@ -141,6 +143,7 @@ cli.add_command(dashboard_group)
 cli.add_command(console_cmd)
 cli.add_command(replay_group)
 cli.add_command(risk_group)
+cli.add_command(chat_cmd)
 
 
 # ---------------------------------------------------------------------------

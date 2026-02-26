@@ -216,6 +216,45 @@ class StreamingConfig(BaseModel):
         return v
 
 
+class ProviderConfig(BaseModel):
+    """LLM provider configuration for chat mode."""
+
+    name: str = ""  # anthropic | openai | google
+    model: str = ""  # empty = provider default
+    api_key: SecretStr | None = None
+    max_tokens: int = 4096
+    system_prompt: str = ""
+
+    @field_validator("name")
+    @classmethod
+    def validate_provider_name(cls, v: str) -> str:
+        if v and v not in ("anthropic", "openai", "google"):
+            raise ValueError(f"Unknown provider {v!r}. Supported: anthropic, openai, google")
+        return v
+
+    @field_validator("max_tokens")
+    @classmethod
+    def validate_max_tokens(cls, v: int) -> int:
+        if not (1 <= v <= 128000):
+            raise ValueError("max_tokens must be between 1 and 128000")
+        return v
+
+
+class ChatConfig(BaseModel):
+    """Chat mode configuration."""
+
+    provider: ProviderConfig = Field(default_factory=ProviderConfig)
+    tools_enabled: bool = True
+    max_history_messages: int = 50
+
+    @field_validator("max_history_messages")
+    @classmethod
+    def validate_max_history(cls, v: int) -> int:
+        if not (1 <= v <= 500):
+            raise ValueError("max_history_messages must be between 1 and 500")
+        return v
+
+
 # ---------------------------------------------------------------------------
 # Root config
 # ---------------------------------------------------------------------------
@@ -232,6 +271,7 @@ class AtlasBridgeConfig(BaseModel):
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     adapters: AdaptersConfig = Field(default_factory=AdaptersConfig)
     streaming: StreamingConfig = Field(default_factory=StreamingConfig)
+    chat: ChatConfig = Field(default_factory=ChatConfig)
 
     @model_validator(mode="after")
     def at_least_one_channel(self) -> AtlasBridgeConfig:
@@ -374,6 +414,14 @@ def _apply_env_overrides(data: dict[str, Any]) -> None:
     if timeout := _env("ATLASBRIDGE_APPROVAL_TIMEOUT_SECONDS", "AEGIS_APPROVAL_TIMEOUT_SECONDS"):
         data.setdefault("prompts", {})["timeout_seconds"] = int(timeout)
 
+    # Chat / LLM provider
+    if llm_provider := _env("ATLASBRIDGE_LLM_PROVIDER"):
+        data.setdefault("chat", {}).setdefault("provider", {})["name"] = llm_provider
+    if llm_key := _env("ATLASBRIDGE_LLM_API_KEY"):
+        data.setdefault("chat", {}).setdefault("provider", {})["api_key"] = llm_key
+    if llm_model := _env("ATLASBRIDGE_LLM_MODEL"):
+        data.setdefault("chat", {}).setdefault("provider", {})["model"] = llm_model
+
 
 def save_config(
     config_data: dict[str, Any],
@@ -425,6 +473,11 @@ _KEYRING_TOKEN_FIELDS: list[tuple[str, str]] = [
     ("slack", "app_token"),
 ]
 
+# Nested paths for keyring resolution (section.subsection, key)
+_KEYRING_NESTED_FIELDS: list[tuple[str, str, str]] = [
+    ("chat", "provider", "api_key"),
+]
+
 
 def _resolve_keyring_placeholders(data: dict[str, Any]) -> None:
     """In-place resolve ``keyring:*`` placeholders to actual tokens."""
@@ -446,6 +499,20 @@ def _resolve_keyring_placeholders(data: dict[str, Any]) -> None:
                     f"Is the keyring unlocked? Try: pip install 'atlasbridge[keyring]'"
                 )
             data[section][key] = resolved
+
+    for section, subsection, key in _KEYRING_NESTED_FIELDS:
+        sub = data.get(section, {}).get(subsection, {})
+        if key not in sub:
+            continue
+        val = sub[key]
+        if is_keyring_placeholder(val):
+            resolved = retrieve_token(val)
+            if resolved is None:
+                raise ConfigError(
+                    f"Cannot resolve keyring token for [{section}.{subsection}].{key}. "
+                    f"Placeholder: {val!r}."
+                )
+            sub[key] = resolved
 
 
 def _store_tokens_in_keyring(data: dict[str, Any]) -> None:

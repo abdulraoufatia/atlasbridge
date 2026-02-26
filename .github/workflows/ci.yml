@@ -115,6 +115,9 @@ jobs:
       - name: atlasbridge console --help
         run: atlasbridge console --help
 
+      - name: atlasbridge chat --help
+        run: atlasbridge chat --help
+
   lint:
     name: Lint & Type Check
     runs-on: ubuntu-latest

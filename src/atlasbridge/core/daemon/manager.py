@@ -466,18 +466,149 @@ class DaemonManager:
             await self.stop()
 
     # ------------------------------------------------------------------
+    # Chat session (direct LLM API mode)
+    # ------------------------------------------------------------------
+
+    async def _run_chat_session(self) -> None:
+        """
+        Run a chat session: users talk to an LLM via the channel,
+        with tool use governed by the policy engine.
+
+        Data flow::
+
+            user message (Telegram/Slack)
+              -> ChatEngine.handle_message()
+                -> LLM provider (streaming)
+                  -> tool_calls -> policy -> execute/escalate/deny
+                -> response -> channel
+        """
+        chat_cfg = self._config.get("chat", {})
+        provider_name = chat_cfg.get("provider_name", "")
+        api_key = chat_cfg.get("api_key", "")
+
+        if not provider_name or not api_key:
+            logger.error("chat_session_missing_provider")
+            return
+
+        if self._channel is None:
+            logger.error("chat_session_no_channel")
+            return
+
+        # Import and create provider (import triggers auto-registration)
+        import atlasbridge.providers  # noqa: F401
+        from atlasbridge.providers.base import ProviderRegistry
+
+        try:
+            provider_cls = ProviderRegistry.get(provider_name)
+        except KeyError as exc:
+            logger.error("chat_provider_not_found", error=str(exc))
+            return
+
+        model = chat_cfg.get("model", "")
+        provider = provider_cls(api_key=api_key, model=model)  # type: ignore[call-arg]
+
+        # Create session
+        from atlasbridge.core.session.models import Session
+
+        session_id = str(uuid.uuid4())
+        session = Session(
+            session_id=session_id,
+            tool=f"chat:{provider_name}",
+            command=["chat"],
+        )
+        if self._session_manager is not None:
+            self._session_manager.register(session)
+
+        # Set up tool registry + executor (if tools enabled)
+        tool_registry = None
+        tool_executor = None
+        if chat_cfg.get("tools_enabled", True):
+            from atlasbridge.tools.executor import ToolExecutor
+            from atlasbridge.tools.registry import get_default_registry
+
+            tool_registry = get_default_registry()
+            tool_executor = ToolExecutor(tool_registry)
+
+        # Create ChatEngine
+        from atlasbridge.core.chat.engine import ChatEngine
+
+        engine = ChatEngine(
+            provider=provider,
+            channel=self._channel,
+            session_id=session_id,
+            session_manager=self._session_manager,  # type: ignore[arg-type]
+            tool_registry=tool_registry,
+            tool_executor=tool_executor,
+            policy=self._policy,
+            system_prompt=chat_cfg.get("system_prompt", ""),
+            max_history=chat_cfg.get("max_history", 50),
+        )
+
+        logger.info(
+            "chat_session_started",
+            session_id=session_id[:8],
+            provider=provider_name,
+            model=model or "(default)",
+            tools=chat_cfg.get("tools_enabled", True),
+        )
+
+        if not self._dry_run:
+            await self._channel.notify(
+                f"Chat session started ({provider_name}). Send a message to begin.",
+                session_id=session_id,
+            )
+
+        # Consume channel messages and forward to ChatEngine
+        try:
+            async for reply in self._channel.receive_replies():
+                text = reply.text if hasattr(reply, "text") else str(reply)
+                if not text or not text.strip():
+                    continue
+                try:
+                    await engine.handle_message(text)
+                except Exception as exc:  # noqa: BLE001
+                    logger.error(
+                        "chat_message_error",
+                        session_id=session_id[:8],
+                        error=str(exc),
+                    )
+                    try:
+                        await self._channel.notify(
+                            f"Error: {exc}",
+                            session_id=session_id,
+                        )
+                    except Exception:  # noqa: BLE001
+                        pass
+        finally:
+            await provider.close()
+            if self._session_manager is not None:
+                self._session_manager.mark_ended(session_id)
+            logger.info("chat_session_ended", session_id=session_id[:8])
+
+    # ------------------------------------------------------------------
     # Main loop
     # ------------------------------------------------------------------
 
     async def _run_loop(self) -> None:
-        """Run the reply consumer, TTL sweeper, and adapter session until shutdown."""
+        """Run the reply consumer, TTL sweeper, and adapter/chat session until shutdown."""
         tasks: list[asyncio.Task[Any]] = []
         router = self._intent_router or self._router
-        if self._channel and router:
-            tasks.append(asyncio.create_task(self._reply_consumer(), name="reply_consumer"))
+
+        is_chat_mode = self._config.get("mode") == "chat"
+
+        if is_chat_mode:
+            # Chat mode: ChatEngine consumes replies directly
+            tasks.append(asyncio.create_task(self._run_chat_session(), name="chat_session"))
+        else:
+            # Adapter (PTY) mode: reply consumer + adapter session
+            if self._channel and router:
+                tasks.append(asyncio.create_task(self._reply_consumer(), name="reply_consumer"))
+            if self._config.get("tool") and self._config.get("command"):
+                tasks.append(
+                    asyncio.create_task(self._run_adapter_session(), name="adapter_session")
+                )
+
         tasks.append(asyncio.create_task(self._ttl_sweeper(), name="ttl_sweeper"))
-        if self._config.get("tool") and self._config.get("command"):
-            tasks.append(asyncio.create_task(self._run_adapter_session(), name="adapter_session"))
 
         await self._shutdown_event.wait()
 

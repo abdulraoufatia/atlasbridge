@@ -172,6 +172,43 @@ def _match_deny_input_types(criterion: list[str] | None, prompt_type: str) -> tu
     )
 
 
+def _match_tool_name(
+    criterion: str | None,
+    excerpt: str,
+    is_regex: bool = False,
+) -> tuple[bool, str]:
+    """Match on a tool_name field. Extracts tool name from 'tool_use: <name>(...)' excerpts."""
+    if criterion is None:
+        return True, "tool_name: not specified (always matches)"
+
+    # Extract tool name from synthetic excerpt format: "tool_use: name({args})"
+    tool_name = excerpt
+    if excerpt.startswith("tool_use: "):
+        paren_idx = excerpt.find("(", 10)
+        if paren_idx > 0:
+            tool_name = excerpt[10:paren_idx]
+        else:
+            tool_name = excerpt[10:]
+
+    if is_regex:
+        try:
+            with _regex_timeout(_REGEX_TIMEOUT_S):
+                matched = bool(re.search(criterion, tool_name, re.IGNORECASE))
+            return (
+                matched,
+                f"tool_name: regex {criterion!r} {'matched' if matched else 'did not match'} "
+                f"{tool_name!r}",
+            )
+        except (TimeoutError, re.error):
+            return False, f"tool_name: regex {criterion!r} failed"
+
+    matched = criterion.lower() == tool_name.lower()
+    return (
+        matched,
+        f"tool_name: {criterion!r} {'==' if matched else '!='} {tool_name!r}",
+    )
+
+
 def _match_contains(
     contains: str | None,
     contains_is_regex: bool,
@@ -238,6 +275,7 @@ def _evaluate_rule(
         _match_repo(m.repo, repo),
         _match_prompt_type(m.prompt_type, prompt_type),
         _match_confidence(m.min_confidence, confidence),
+        _match_tool_name(m.tool_name, excerpt, m.contains_is_regex),
         _match_contains(m.contains, m.contains_is_regex, excerpt),
     ]
 

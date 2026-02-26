@@ -44,6 +44,7 @@ class PromptTypeFilter(str, Enum):
     CONFIRM_ENTER = "confirm_enter"
     MULTIPLE_CHOICE = "multiple_choice"
     FREE_TEXT = "free_text"
+    TOOL_USE = "tool_use"
     ANY = "*"
 
 
@@ -206,6 +207,9 @@ class MatchCriteria(BaseModel):
 
     prompt_type: list[PromptTypeFilter] | None = None
     """List of prompt types that trigger this rule. Omit = match any type."""
+
+    tool_name: str | None = None
+    """Match on the tool being invoked (chat mode only). Supports regex if contains_is_regex=true."""
 
     contains: str | None = None
     """Substring or regex pattern to match against the prompt excerpt."""

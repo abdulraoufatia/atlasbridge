@@ -131,6 +131,10 @@ def run_setup(
     if channel == "telegram" and sys.platform.startswith("linux") and not non_interactive:
         _maybe_install_systemd(console, str(cfg_path))
 
+    # Optional: LLM provider for chat mode
+    if not non_interactive and not from_env and sys.stdin.isatty():
+        _maybe_setup_llm_provider(console, config_data, str(cfg_path))
+
     console.print("\n[green]Setup complete.[/green]")
     if channel == "telegram":
         console.print(
@@ -138,6 +142,7 @@ def run_setup(
         )
         console.print("This is required before AtlasBridge can deliver prompts to you.")
     console.print("\nRun [cyan]atlasbridge run claude[/cyan] to start supervising Claude Code.")
+    console.print("Run [cyan]atlasbridge chat[/cyan] to chat with an LLM via your channel.")
 
 
 # ---------------------------------------------------------------------------
@@ -390,6 +395,60 @@ def _setup_from_env(console: Console) -> dict:
     console.print(f"Detected channel(s): [cyan]{', '.join(channels)}[/cyan]")
 
     return config_data
+
+
+# ---------------------------------------------------------------------------
+# LLM provider setup (optional, for chat mode)
+# ---------------------------------------------------------------------------
+
+
+def _maybe_setup_llm_provider(console: Console, config_data: dict, cfg_path: str) -> None:
+    """Optionally configure an LLM provider for chat mode."""
+    console.print()
+    setup_llm = Confirm.ask(
+        "[bold]Set up an LLM provider for chat mode?[/bold] "
+        "(talk to Claude/GPT/Gemini via Telegram)",
+        default=False,
+    )
+    if not setup_llm:
+        return
+
+    provider = Prompt.ask(
+        "[bold]LLM provider[/bold]",
+        choices=["anthropic", "openai", "google"],
+        default="anthropic",
+    )
+
+    api_key = Prompt.ask(f"[bold]{provider} API key[/bold]").strip()
+    if not api_key:
+        console.print("[yellow]No API key entered. Skipping LLM setup.[/yellow]")
+        return
+
+    model = Prompt.ask(
+        "[bold]Model[/bold] (leave blank for default)",
+        default="",
+    ).strip()
+
+    config_data.setdefault("chat", {})["provider"] = {
+        "name": provider,
+        "api_key": api_key,
+    }
+    if model:
+        config_data["chat"]["provider"]["model"] = model
+
+    # Re-save config with the new chat section
+    from atlasbridge.core.config import save_config
+    from atlasbridge.core.exceptions import ConfigError
+
+    try:
+        from pathlib import Path
+
+        save_config(config_data, Path(cfg_path) if cfg_path else None)
+        console.print(f"[green]LLM provider configured:[/green] {provider}")
+        if model:
+            console.print(f"  Model: [cyan]{model}[/cyan]")
+    except ConfigError as exc:
+        console.print(f"[yellow]Could not save LLM config: {exc}[/yellow]")
 
 
 # ---------------------------------------------------------------------------
