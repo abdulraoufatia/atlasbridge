@@ -762,6 +762,84 @@ export async function registerRoutes(
   );
 
   // ---------------------------------------------------------------------------
+  // Channel configuration
+  // ---------------------------------------------------------------------------
+
+  app.get("/api/channels", async (_req, res) => {
+    try {
+      const { runAtlasBridge } = await import("./routes/operator");
+      const { stdout } = await runAtlasBridge(["config", "show", "--json"]);
+      const cfg = JSON.parse(stdout);
+      res.json({
+        telegram: cfg.telegram ?? null,
+        slack: cfg.slack ?? null,
+      });
+    } catch (err: any) {
+      res.status(503).json({ error: "Failed to read channel config", detail: err.message });
+    }
+  });
+
+  app.post(
+    "/api/channels/telegram",
+    requireCsrf,
+    operatorRateLimiter,
+    async (req, res) => {
+      const { token, users } = req.body as { token?: string; users?: string };
+      if (!token || !users) {
+        res.status(400).json({ error: "token and users are required" });
+        return;
+      }
+      try {
+        const { runAtlasBridge } = await import("./routes/operator");
+        await runAtlasBridge(["channel", "add", "telegram", "--token", token, "--users", String(users)]);
+        res.json({ ok: true });
+      } catch (err: any) {
+        res.status(503).json({ error: "Failed to configure Telegram channel", detail: err.message });
+      }
+    },
+  );
+
+  app.post(
+    "/api/channels/slack",
+    requireCsrf,
+    operatorRateLimiter,
+    async (req, res) => {
+      const { token, appToken, users } = req.body as { token?: string; appToken?: string; users?: string };
+      if (!token || !appToken || !users) {
+        res.status(400).json({ error: "token, appToken, and users are required" });
+        return;
+      }
+      try {
+        const { runAtlasBridge } = await import("./routes/operator");
+        await runAtlasBridge(["channel", "add", "slack", "--token", token, "--app-token", appToken, "--users", String(users)]);
+        res.json({ ok: true });
+      } catch (err: any) {
+        res.status(503).json({ error: "Failed to configure Slack channel", detail: err.message });
+      }
+    },
+  );
+
+  app.delete(
+    "/api/channels/:name",
+    requireCsrf,
+    operatorRateLimiter,
+    async (req, res) => {
+      const name = req.params.name;
+      if (!["telegram", "slack"].includes(name)) {
+        res.status(400).json({ error: "Invalid channel name" });
+        return;
+      }
+      try {
+        const { runAtlasBridge } = await import("./routes/operator");
+        await runAtlasBridge(["channel", "remove", name]);
+        res.json({ ok: true });
+      } catch (err: any) {
+        res.status(503).json({ error: "Failed to remove channel", detail: err.message });
+      }
+    },
+  );
+
+  // ---------------------------------------------------------------------------
   // Session start / stop from dashboard
   // ---------------------------------------------------------------------------
 

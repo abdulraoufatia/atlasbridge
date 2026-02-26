@@ -19,7 +19,8 @@ import {
   Users, Shield, KeyRound, Building2, Bell, FileCheck, Network,
   UserCog, ChevronDown, Search, ShieldCheck, ShieldAlert, Clock,
   CheckCircle, XCircle, AlertTriangle, Server, Eye, Fingerprint,
-  Plus, Trash2, Edit, UserPlus, RotateCcw
+  Plus, Trash2, Edit, UserPlus, RotateCcw,
+  Key, FolderCheck, Radio, AlertCircle, ShieldOff
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -734,6 +735,351 @@ function NotificationsTab({ org }: { org: OrgSettingsData }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Providers tab
+// ---------------------------------------------------------------------------
+
+interface ProviderConfig {
+  provider: string;
+  status: "configured" | "validated" | "invalid";
+  key_prefix: string | null;
+  configured_at: string | null;
+  validated_at: string | null;
+  last_error: string | null;
+}
+
+const PROVIDERS_QUERY_KEY = ["/api/providers"];
+const SUPPORTED_PROVIDERS = ["openai", "anthropic", "gemini"] as const;
+type SupportedProvider = typeof SUPPORTED_PROVIDERS[number];
+const PROVIDER_INFO: Record<SupportedProvider, { label: string; keyHint: string }> = {
+  openai: { label: "OpenAI", keyHint: "sk-…" },
+  anthropic: { label: "Anthropic", keyHint: "sk-ant-…" },
+  gemini: { label: "Google Gemini", keyHint: "AIza…" },
+};
+
+function ProviderStatusBadge({ status }: { status: string }) {
+  if (status === "validated") return <Badge className="bg-emerald-600 text-white gap-1"><CheckCircle className="w-3 h-3" />Validated</Badge>;
+  if (status === "configured") return <Badge variant="secondary" className="gap-1"><AlertCircle className="w-3 h-3" />Configured</Badge>;
+  return <Badge variant="destructive" className="gap-1"><XCircle className="w-3 h-3" />Invalid</Badge>;
+}
+
+function ProviderCard({ provider, config }: { provider: SupportedProvider; config: ProviderConfig | undefined }) {
+  const { toast } = useToast();
+  const info = PROVIDER_INFO[provider];
+  const [keyValue, setKeyValue] = useState("");
+  const [showInput, setShowInput] = useState(false);
+
+  const saveMutation = useMutation({
+    mutationFn: (key: string) => apiRequest("POST", "/api/providers", { provider, key }),
+    onSuccess: () => {
+      toast({ title: "Key saved", description: `${info.label} key stored securely.` });
+      queryClient.invalidateQueries({ queryKey: PROVIDERS_QUERY_KEY });
+      setKeyValue(""); setShowInput(false);
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const validateMutation = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/providers/${provider}/validate`),
+    onSuccess: () => { toast({ title: "Validated", description: `${info.label} key is valid.` }); queryClient.invalidateQueries({ queryKey: PROVIDERS_QUERY_KEY }); },
+    onError: (e: Error) => toast({ title: "Validation failed", description: e.message, variant: "destructive" }),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: () => apiRequest("DELETE", `/api/providers/${provider}`),
+    onSuccess: () => { toast({ title: "Removed", description: `${info.label} key removed.` }); queryClient.invalidateQueries({ queryKey: PROVIDERS_QUERY_KEY }); },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2"><Key className="w-4 h-4 text-muted-foreground" />{info.label}</CardTitle>
+          {config && <ProviderStatusBadge status={config.status} />}
+        </div>
+        {config?.key_prefix && <p className="font-mono text-xs text-muted-foreground mt-1">Key: {config.key_prefix}</p>}
+        {config?.last_error && config.status === "invalid" && <p className="text-destructive text-xs mt-1">{config.last_error}</p>}
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {showInput ? (
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">API key — stored securely, never displayed again</Label>
+            <Input type="password" placeholder={info.keyHint} value={keyValue} onChange={e => setKeyValue(e.target.value)} onKeyDown={e => e.key === "Enter" && keyValue && saveMutation.mutate(keyValue)} className="font-mono text-sm" />
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => keyValue && saveMutation.mutate(keyValue)} disabled={!keyValue || saveMutation.isPending}>{saveMutation.isPending ? "Saving…" : "Save"}</Button>
+              <Button size="sm" variant="ghost" onClick={() => { setShowInput(false); setKeyValue(""); }}>Cancel</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant={config ? "outline" : "default"} onClick={() => setShowInput(true)}>{config ? "Replace key" : "Add key"}</Button>
+            {config && (
+              <>
+                <Button size="sm" variant="outline" onClick={() => validateMutation.mutate()} disabled={validateMutation.isPending}>{validateMutation.isPending ? "Validating…" : "Validate"}</Button>
+                <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => removeMutation.mutate()} disabled={removeMutation.isPending}><Trash2 className="w-3.5 h-3.5 mr-1" />Remove</Button>
+              </>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ProvidersTab() {
+  const { data: providers, isLoading } = useQuery<ProviderConfig[]>({ queryKey: PROVIDERS_QUERY_KEY, refetchInterval: 15_000 });
+  const configMap = Object.fromEntries((providers ?? []).map(p => [p.provider, p])) as Record<string, ProviderConfig>;
+
+  return (
+    <div className="space-y-4">
+      {isLoading ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{SUPPORTED_PROVIDERS.map(p => <Skeleton key={p} className="h-40 w-full" />)}</div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {SUPPORTED_PROVIDERS.map(p => <ProviderCard key={p} provider={p} config={configMap[p]} />)}
+        </div>
+      )}
+      <Card className="border-dashed">
+        <CardContent className="p-4">
+          <p className="text-xs text-muted-foreground"><strong>Storage:</strong> API keys are stored in your OS keychain (macOS Keychain, Linux Secret Service). Only a short prefix is shown. Keys are never transmitted to AtlasBridge servers and never appear in logs or audit traces.</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Workspaces tab
+// ---------------------------------------------------------------------------
+
+interface WorkspaceRecord {
+  id: string;
+  path: string;
+  path_hash: string;
+  trusted: number;
+  actor: string | null;
+  channel: string | null;
+  session_id: string | null;
+  granted_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+}
+
+const WORKSPACES_QUERY_KEY = ["/api/workspaces"];
+
+function WorkspacesTab() {
+  const { toast } = useToast();
+  const { data: workspaces, isLoading } = useQuery<WorkspaceRecord[]>({ queryKey: WORKSPACES_QUERY_KEY, refetchInterval: 10_000 });
+  const [newPath, setNewPath] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+
+  const trustMutation = useMutation({
+    mutationFn: (path: string) => apiRequest("POST", "/api/workspaces/trust", { path }),
+    onSuccess: () => { toast({ title: "Trust granted", description: "Workspace marked as trusted." }); queryClient.invalidateQueries({ queryKey: WORKSPACES_QUERY_KEY }); setNewPath(""); setShowAdd(false); },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const revokeMutation = useMutation({
+    mutationFn: (path: string) => apiRequest("DELETE", "/api/workspaces/trust", { path }),
+    onSuccess: () => { toast({ title: "Trust revoked" }); queryClient.invalidateQueries({ queryKey: WORKSPACES_QUERY_KEY }); },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button size="sm" variant="outline" onClick={() => setShowAdd(!showAdd)}><Plus className="w-4 h-4 mr-1.5" />Grant Trust</Button>
+      </div>
+
+      {showAdd && (
+        <Card>
+          <CardHeader className="pb-3"><CardTitle className="text-sm font-medium">Grant workspace trust</CardTitle></CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-3">Enter the absolute path of the workspace directory. Future sessions using this path will auto-approve without a channel prompt.</p>
+            <div className="flex gap-2">
+              <Input placeholder="/path/to/workspace" value={newPath} onChange={e => setNewPath(e.target.value)} onKeyDown={e => e.key === "Enter" && trustMutation.mutate(newPath.trim())} className="font-mono text-sm" />
+              <Button onClick={() => trustMutation.mutate(newPath.trim())} disabled={!newPath.trim() || trustMutation.isPending}>{trustMutation.isPending ? "Saving…" : "Grant"}</Button>
+              <Button variant="ghost" onClick={() => { setShowAdd(false); setNewPath(""); }}>Cancel</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader className="pb-3"><CardTitle className="text-sm font-medium flex items-center gap-2"><FolderCheck className="w-4 h-4 text-muted-foreground" />Recorded workspaces</CardTitle></CardHeader>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="p-4 space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+          ) : !workspaces || workspaces.length === 0 ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">No workspaces recorded yet. Grant trust to a directory above or start a session that requests workspace access.</div>
+          ) : (
+            <div className="divide-y">
+              {workspaces.map(ws => {
+                const isTrusted = Boolean(ws.trusted);
+                return (
+                  <div key={ws.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {isTrusted ? <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" /> : <ShieldOff className="w-4 h-4 text-muted-foreground shrink-0" />}
+                      <div className="min-w-0">
+                        <p className="text-sm font-mono truncate" title={ws.path}>{ws.path}</p>
+                        <p className="text-xs text-muted-foreground">{ws.actor ? `via ${ws.actor}` : ""}{ws.granted_at ? ` · ${new Date(ws.granted_at).toLocaleString()}` : ""}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant={isTrusted ? "default" : "secondary"} className={isTrusted ? "bg-emerald-600 text-white" : ""}>{isTrusted ? "Trusted" : "Not trusted"}</Badge>
+                      {isTrusted ? (
+                        <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => revokeMutation.mutate(ws.path)} disabled={revokeMutation.isPending}>Revoke</Button>
+                      ) : (
+                        <Button size="sm" variant="ghost" onClick={() => trustMutation.mutate(ws.path)} disabled={trustMutation.isPending}>Trust</Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Channels tab
+// ---------------------------------------------------------------------------
+
+interface ChannelConfig {
+  telegram: { bot_token: string; allowed_users: number[] } | null;
+  slack: { bot_token: string; app_token: string; allowed_users: string[] } | null;
+}
+
+const CHANNELS_QUERY_KEY = ["/api/channels"];
+
+function ChannelCard({
+  name,
+  label,
+  isConfigured,
+  fields,
+  onSave,
+  onRemove,
+  isPending,
+}: {
+  name: string;
+  label: string;
+  isConfigured: boolean;
+  fields: { id: string; label: string; placeholder: string; hint?: string }[];
+  onSave: (values: Record<string, string>) => void;
+  onRemove: () => void;
+  isPending: boolean;
+}) {
+  const [showForm, setShowForm] = useState(false);
+  const [values, setValues] = useState<Record<string, string>>({});
+
+  const handleSave = () => {
+    onSave(values);
+    setValues({});
+    setShowForm(false);
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2"><Radio className="w-4 h-4 text-muted-foreground" />{label}</CardTitle>
+          <Badge variant={isConfigured ? "default" : "secondary"} className={isConfigured ? "bg-emerald-600 text-white" : ""}>{isConfigured ? "Configured" : "Not configured"}</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {showForm ? (
+          <div className="space-y-3">
+            {fields.map(f => (
+              <div key={f.id} className="space-y-1">
+                <Label className="text-xs text-muted-foreground">{f.label}</Label>
+                <Input type="password" placeholder={f.placeholder} value={values[f.id] ?? ""} onChange={e => setValues(v => ({ ...v, [f.id]: e.target.value }))} className="font-mono text-sm" />
+                {f.hint && <p className="text-[11px] text-muted-foreground">{f.hint}</p>}
+              </div>
+            ))}
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleSave} disabled={fields.some(f => !values[f.id]) || isPending}>{isPending ? "Saving…" : "Save"}</Button>
+              <Button size="sm" variant="ghost" onClick={() => { setShowForm(false); setValues({}); }}>Cancel</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant={isConfigured ? "outline" : "default"} onClick={() => setShowForm(true)}>{isConfigured ? "Reconfigure" : "Configure"}</Button>
+            {isConfigured && (
+              <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={onRemove} disabled={isPending}><Trash2 className="w-3.5 h-3.5 mr-1" />Remove</Button>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ChannelsTab() {
+  const { toast } = useToast();
+  const { data: channels, isLoading } = useQuery<ChannelConfig>({ queryKey: CHANNELS_QUERY_KEY, refetchInterval: 15_000 });
+
+  const telegramMutation = useMutation({
+    mutationFn: (vals: Record<string, string>) => apiRequest("POST", "/api/channels/telegram", { token: vals.token, users: vals.users }),
+    onSuccess: () => { toast({ title: "Telegram configured" }); queryClient.invalidateQueries({ queryKey: CHANNELS_QUERY_KEY }); },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const slackMutation = useMutation({
+    mutationFn: (vals: Record<string, string>) => apiRequest("POST", "/api/channels/slack", { token: vals.token, appToken: vals.appToken, users: vals.users }),
+    onSuccess: () => { toast({ title: "Slack configured" }); queryClient.invalidateQueries({ queryKey: CHANNELS_QUERY_KEY }); },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (name: string) => apiRequest("DELETE", `/api/channels/${name}`),
+    onSuccess: () => { toast({ title: "Channel removed" }); queryClient.invalidateQueries({ queryKey: CHANNELS_QUERY_KEY }); },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  if (isLoading) return <div className="grid gap-4 sm:grid-cols-2"><Skeleton className="h-40 w-full" /><Skeleton className="h-40 w-full" /></div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <ChannelCard
+          name="telegram"
+          label="Telegram"
+          isConfigured={Boolean(channels?.telegram)}
+          fields={[
+            { id: "token", label: "Bot token", placeholder: "123456789:AAF…", hint: "Get from @BotFather on Telegram" },
+            { id: "users", label: "Allowed user IDs", placeholder: "123456789, 987654321", hint: "Comma-separated numeric Telegram user IDs" },
+          ]}
+          onSave={vals => telegramMutation.mutate(vals)}
+          onRemove={() => removeMutation.mutate("telegram")}
+          isPending={telegramMutation.isPending || removeMutation.isPending}
+        />
+        <ChannelCard
+          name="slack"
+          label="Slack"
+          isConfigured={Boolean(channels?.slack)}
+          fields={[
+            { id: "token", label: "Bot token", placeholder: "xoxb-…", hint: "OAuth & Permissions page in your Slack App" },
+            { id: "appToken", label: "App-level token", placeholder: "xapp-…", hint: "Basic Information → App-Level Tokens (Socket Mode)" },
+            { id: "users", label: "Allowed user IDs", placeholder: "U1234567890, U0987654321", hint: "Comma-separated Slack user IDs" },
+          ]}
+          onSave={vals => slackMutation.mutate(vals)}
+          onRemove={() => removeMutation.mutate("slack")}
+          isPending={slackMutation.isPending || removeMutation.isPending}
+        />
+      </div>
+      <Card className="border-dashed">
+        <CardContent className="p-4">
+          <p className="text-xs text-muted-foreground"><strong>Storage:</strong> Channel tokens are stored in your OS keychain (macOS Keychain, Linux Secret Service). They are never logged or transmitted to AtlasBridge servers. Only users in the allowed list can send commands to your agent.</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { data: settings, isLoading: settingsLoading } = useQuery<SettingsData>({ queryKey: ["/api/settings"] });
   const { data: orgData, isLoading: orgLoading } = useQuery<OrgSettingsData>({ queryKey: ORG_QUERY_KEY });
@@ -765,6 +1111,9 @@ export default function SettingsPage() {
             <TabsTrigger value="security" data-testid="tab-security"><ShieldCheck className="w-3.5 h-3.5 mr-1.5" />Security</TabsTrigger>
             <TabsTrigger value="compliance" data-testid="tab-compliance"><FileCheck className="w-3.5 h-3.5 mr-1.5" />Compliance</TabsTrigger>
             <TabsTrigger value="notifications" data-testid="tab-notifications"><Bell className="w-3.5 h-3.5 mr-1.5" />Alerts</TabsTrigger>
+            <TabsTrigger value="channels" data-testid="tab-channels"><Radio className="w-3.5 h-3.5 mr-1.5" />Channels</TabsTrigger>
+            <TabsTrigger value="providers" data-testid="tab-providers"><Key className="w-3.5 h-3.5 mr-1.5" />Providers</TabsTrigger>
+            <TabsTrigger value="workspaces" data-testid="tab-workspaces"><FolderCheck className="w-3.5 h-3.5 mr-1.5" />Workspaces</TabsTrigger>
           </TabsList>
         </div>
         <TabsContent value="general"><GeneralTab data={settings} /></TabsContent>
@@ -776,6 +1125,9 @@ export default function SettingsPage() {
         <TabsContent value="security"><SecurityTab org={orgData} /></TabsContent>
         <TabsContent value="compliance"><ComplianceTab org={orgData} /></TabsContent>
         <TabsContent value="notifications"><NotificationsTab org={orgData} /></TabsContent>
+        <TabsContent value="channels"><ChannelsTab /></TabsContent>
+        <TabsContent value="providers"><ProvidersTab /></TabsContent>
+        <TabsContent value="workspaces"><WorkspacesTab /></TabsContent>
       </Tabs>
     </div>
   );

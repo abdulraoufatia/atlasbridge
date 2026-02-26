@@ -272,6 +272,7 @@ def _setup_slack(
     non_interactive: bool,
     token: str,
     users: str,
+    app_token: str = "",
 ) -> dict:
     """Collect Slack credentials and return config dict."""
     # Bot token (xoxb-*)
@@ -299,7 +300,7 @@ def _setup_slack(
         sys.exit(1)
 
     # App-level token (xapp-*) for Socket Mode
-    app_token = _env("ATLASBRIDGE_SLACK_APP_TOKEN", "AEGIS_SLACK_APP_TOKEN")
+    app_token = app_token or _env("ATLASBRIDGE_SLACK_APP_TOKEN", "AEGIS_SLACK_APP_TOKEN")
 
     if not app_token and not non_interactive:
         console.print(

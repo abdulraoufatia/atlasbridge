@@ -16,8 +16,6 @@ import SettingsPage from "@/pages/settings";
 import RepositoriesPage from "@/pages/repositories";
 import TerminalPage from "@/pages/terminal";
 import EvidencePage from "@/pages/evidence";
-import ProvidersPage from "@/pages/providers";
-import WorkspacesPage from "@/pages/workspaces";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -35,8 +33,6 @@ function Router() {
         <Route path="/repositories" component={RepositoriesPage} />
         <Route path="/terminal" component={TerminalPage} />
         <Route path="/evidence" component={EvidencePage} />
-        <Route path="/providers" component={ProvidersPage} />
-        <Route path="/workspaces" component={WorkspacesPage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
