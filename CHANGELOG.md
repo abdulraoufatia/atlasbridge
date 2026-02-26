@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.7] — 2026-02-26
+
+### Added
+- **Dashboard: Channels tab** — configure Telegram and Slack directly from Settings; tokens stored in OS keychain via existing `channel` CLI (#369)
+- **`atlasbridge channel remove`** — new CLI command to remove a configured channel from config (#369)
+- **`atlasbridge channel add slack --app-token`** — `--app-token` flag for non-interactive Slack Socket Mode setup (#369)
+
+### Changed
+- **Dashboard nav** — Providers and Workspaces removed as standalone nav items; consolidated under Settings as dedicated tabs (#369)
+- **Settings page** — three new tabs: Channels, Providers, Workspaces (#369)
+
+---
+
 ## [1.6.6] — 2026-02-26
 
 ### Added
