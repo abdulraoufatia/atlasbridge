@@ -1,4 +1,4 @@
-"""Integration tests for the Core Settings page — #352."""
+"""Integration tests for the Settings page + /runtime/capabilities endpoint."""
 
 from __future__ import annotations
 
@@ -88,6 +88,16 @@ class TestSettingsHTMLPage:
         for forbidden in ("RBAC", "Organization", "Tenant", "GBAC"):
             assert forbidden not in text, f"Found forbidden string {forbidden!r} in settings page"
 
+    def test_settings_contains_capabilities_section(self, client):
+        """Settings page should show Capabilities section."""
+        resp = client.get("/settings")
+        assert "Capabilities" in resp.text
+
+    def test_settings_contains_authority_mode(self, client):
+        """Settings page should show Authority Mode."""
+        resp = client.get("/settings")
+        assert "Authority Mode" in resp.text
+
 
 class TestSettingsJSONAPI:
     """GET /api/settings returns structured JSON."""
@@ -101,6 +111,7 @@ class TestSettingsJSONAPI:
         assert "runtime" in data
         runtime = data["runtime"]
         assert "edition" in runtime
+        assert "authority_mode" in runtime
         assert "version" in runtime
         assert "python_version" in runtime
         assert "platform" in runtime
@@ -133,15 +144,64 @@ class TestSettingsJSONAPI:
             assert "status" in check
             assert "detail" in check
 
-    def test_api_settings_edition_is_community(self, client):
-        """Default edition is community."""
+    def test_api_settings_edition_is_core(self, client):
+        """Default edition is core."""
         data = client.get("/api/settings").json()
-        assert data["runtime"]["edition"] == "community"
+        assert data["runtime"]["edition"] == "core"
 
-    def test_api_settings_community_has_no_features(self, client):
-        """Community edition should not include feature flags."""
+    def test_api_settings_has_capabilities(self, client):
+        """All editions include capabilities."""
         data = client.get("/api/settings").json()
-        assert "features" not in data
+        assert "capabilities" in data
+        caps = data["capabilities"]
+        assert isinstance(caps, dict)
+        assert len(caps) > 0
+        # Verify structure
+        for _name, info in caps.items():
+            assert "allowed" in info
+            assert "capability_class" in info
+
+
+class TestRuntimeCapabilities:
+    """GET /runtime/capabilities returns edition + capability summary."""
+
+    def test_returns_200(self, client):
+        resp = client.get("/runtime/capabilities")
+        assert resp.status_code == 200
+
+    def test_has_required_fields(self, client):
+        data = client.get("/runtime/capabilities").json()
+        assert "edition" in data
+        assert "authority_mode" in data
+        assert "enabled_capabilities" in data
+        assert "enabled_capabilities_hash" in data
+        assert "registry_version" in data
+
+    def test_default_edition_is_core(self, client):
+        data = client.get("/runtime/capabilities").json()
+        assert data["edition"] == "core"
+        assert data["authority_mode"] == "readonly"
+
+    def test_enabled_capabilities_are_sorted(self, client):
+        data = client.get("/runtime/capabilities").json()
+        caps = data["enabled_capabilities"]
+        assert caps == sorted(caps)
+
+    def test_core_only_has_tooling(self, client):
+        """CORE edition should only enable TOOLING capabilities."""
+        data = client.get("/runtime/capabilities").json()
+        for cap_id in data["enabled_capabilities"]:
+            assert cap_id.startswith("tooling."), f"Non-tooling cap enabled in CORE: {cap_id}"
+
+    def test_hash_is_sha256(self, client):
+        data = client.get("/runtime/capabilities").json()
+        h = data["enabled_capabilities_hash"]
+        assert isinstance(h, str)
+        assert len(h) == 64  # SHA-256 hex
+
+    def test_registry_version(self, client):
+        data = client.get("/runtime/capabilities").json()
+        assert data["registry_version"] == "1.0.0"
 
 
 class TestEditionScopedSettings:
@@ -184,29 +244,32 @@ class TestEditionScopedSettings:
         app = create_app(db_path=db_path, trace_path=trace_path)
         return TestClient(app)
 
-    def test_core_settings_include_features(self, core_client):
-        """Core edition settings include feature flags."""
+    def test_core_settings_include_capabilities(self, core_client):
+        """Core edition settings include capabilities."""
         data = core_client.get("/api/settings").json()
-        assert "features" in data
-        assert "decision_trace_v2" in data["features"]
+        assert "capabilities" in data
+        assert "tooling.decision_trace_v2" in data["capabilities"]
 
-    def test_core_settings_html_shows_features(self, core_client):
-        """Core edition settings page shows Feature Flags section."""
+    def test_core_settings_html_shows_capabilities(self, core_client):
+        """Core edition settings page shows Capabilities section."""
         resp = core_client.get("/settings")
         assert resp.status_code == 200
-        assert "Feature Flags" in resp.text
+        assert "Capabilities" in resp.text
 
     def test_core_edition_in_runtime(self, core_client):
         """Core edition reports correctly in runtime section."""
         data = core_client.get("/api/settings").json()
         assert data["runtime"]["edition"] == "core"
 
-    def test_enterprise_settings_returns_404_on_community(self, client):
-        """Enterprise settings route returns 404 on community edition."""
-        resp = client.get("/enterprise/settings")
-        assert resp.status_code == 404
-
     def test_enterprise_settings_returns_404_on_core(self, core_client):
         """Enterprise settings route returns 404 on core edition."""
         resp = core_client.get("/enterprise/settings")
         assert resp.status_code == 404
+
+    def test_enterprise_settings_404_is_json(self, core_client):
+        """Enterprise settings 404 should be JSON with capability info."""
+        resp = core_client.get("/enterprise/settings")
+        assert resp.status_code == 404
+        data = resp.json()
+        assert "error" in data
+        assert "authority.enterprise_settings" in data["error"]

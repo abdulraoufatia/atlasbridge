@@ -10,6 +10,7 @@
 <table>
     <tbody>
         <tr><td>Edition</td><td>{{ settings.runtime.edition }}</td></tr>
+        <tr><td>Authority Mode</td><td>{{ settings.runtime.authority_mode }}</td></tr>
         <tr><td>Version</td><td>{{ settings.runtime.version }}</td></tr>
         <tr><td>Python</td><td>{{ settings.runtime.python_version }}</td></tr>
         <tr><td>Platform</td><td>{{ settings.runtime.platform }}</td></tr>
@@ -73,24 +74,24 @@
 </table>
 </div>
 
-{% if settings.features %}
-<h2>Feature Flags</h2>
+{% if settings.capabilities %}
+<h2>Capabilities</h2>
 <div class="table-responsive">
 <table>
     <thead>
         <tr>
-            <th>Feature</th>
-            <th>Required Edition</th>
+            <th>Capability</th>
+            <th>Class</th>
             <th>Status</th>
         </tr>
     </thead>
     <tbody>
-        {% for name, info in settings.features.items() %}
+        {% for name, info in settings.capabilities.items() %}
         <tr>
             <td>{{ name }}</td>
-            <td>{{ info.required_edition }}</td>
+            <td>{{ info.capability_class }}</td>
             <td>
-                {% if info.status == "active" %}
+                {% if info.allowed %}
                 <span class="status-completed">active</span>
                 {% else %}
                 <span class="status-canceled">locked</span>
