@@ -14,6 +14,8 @@ Migration contract:
 Version history:
   0 → 1: Initial schema (sessions, prompts, replies, audit_events with timestamp cols)
   1 → 2: Delivery tracking (prompt_deliveries table for idempotent channel sends)
+  2 → 3: Workspace trust (workspace_trust table for runtime consent model)
+  3 → 4: Provider configs + processed_messages (provider key metadata, channel dedup)
 """
 
 from __future__ import annotations
@@ -27,7 +29,7 @@ import structlog
 logger = structlog.get_logger()
 
 # Bump this when adding a new migration.
-LATEST_SCHEMA_VERSION = 2
+LATEST_SCHEMA_VERSION = 4
 
 
 # ---------------------------------------------------------------------------
@@ -165,9 +167,62 @@ def _migrate_1_to_2(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _migrate_2_to_3(conn: sqlite3.Connection) -> None:
+    """Version 2 → 3: add workspace_trust table for runtime consent model."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS workspace_trust (
+            id          TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+            path        TEXT NOT NULL,
+            path_hash   TEXT NOT NULL UNIQUE,
+            trusted     INTEGER NOT NULL DEFAULT 0,
+            actor       TEXT,
+            channel     TEXT,
+            session_id  TEXT,
+            granted_at  TEXT,
+            revoked_at  TEXT,
+            created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_workspace_trust_hash
+            ON workspace_trust(path_hash)
+    """)
+
+
+def _migrate_3_to_4(conn: sqlite3.Connection) -> None:
+    """Version 3 → 4: add provider_configs and processed_messages tables."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS provider_configs (
+            id             TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+            provider       TEXT NOT NULL UNIQUE,
+            status         TEXT NOT NULL DEFAULT 'configured',
+            key_prefix     TEXT,
+            configured_at  TEXT,
+            validated_at   TEXT,
+            last_error     TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS processed_messages (
+            id               TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+            channel          TEXT NOT NULL,
+            channel_identity TEXT NOT NULL,
+            message_id       TEXT NOT NULL,
+            processed_at     TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(channel, channel_identity, message_id)
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_processed_messages_lookup
+            ON processed_messages(channel, channel_identity, message_id)
+    """)
+
+
 _MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     0: _migrate_0_to_1,
     1: _migrate_1_to_2,
+    2: _migrate_2_to_3,
+    3: _migrate_3_to_4,
 }
 
 

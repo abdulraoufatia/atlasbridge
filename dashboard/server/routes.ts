@@ -11,6 +11,9 @@ import {
   computeGovernanceScore, compliancePacks, listGeneratedBundles, addGeneratedBundle,
 } from "./evidence-engine";
 import { handleTerminalConnection } from "./terminal";
+import { requireCsrf } from "./middleware/csrf";
+import { operatorRateLimiter } from "./middleware/rate-limit";
+import { insertOperatorAuditLog } from "./db";
 
 // Static org settings (stored in dashboard DB via seed, not in AtlasBridge DB)
 import type { RbacPermission, OrgProfile, SsoConfig, ComplianceConfig, SessionPolicyConfig } from "@shared/schema";
@@ -562,6 +565,294 @@ export async function registerRoutes(
     const bundle = generateEvidenceJSON();
     res.json(bundle.integrityReport);
   });
+
+  // ---------------------------------------------------------------------------
+  // Workspace trust — read and manage per-workspace consent
+  // ---------------------------------------------------------------------------
+
+  app.get("/api/workspaces", async (_req, res) => {
+    try {
+      const { runAtlasBridge } = await import("./routes/operator");
+      const { stdout } = await runAtlasBridge(["workspace", "list", "--json"]);
+      const data = JSON.parse(stdout.trim() || "[]");
+      res.json(data);
+    } catch {
+      res.json([]);
+    }
+  });
+
+  app.post(
+    "/api/workspaces/trust",
+    requireCsrf,
+    operatorRateLimiter,
+    async (req, res) => {
+      const { runAtlasBridge } = await import("./routes/operator");
+      const body = req.body as Record<string, unknown>;
+      const path = typeof body.path === "string" ? body.path : "";
+      if (!path) {
+        res.status(400).json({ error: "path is required" });
+        return;
+      }
+      try {
+        const { stdout } = await runAtlasBridge(["workspace", "trust", path]);
+        insertOperatorAuditLog({
+          method: "POST",
+          path: "/api/workspaces/trust",
+          action: `workspace-trust:${path}`,
+          body: { path },
+          result: "ok",
+        });
+        res.json({ ok: true, path, detail: stdout.trim() });
+      } catch (err: any) {
+        insertOperatorAuditLog({
+          method: "POST",
+          path: "/api/workspaces/trust",
+          action: `workspace-trust:${path}`,
+          body: { path },
+          result: "error",
+          error: err.message,
+        });
+        res.status(503).json({ error: "Failed to grant workspace trust", detail: err.message });
+      }
+    },
+  );
+
+  app.delete(
+    "/api/workspaces/trust",
+    requireCsrf,
+    operatorRateLimiter,
+    async (req, res) => {
+      const { runAtlasBridge } = await import("./routes/operator");
+      const body = req.body as Record<string, unknown>;
+      const path = typeof body.path === "string" ? body.path : "";
+      if (!path) {
+        res.status(400).json({ error: "path is required" });
+        return;
+      }
+      try {
+        const { stdout } = await runAtlasBridge(["workspace", "revoke", path]);
+        insertOperatorAuditLog({
+          method: "DELETE",
+          path: "/api/workspaces/trust",
+          action: `workspace-revoke:${path}`,
+          body: { path },
+          result: "ok",
+        });
+        res.json({ ok: true, path, detail: stdout.trim() });
+      } catch (err: any) {
+        insertOperatorAuditLog({
+          method: "DELETE",
+          path: "/api/workspaces/trust",
+          action: `workspace-revoke:${path}`,
+          body: { path },
+          result: "error",
+          error: err.message,
+        });
+        res.status(503).json({ error: "Failed to revoke workspace trust", detail: err.message });
+      }
+    },
+  );
+
+  // ---------------------------------------------------------------------------
+  // Providers — AI provider key management (metadata only; keys stay in keychain)
+  // ---------------------------------------------------------------------------
+
+  app.get("/api/providers", async (_req, res) => {
+    try {
+      const { runAtlasBridge } = await import("./routes/operator");
+      const { stdout } = await runAtlasBridge(["providers", "list", "--json"]);
+      const data = JSON.parse(stdout.trim() || "[]");
+      res.json(data);
+    } catch {
+      res.json([]);
+    }
+  });
+
+  app.post(
+    "/api/providers",
+    requireCsrf,
+    operatorRateLimiter,
+    async (req, res) => {
+      const { runAtlasBridge } = await import("./routes/operator");
+      const body = req.body as Record<string, unknown>;
+      const provider = typeof body.provider === "string" ? body.provider : "";
+      const key = typeof body.key === "string" ? body.key : "";
+      if (!provider || !key) {
+        res.status(400).json({ error: "provider and key are required" });
+        return;
+      }
+      try {
+        await runAtlasBridge(["providers", "add", provider, key]);
+        // DO NOT include key in audit log — redact it
+        insertOperatorAuditLog({
+          method: "POST",
+          path: "/api/providers",
+          action: `provider-add:${provider}`,
+          body: { provider, key: "[REDACTED]" },
+          result: "ok",
+        });
+        res.json({ ok: true, provider });
+      } catch (err: any) {
+        insertOperatorAuditLog({
+          method: "POST",
+          path: "/api/providers",
+          action: `provider-add:${provider}`,
+          body: { provider, key: "[REDACTED]" },
+          result: "error",
+          error: err.message,
+        });
+        res.status(503).json({ error: "Failed to store provider key", detail: err.message });
+      }
+    },
+  );
+
+  app.post(
+    "/api/providers/:name/validate",
+    requireCsrf,
+    operatorRateLimiter,
+    async (req, res) => {
+      const { runAtlasBridge } = await import("./routes/operator");
+      const name = String(req.params.name);
+      try {
+        const { stdout } = await runAtlasBridge(["providers", "validate", name]);
+        insertOperatorAuditLog({
+          method: "POST",
+          path: `/api/providers/${name}/validate`,
+          action: `provider-validate:${name}`,
+          body: {},
+          result: "ok",
+        });
+        res.json({ ok: true, provider: name, detail: stdout.trim() });
+      } catch (err: any) {
+        const detail = (err.stderr as string | undefined)?.trim() ?? err.message;
+        insertOperatorAuditLog({
+          method: "POST",
+          path: `/api/providers/${name}/validate`,
+          action: `provider-validate:${name}`,
+          body: {},
+          result: "error",
+          error: err.message,
+        });
+        res.status(422).json({ ok: false, provider: name, error: "Validation failed", detail });
+      }
+    },
+  );
+
+  app.delete(
+    "/api/providers/:name",
+    requireCsrf,
+    operatorRateLimiter,
+    async (req, res) => {
+      const { runAtlasBridge } = await import("./routes/operator");
+      const name = String(req.params.name);
+      try {
+        await runAtlasBridge(["providers", "remove", name]);
+        insertOperatorAuditLog({
+          method: "DELETE",
+          path: `/api/providers/${name}`,
+          action: `provider-remove:${name}`,
+          body: {},
+          result: "ok",
+        });
+        res.json({ ok: true, provider: name });
+      } catch (err: any) {
+        res.status(503).json({ error: "Failed to remove provider", detail: err.message });
+      }
+    },
+  );
+
+  // ---------------------------------------------------------------------------
+  // Session start / stop from dashboard
+  // ---------------------------------------------------------------------------
+
+  const VALID_ADAPTERS = new Set(["claude", "openai", "gemini", "claude-code"]);
+  const VALID_SESSION_MODES = new Set(["off", "assist", "full"]);
+
+  app.post(
+    "/api/sessions/start",
+    requireCsrf,
+    operatorRateLimiter,
+    async (req, res) => {
+      const { runAtlasBridge } = await import("./routes/operator");
+      const body = req.body as Record<string, unknown>;
+      const adapter = typeof body.adapter === "string" ? body.adapter.toLowerCase() : "claude";
+      const mode = typeof body.mode === "string" ? body.mode.toLowerCase() : "off";
+      const cwd = typeof body.cwd === "string" ? body.cwd : "";
+      const profile = typeof body.profile === "string" ? body.profile : "";
+      const label = typeof body.label === "string" ? body.label : "";
+
+      if (!VALID_ADAPTERS.has(adapter)) {
+        res.status(400).json({ error: `Invalid adapter. Choose from: ${Array.from(VALID_ADAPTERS).join(", ")}` });
+        return;
+      }
+      if (!VALID_SESSION_MODES.has(mode)) {
+        res.status(400).json({ error: "Invalid mode. Must be: off, assist, full" });
+        return;
+      }
+
+      const args = ["sessions", "start", "--adapter", adapter, "--mode", mode, "--json"];
+      if (cwd) args.push("--cwd", cwd);
+      if (profile) args.push("--profile", profile);
+      if (label) args.push("--label", label);
+
+      try {
+        const { stdout } = await runAtlasBridge(args);
+        const parsed = JSON.parse(stdout.trim() || "{}");
+        insertOperatorAuditLog({
+          method: "POST",
+          path: "/api/sessions/start",
+          action: `session-start:${adapter}:${mode}`,
+          body: { adapter, mode, cwd: cwd || undefined, profile: profile || undefined },
+          result: "ok",
+        });
+        res.json({ ok: true, ...parsed });
+      } catch (err: any) {
+        const detail = (err.stderr as string | undefined)?.trim() ?? err.message;
+        insertOperatorAuditLog({
+          method: "POST",
+          path: "/api/sessions/start",
+          action: `session-start:${adapter}:${mode}`,
+          body: { adapter, mode },
+          result: "error",
+          error: err.message,
+        });
+        res.status(503).json({ error: "Failed to start session", detail });
+      }
+    },
+  );
+
+  app.post(
+    "/api/sessions/:id/stop",
+    requireCsrf,
+    operatorRateLimiter,
+    async (req, res) => {
+      const { runAtlasBridge } = await import("./routes/operator");
+      const sessionId = String(req.params.id);
+      try {
+        const { stdout } = await runAtlasBridge(["sessions", "stop", sessionId, "--json"]);
+        const parsed = JSON.parse(stdout.trim() || "{}");
+        insertOperatorAuditLog({
+          method: "POST",
+          path: `/api/sessions/${sessionId}/stop`,
+          action: `session-stop:${sessionId}`,
+          body: {},
+          result: "ok",
+        });
+        res.json({ ok: true, session_id: sessionId, ...parsed });
+      } catch (err: any) {
+        const detail = (err.stderr as string | undefined)?.trim() ?? err.message;
+        insertOperatorAuditLog({
+          method: "POST",
+          path: `/api/sessions/${sessionId}/stop`,
+          action: `session-stop:${sessionId}`,
+          body: {},
+          result: "error",
+          error: err.message,
+        });
+        res.status(503).json({ error: "Failed to stop session", detail });
+      }
+    },
+  );
 
   // ---------------------------------------------------------------------------
   // Operator write actions (kill switch, autonomy mode, audit log)

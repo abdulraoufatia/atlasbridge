@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
+import signal
+import subprocess
 import sys
 
 import click
@@ -297,3 +300,160 @@ def _resolve_session_id(db, session_id: str) -> str | None:
     if len(matches) == 1:
         return matches[0]["id"]
     return None
+
+
+# ------------------------------------------------------------------
+# sessions start (background launch)
+# ------------------------------------------------------------------
+
+
+_VALID_MODES = ("off", "assist", "full")
+_VALID_ADAPTERS = ("claude", "openai", "gemini", "claude-code")
+
+
+@sessions_group.command("start")
+@click.option(
+    "--adapter",
+    default="claude",
+    type=click.Choice(list(_VALID_ADAPTERS), case_sensitive=False),
+    show_default=True,
+    help="Agent adapter to use.",
+)
+@click.option(
+    "--mode",
+    default="off",
+    type=click.Choice(list(_VALID_MODES), case_sensitive=False),
+    show_default=True,
+    help="Autonomy mode (off / assist / full).",
+)
+@click.option("--cwd", default="", help="Working directory for the session.")
+@click.option("--profile", "profile_name", default="", help="Agent profile name.")
+@click.option("--label", "session_label", default="", help="Human-readable session label.")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output session info as JSON.")
+def sessions_start(
+    adapter: str,
+    mode: str,
+    cwd: str,
+    profile_name: str,
+    session_label: str,
+    as_json: bool,
+) -> None:
+    """Start a new session in the background.
+
+    Launches ``atlasbridge run`` as a detached child process so the dashboard
+    can start sessions without blocking.  The session ID is written to stdout
+    so callers can poll the sessions list.
+    """
+    import shutil
+
+    atlas_bin = shutil.which("atlasbridge") or sys.executable + " -m atlasbridge"
+
+    args = [atlas_bin, "run", adapter, "--mode", mode]
+    if cwd:
+        args += ["--cwd", cwd]
+    if profile_name:
+        args += ["--profile", profile_name]
+    if session_label:
+        args += ["--session-label", session_label]
+
+    try:
+        # Detach: new process group, stdin/out/err redirected to /dev/null
+        with open(os.devnull, "r") as devnull_r, open(os.devnull, "w") as devnull_w:
+            proc = subprocess.Popen(
+                args,
+                stdin=devnull_r,
+                stdout=devnull_w,
+                stderr=devnull_w,
+                close_fds=True,
+                start_new_session=True,
+            )
+
+        if as_json:
+            print(json.dumps({"ok": True, "pid": proc.pid, "adapter": adapter, "mode": mode}))
+        else:
+            console.print(f"[green]Session started[/green] (PID {proc.pid})")
+            console.print(f"  Adapter: {adapter}  Mode: {mode}")
+            if cwd:
+                console.print(f"  CWD:     {cwd}")
+            console.print("\nRun [cyan]atlasbridge sessions list[/cyan] to see it appear.")
+
+    except Exception as exc:
+        if as_json:
+            print(json.dumps({"ok": False, "error": str(exc)}))
+        else:
+            console.print(f"[red]Failed to start session:[/red] {exc}")
+        sys.exit(1)
+
+
+# ------------------------------------------------------------------
+# sessions stop
+# ------------------------------------------------------------------
+
+
+@sessions_group.command("stop")
+@click.argument("session_id")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output result as JSON.")
+def sessions_stop(session_id: str, as_json: bool = False) -> None:
+    """Stop a running session by sending SIGTERM to its process."""
+    db = _open_db()
+    if db is None:
+        if as_json:
+            print(json.dumps({"ok": False, "error": "Database not found"}))
+        else:
+            console.print("[red]No database found.[/red]")
+        sys.exit(1)
+
+    try:
+        full_id = _resolve_session_id(db, session_id)
+        if full_id is None:
+            if as_json:
+                print(json.dumps({"ok": False, "error": f"Session not found: {session_id}"}))
+            else:
+                console.print(f"[red]Session not found:[/red] {session_id}")
+            sys.exit(1)
+
+        row = db.get_session(full_id)
+        if row is None:
+            if as_json:
+                print(json.dumps({"ok": False, "error": "Session not found"}))
+            else:
+                console.print(f"[red]Session not found:[/red] {session_id}")
+            sys.exit(1)
+
+        pid = row["pid"]
+        status = row["status"]
+
+        if status in ("completed", "crashed", "canceled"):
+            if as_json:
+                print(json.dumps({"ok": False, "error": f"Session already {status}"}))
+            else:
+                console.print(f"[yellow]Session already {status}.[/yellow]")
+            return
+
+        if not pid:
+            if as_json:
+                print(json.dumps({"ok": False, "error": "No PID recorded for session"}))
+            else:
+                console.print("[red]No PID recorded for this session.[/red]")
+            sys.exit(1)
+
+        try:
+            os.kill(pid, signal.SIGTERM)
+            if as_json:
+                print(json.dumps({"ok": True, "session_id": full_id, "pid": pid, "signal": "SIGTERM"}))
+            else:
+                console.print(f"[green]SIGTERM sent[/green] to PID {pid} (session {full_id[:8]})")
+        except ProcessLookupError:
+            if as_json:
+                print(json.dumps({"ok": False, "error": f"Process {pid} not found (already stopped?)"}))
+            else:
+                console.print(f"[yellow]Process {pid} not found — session may have already stopped.[/yellow]")
+        except PermissionError:
+            if as_json:
+                print(json.dumps({"ok": False, "error": f"Permission denied to stop PID {pid}"}))
+            else:
+                console.print(f"[red]Permission denied:[/red] cannot stop PID {pid}")
+            sys.exit(1)
+
+    finally:
+        db.close()

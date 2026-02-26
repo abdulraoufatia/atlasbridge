@@ -23,6 +23,7 @@ Channel message gating:
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import time
 from collections.abc import Awaitable, Callable
@@ -154,6 +155,14 @@ class PromptRouter:
             event.tool = session.tool
             event.cwd = session.cwd
             event.session_label = session.label
+
+        # Workspace trust intercept — must run AFTER cwd is populated on the event.
+        # If the workspace is already trusted: auto-inject and skip the channel.
+        # If not trusted: mark the event so the trust decision is recorded on reply.
+        if self._is_folder_trust_event(event) and event.cwd:
+            event.constraints["workspace_trust_path"] = event.cwd
+            if await self._try_auto_inject_workspace_trust(event, log):
+                return  # Handled; no channel message needed.
 
         sm = PromptStateMachine(event=event)
         self._machines[event.prompt_id] = sm
@@ -357,6 +366,10 @@ class PromptRouter:
 
                 self._sessions.mark_reply_received(sm.event.session_id)
 
+                # Record workspace trust decision if this was a trust prompt
+                if result.success:
+                    self._record_workspace_trust(sm.event, result.injected_value, effective_reply)
+
                 # Edit the channel message with structured feedback
                 feedback = result.feedback_message or f"\u2713 Answered: {result.injected_value!r}"
                 session = self._sessions.get_or_none(sm.event.session_id)
@@ -431,6 +444,136 @@ class PromptRouter:
                     "Reply failed. Try again.",
                     session_id=sm.event.session_id,
                 )
+
+    # ------------------------------------------------------------------
+    # Workspace trust helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _is_folder_trust_event(event: PromptEvent) -> bool:
+        """Return True if the event looks like a folder / workspace trust prompt."""
+        lower = event.excerpt.lower()
+        return "trust" in lower and "folder" in lower
+
+    async def _try_auto_inject_workspace_trust(
+        self,
+        event: PromptEvent,
+        log: Any,
+    ) -> bool:
+        """Auto-inject trust acceptance if the workspace is already trusted.
+
+        Returns True if the event was handled (auto-injected) and the caller
+        should skip routing to the channel.  Returns False if the workspace is
+        not yet trusted (caller should proceed with channel notification).
+        """
+        db_conn = getattr(self._store, "_conn", None) if self._store else None
+        if db_conn is None:
+            return False
+
+        try:
+            from atlasbridge.core.store.workspace_trust import get_trust
+
+            is_trusted = get_trust(event.cwd, db_conn)
+        except Exception:
+            return False  # Fail-safe: route to channel as normal
+
+        if not is_trusted:
+            return False  # Not yet trusted; caller will send to channel
+
+        # Workspace is pre-trusted — auto-inject "1" (accept) without channel message
+        adapter = self._adapter_map.get(event.session_id)
+        if adapter is None:
+            return False  # No adapter; fall back to channel
+
+        sm = PromptStateMachine(event=event)
+        self._machines[event.prompt_id] = sm
+        sm.transition(PromptStatus.ROUTED, "workspace pre-trusted: auto-inject")
+        self._sessions.mark_awaiting_reply(event.session_id, event.prompt_id)
+
+        # Detach the injection so we return immediately
+        asyncio.ensure_future(
+            self._auto_inject_trusted_workspace(event, adapter, sm, log)
+        )
+        log.info("workspace_trust_auto_inject_scheduled", cwd=event.cwd)
+        return True
+
+    async def _auto_inject_trusted_workspace(
+        self,
+        event: PromptEvent,
+        adapter: Any,
+        sm: PromptStateMachine,
+        log: Any,
+    ) -> None:
+        """Background task: inject trust acceptance for a pre-trusted workspace."""
+        try:
+            # Brief delay to ensure PTY prompt is stable before injection
+            await asyncio.sleep(0.15)
+            await adapter.inject_reply(
+                session_id=event.session_id,
+                value="1",
+                prompt_type=event.prompt_type,
+            )
+            sm.transition(PromptStatus.INJECTED, "workspace pre-trusted: injected 1")
+            sm.transition(PromptStatus.RESOLVED, "workspace pre-trusted: resolved")
+            self._sessions.mark_reply_received(event.session_id)
+            self._session_dispatch_counts.pop(event.session_id, None)
+            log.info("workspace_trust_auto_injected", cwd=event.cwd)
+        except Exception as exc:
+            sm.transition(PromptStatus.FAILED, f"auto-inject failed: {exc}")
+            log.error("workspace_trust_auto_inject_failed", error=str(exc))
+            # Notify channel so the user can respond manually
+            if self._channel is not None:
+                try:
+                    await self._channel.notify(
+                        f"Workspace trust auto-confirm failed for {event.cwd!r}. "
+                        "Please confirm manually.",
+                        session_id=event.session_id,
+                    )
+                except Exception:
+                    pass
+
+    def _record_workspace_trust(
+        self,
+        event: PromptEvent,
+        injected_value: str,
+        reply: Reply,
+    ) -> None:
+        """Record a workspace trust grant or denial after injection."""
+        trust_path = event.constraints.get("workspace_trust_path")
+        if not trust_path:
+            return
+
+        db_conn = getattr(self._store, "_conn", None) if self._store else None
+        if db_conn is None:
+            return
+
+        try:
+            from atlasbridge.core.store.workspace_trust import grant_trust, revoke_trust
+
+            # injected_value "1" = accept (trust), "2" = deny
+            if injected_value in ("1", "yes", "y"):
+                grant_trust(
+                    trust_path,
+                    db_conn,
+                    actor=reply.channel_identity,
+                    channel=reply.channel_identity.split(":")[0] if reply.channel_identity else "",
+                    session_id=event.session_id,
+                )
+                logger.info(
+                    "workspace_trust_recorded",
+                    decision="granted",
+                    path=trust_path,
+                    actor=reply.channel_identity,
+                )
+            elif injected_value in ("2", "no", "n"):
+                revoke_trust(trust_path, db_conn)
+                logger.info(
+                    "workspace_trust_recorded",
+                    decision="denied",
+                    path=trust_path,
+                )
+        except Exception as exc:
+            logger.warning("workspace_trust_record_failed", error=str(exc))
 
     def _evaluate_gate(self, reply: Reply) -> GateDecision | None:
         """Build a GateContext and evaluate the channel message gate.

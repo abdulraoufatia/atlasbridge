@@ -71,10 +71,18 @@ class TestRejectMessages:
         assert reason in _REJECT_HEADLINES, f"Missing headline for {reason}"
         assert len(_REJECT_HEADLINES[reason]) > 0
 
+    # Busy reasons intentionally use empty next_action (headline is self-explanatory)
+    _EMPTY_NEXT_ACTION_OK = {
+        GateRejectReason.REJECT_BUSY_STREAMING,
+        GateRejectReason.REJECT_BUSY_RUNNING,
+        GateRejectReason.REJECT_NOT_AWAITING_INPUT,
+    }
+
     @pytest.mark.parametrize("reason", list(GateRejectReason))
     def test_every_reason_has_next_action(self, reason):
         assert reason in _REJECT_NEXT_ACTIONS, f"Missing next action for {reason}"
-        assert len(_REJECT_NEXT_ACTIONS[reason]) > 0
+        if reason not in TestRejectMessages._EMPTY_NEXT_ACTION_OK:
+            assert len(_REJECT_NEXT_ACTIONS[reason]) > 0
 
     @pytest.mark.parametrize("reason", list(GateRejectReason))
     def test_reject_message_contains_next_action(self, reason):
@@ -149,8 +157,19 @@ class TestUnsafeInputType:
         assert "terminal" in action.lower()
 
 
+_SINGLE_LINE_REASONS = {
+    GateRejectReason.REJECT_BUSY_STREAMING,
+    GateRejectReason.REJECT_BUSY_RUNNING,
+    GateRejectReason.REJECT_NOT_AWAITING_INPUT,
+}
+
+
 class TestMessageFormat:
-    """Verify the two-line format: headline + next action."""
+    """Verify the two-line format: headline + next action.
+
+    Busy reasons use single-line format (headline is self-explanatory,
+    no next_action needed for phone UX).
+    """
 
     @pytest.mark.parametrize("reason", list(GateRejectReason))
     def test_reject_has_two_lines(self, reason):
@@ -162,7 +181,10 @@ class TestMessageFormat:
         )
         msg = format_gate_decision(decision)
         lines = msg.split("\n")
-        assert len(lines) == 2, f"{reason} should have 2 lines, got {len(lines)}: {msg}"
+        if reason in _SINGLE_LINE_REASONS:
+            assert len(lines) == 1, f"{reason} should have 1 line (busy), got {len(lines)}: {msg}"
+        else:
+            assert len(lines) == 2, f"{reason} should have 2 lines, got {len(lines)}: {msg}"
 
     @pytest.mark.parametrize("reason", list(GateRejectReason))
     def test_headline_ends_with_period_or_similar(self, reason):
