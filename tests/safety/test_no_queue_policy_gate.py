@@ -234,8 +234,8 @@ class TestInvariantPreservation:
         assert decision.action == "reject"
         assert decision.reason_code == GateRejectReason.REJECT_NOT_AWAITING_INPUT
 
-    def test_invalid_choice_rejected(self):
-        """Invalid numbered choice must be caught by gate."""
+    def test_free_text_choice_accepted_for_normalizer(self):
+        """Gate accepts free-text replies; normalizer handles choice mapping."""
         decision = evaluate_gate(
             _ctx(
                 interaction_class=InteractionClass.NUMBERED_CHOICE,
@@ -244,8 +244,10 @@ class TestInvariantPreservation:
                 message_hash=_hash("99"),
             )
         )
-        assert decision.action == "reject"
-        assert decision.reason_code == GateRejectReason.REJECT_INVALID_CHOICE
+        # Gate no longer validates choices — the interaction engine's
+        # normalizer maps natural language (yes/no/allow/deny) to option
+        # numbers post-gate.
+        assert decision.action == "accept"
 
     def test_gate_is_pure_function(self):
         """Same inputs produce same outputs (determinism)."""

@@ -82,6 +82,20 @@ def poll_state() -> AppState:
     except Exception:  # noqa: BLE001
         pass
 
+    # ----------------------------------------------------------------
+    # Version check (cached — effectively free on cache hit)
+    # ----------------------------------------------------------------
+    update_available = False
+    latest_version = ""
+    try:
+        from atlasbridge.core.version_check import check_version
+
+        vs = check_version()
+        update_available = vs.update_available
+        latest_version = vs.latest or ""
+    except Exception:  # noqa: BLE001
+        pass
+
     return AppState(
         config_status=config_status,
         daemon_status=daemon_status,
@@ -89,4 +103,6 @@ def poll_state() -> AppState:
         session_count=session_count,
         pending_prompt_count=pending_count,
         last_error=last_error,
+        update_available=update_available,
+        latest_version=latest_version,
     )

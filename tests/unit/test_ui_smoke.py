@@ -210,7 +210,7 @@ def test_wizard_uses_container_not_static() -> None:
 
 def test_wizard_state_step_transitions_preserve_data() -> None:
     """Navigating forward and back preserves all entered data."""
-    from atlasbridge.tui.state import WizardState
+    from atlasbridge.ui.state import WizardState
 
     w = WizardState(channel="slack", token="xoxb-test", app_token="xapp-test", users="U123")
     w2 = w.next()
@@ -242,7 +242,7 @@ def test_channel_token_setup_docs_exist() -> None:
 
 def test_guidance_not_configured() -> None:
     """Unconfigured state shows setup prompt and workflow example."""
-    from atlasbridge.tui.state import AppState, DaemonStatus, guidance_message
+    from atlasbridge.ui.state import AppState, DaemonStatus, guidance_message
 
     msg = guidance_message(AppState(), DaemonStatus.UNKNOWN)
     assert "setup wizard" in msg.lower()
@@ -252,7 +252,7 @@ def test_guidance_not_configured() -> None:
 
 def test_guidance_configured_daemon_stopped() -> None:
     """Configured but daemon not running shows start instructions."""
-    from atlasbridge.tui.state import (
+    from atlasbridge.ui.state import (
         AppState,
         ConfigStatus,
         DaemonStatus,
@@ -268,7 +268,7 @@ def test_guidance_configured_daemon_stopped() -> None:
 
 def test_guidance_daemon_running_no_sessions() -> None:
     """Daemon running with no sessions shows run tool prompt."""
-    from atlasbridge.tui.state import (
+    from atlasbridge.ui.state import (
         AppState,
         ConfigStatus,
         DaemonStatus,
@@ -283,7 +283,7 @@ def test_guidance_daemon_running_no_sessions() -> None:
 
 def test_guidance_active_sessions() -> None:
     """Active sessions shows session count and management hint."""
-    from atlasbridge.tui.state import (
+    from atlasbridge.ui.state import (
         AppState,
         ConfigStatus,
         DaemonStatus,
@@ -297,8 +297,8 @@ def test_guidance_active_sessions() -> None:
 
 
 def test_guidance_is_importable_from_ui_state() -> None:
-    """guidance_message must be accessible via the ui.state re-export."""
-    from atlasbridge.tui.state import guidance_message
+    """guidance_message must be accessible via ui.state."""
+    from atlasbridge.ui.state import guidance_message
 
     assert callable(guidance_message)
 
@@ -318,30 +318,34 @@ def test_cli_ui_non_tty_exits_nonzero(monkeypatch) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Module architecture — canonical vs legacy (#96)
+# Module architecture — tui/ fully removed
 # ---------------------------------------------------------------------------
 
 
-def test_cli_imports_canonical_ui_module() -> None:
-    """cli/ must import from atlasbridge.ui.app, not atlasbridge.tui.app."""
+def test_tui_package_does_not_exist() -> None:
+    """tui/ was removed — no atlasbridge.tui package should exist."""
     from pathlib import Path
 
-    cli_dir = Path(__file__).resolve().parents[2] / "src" / "atlasbridge" / "cli"
-    # Check all CLI files for TUI imports
-    for pyfile in cli_dir.glob("*.py"):
-        source = pyfile.read_text()
-        assert "from atlasbridge.tui.app import" not in source, (
-            f"{pyfile.name} imports from tui.app — must use ui.app (canonical)"
-        )
+    tui_dir = Path(__file__).resolve().parents[2] / "src" / "atlasbridge" / "tui"
+    assert not tui_dir.exists(), "src/atlasbridge/tui/ should have been removed"
 
 
-def test_tui_init_has_deprecation_marker() -> None:
-    """tui/__init__.py docstring must contain a deprecation notice."""
-    import atlasbridge.tui
+def test_no_tui_imports_in_src() -> None:
+    """No source file should import from atlasbridge.tui."""
+    import ast
+    from pathlib import Path
 
-    doc = atlasbridge.tui.__doc__ or ""
-    assert "deprecated" in doc.lower(), "tui/__init__.py must contain 'DEPRECATED' in its docstring"
-    assert "atlasbridge.ui" in doc, (
-        "tui deprecation notice must reference atlasbridge.ui as canonical"
+    src = Path(__file__).resolve().parents[2] / "src" / "atlasbridge"
+    violations: list[str] = []
+    for pyfile in src.rglob("*.py"):
+        try:
+            tree = ast.parse(pyfile.read_text(), filename=str(pyfile))
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                if node.module.startswith("atlasbridge.tui"):
+                    violations.append(f"{pyfile.name}: {node.module}")
+    assert not violations, "Found tui imports in src/:\n" + "\n".join(
+        f"  - {v}" for v in violations
     )
-    assert "v1.1.0" in doc, "tui deprecation notice must include consolidation timeline (v1.1.0)"

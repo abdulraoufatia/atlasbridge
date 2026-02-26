@@ -8,6 +8,7 @@
  * Port of src/atlasbridge/dashboard/repo.py to TypeScript.
  */
 
+import { execSync } from "child_process";
 import fs from "fs";
 import { getAtlasBridgeDb } from "./db";
 import {
@@ -32,6 +33,25 @@ import type {
   PromptDecision,
   PromptType,
 } from "@shared/schema";
+
+// ---------------------------------------------------------------------------
+// Version detection
+// ---------------------------------------------------------------------------
+
+let _cachedVersion: string | null = null;
+
+function getInstalledVersion(): string {
+  if (_cachedVersion) return _cachedVersion;
+  try {
+    _cachedVersion = execSync("python3 -c 'import atlasbridge; print(atlasbridge.__version__)'", {
+      timeout: 5000,
+      encoding: "utf-8",
+    }).trim();
+    return _cachedVersion;
+  } catch {
+    return "unknown";
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -673,7 +693,7 @@ export class AtlasBridgeRepo {
       configPath: getConfigPath(),
       dbPath: getAtlasBridgeDbPath(),
       tracePath: getTracePath(),
-      version: "1.1.4",
+      version: getInstalledVersion(),
       environment: "local",
       featureFlags: {
         auto_escalation: true,

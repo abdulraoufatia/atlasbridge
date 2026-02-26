@@ -6,12 +6,12 @@ This document lists the invariants that AtlasBridge enforces at all times. These
 
 ## Execution Model
 
-**Cloud OBSERVES, local EXECUTES.**
+**Local execution only.**
 
 - All code execution happens on the operator's machine.
-- No remote code execution. No cloud compute. No SaaS runtime.
-- Cloud components (if any) are interface definitions only. They observe state; they never execute actions.
-- The `cloud/` package contains zero network imports (enforced by `test_cloud_network_isolation.py`).
+- No remote code execution. No remote compute.
+- Remote components (if any) are interface definitions only. They observe state; they never execute actions.
+- The remote integration package contains zero network imports (enforced by isolation tests).
 
 ---
 

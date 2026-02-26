@@ -268,7 +268,9 @@ class OutputForwarder:
         from atlasbridge.core.conversation.session_binding import ConversationState
 
         for binding in self._conversation_registry.bindings_for_session(self._session_id):
-            if binding.state != ConversationState.STREAMING:
+            # Never overwrite AWAITING_INPUT — the agent is blocked on user
+            # input and the router has authoritatively set this state.
+            if binding.state not in (ConversationState.STREAMING, ConversationState.AWAITING_INPUT):
                 self._conversation_registry.transition_state(
                     binding.channel_name,
                     binding.thread_id,

@@ -30,8 +30,8 @@ def test_autonomy_mode_members():
 
 
 def test_prompt_type_filter_members():
-    """PromptTypeFilter must have exactly 5 members."""
-    expected = {"YES_NO", "CONFIRM_ENTER", "MULTIPLE_CHOICE", "FREE_TEXT", "ANY"}
+    """PromptTypeFilter must have exactly 6 members."""
+    expected = {"YES_NO", "CONFIRM_ENTER", "MULTIPLE_CHOICE", "FREE_TEXT", "TOOL_USE", "ANY"}
     actual = {m.name for m in PromptTypeFilter}
     assert actual == expected, f"PromptTypeFilter members changed: {actual}"
 

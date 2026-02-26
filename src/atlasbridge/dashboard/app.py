@@ -105,6 +105,7 @@ class _AccessLogMiddleware(BaseHTTPMiddleware):
 def create_app(
     db_path: Path | None = None,
     trace_path: Path | None = None,
+    environment: str = "",
 ) -> FastAPI:
     """Create the FastAPI dashboard application."""
     db_path = db_path or _default_db_path()
@@ -150,6 +151,7 @@ def create_app(
                 "filter_status": status or "",
                 "filter_tool": tool or "",
                 "filter_q": q or "",
+                "environment": environment,
             },
         )
 
@@ -283,6 +285,7 @@ def start_server(
     trace_path: Path | None = None,
     *,
     allow_non_loopback: bool = False,
+    environment: str = "",
 ) -> None:
     """Start the dashboard server (blocking)."""
     if not is_loopback(host) and not allow_non_loopback:
@@ -293,7 +296,7 @@ def start_server(
 
     import uvicorn
 
-    app = create_app(db_path=db_path, trace_path=trace_path)
+    app = create_app(db_path=db_path, trace_path=trace_path, environment=environment)
 
     if open_browser:
         import threading

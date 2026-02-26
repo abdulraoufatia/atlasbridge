@@ -32,11 +32,13 @@ from typing import Any
 import structlog
 
 from atlasbridge.core.audit.writer import AuditWriter
+from atlasbridge.core.conversation.session_binding import ConversationState
 from atlasbridge.core.gate.engine import GateContext, GateDecision, GateRejectReason, evaluate_gate
 from atlasbridge.core.gate.messages import format_gate_decision
 from atlasbridge.core.prompt.models import Confidence, PromptEvent, PromptStatus, Reply
 from atlasbridge.core.prompt.state import PromptStateMachine
 from atlasbridge.core.session.manager import SessionManager
+from atlasbridge.core.session.models import SessionStatus
 
 logger = structlog.get_logger()
 
@@ -117,6 +119,11 @@ class PromptRouter:
         if len(timestamps) >= _FAILSAFE_MAX_DISPATCHES:
             log.warning("failsafe_routing_paused", dispatches_in_window=len(timestamps))
             self._session_dispatch_counts[event.session_id] = timestamps
+            if self._channel is not None:
+                await self._channel.notify(
+                    f"Rate limit: {len(timestamps)} prompts in 60s. Check console.",
+                    session_id=event.session_id,
+                )
             return
         timestamps.append(now)
         self._session_dispatch_counts[event.session_id] = timestamps
@@ -163,10 +170,58 @@ class PromptRouter:
 
         try:
             sm.transition(PromptStatus.ROUTED, "dispatching to channel")
+
+            # Delivery dedup: skip if already delivered (survives daemon restarts)
+            if self._store is not None and hasattr(self._store, "was_delivered"):
+                ch_name = getattr(self._channel, "channel_name", "unknown")
+                identities = (
+                    list(self._channel.get_allowed_identities())
+                    if hasattr(self._channel, "get_allowed_identities")
+                    else []
+                )
+                if identities and all(
+                    self._store.was_delivered(event.prompt_id, ch_name, ident)
+                    for ident in identities
+                ):
+                    log.info("prompt_already_delivered", prompt_id=event.prompt_id)
+                    sm.transition(PromptStatus.AWAITING_REPLY, "already delivered")
+                    self._sessions.mark_awaiting_reply(event.session_id, event.prompt_id)
+                    return
+
             message_id = await self._channel.send_prompt(event)
 
             sm.transition(PromptStatus.AWAITING_REPLY, "channel delivered prompt")
             self._sessions.mark_awaiting_reply(event.session_id, event.prompt_id)
+
+            # Record delivery for idempotent resend protection
+            if self._store is not None and hasattr(self._store, "record_delivery"):
+                ch_name = getattr(self._channel, "channel_name", "unknown")
+                identities = (
+                    list(self._channel.get_allowed_identities())
+                    if hasattr(self._channel, "get_allowed_identities")
+                    else []
+                )
+                for ident in identities:
+                    self._store.record_delivery(
+                        event.prompt_id, event.session_id, ch_name, ident, message_id or ""
+                    )
+
+            # Bind conversation threads so the gate can resolve session on first reply.
+            # Without this, the first reply to a freshly-dispatched prompt has no
+            # conversation binding and the gate rejects with "No active session".
+            if self._conversation_registry is not None and hasattr(
+                self._channel, "get_allowed_identities"
+            ):
+                for ident in self._channel.get_allowed_identities():
+                    parts = ident.split(":", 1)
+                    if len(parts) == 2:
+                        ch_name_bind, thread_id = parts
+                        self._conversation_registry.bind(ch_name_bind, thread_id, event.session_id)
+                        self._conversation_registry.update_state(
+                            ch_name_bind,
+                            thread_id,
+                            ConversationState.AWAITING_INPUT,
+                        )
 
             # Store message_id for later editing (e.g. resolved, expired)
             session = self._sessions.get_or_none(event.session_id)
@@ -183,10 +238,7 @@ class PromptRouter:
     # ------------------------------------------------------------------
 
     async def handle_reply(self, reply: Reply) -> None:
-        """Process an incoming Reply from the channel.
-
-        Gate evaluation runs first — rejected messages are never injected.
-        """
+        """Process an incoming Reply from the channel."""
         # Plan response handling (sentinel prompt_id)
         if reply.prompt_id == "__plan__":
             await self.handle_plan_response(
@@ -195,50 +247,60 @@ class PromptRouter:
             )
             return
 
-        # Gate evaluation — evaluate before any state mutation
-        decision = self._evaluate_gate(reply)
+        # For free-text replies (no prompt_id), try to bind to the active prompt
+        # before running the gate so that session/prompt context is available.
+        effective_reply = reply
+        if not reply.prompt_id:
+            resolved = self._resolve_free_text_reply(reply)
+            if resolved is not None:
+                effective_reply = resolved
+
+        # Gate evaluation — rejected messages are never injected.
+        decision = self._evaluate_gate(effective_reply)
         if decision is not None and decision.action == "reject":
-            session_id = reply.session_id or self._resolve_session_for_reply(reply) or ""
+            session_id = (
+                effective_reply.session_id or self._resolve_session_for_reply(effective_reply) or ""
+            )
             feedback = format_gate_decision(decision)
             logger.info(
                 "channel_message_rejected",
                 reason_code=decision.reason_code,
                 session_id=session_id[:8] if session_id else "",
             )
-            self._audit_gate_decision(reply, decision, session_id)
+            self._audit_gate_decision(effective_reply, decision, session_id)
             if self._channel is not None:
                 await self._channel.notify(feedback, session_id=session_id)
             return
 
         # Audit accepted gate decision
         if decision is not None and decision.action == "accept":
-            session_id = reply.session_id or self._resolve_session_for_reply(reply) or ""
-            self._audit_gate_decision(reply, decision, session_id)
+            session_id = (
+                effective_reply.session_id or self._resolve_session_for_reply(effective_reply) or ""
+            )
+            self._audit_gate_decision(effective_reply, decision, session_id)
 
-        # Free-text replies have empty prompt_id — resolve to active prompt
-        if not reply.prompt_id:
-            resolved = self._resolve_free_text_reply(reply)
-            if resolved is None:
-                # No active prompt — check conversation state for chat mode
-                if self._chat_mode_handler is not None:
-                    logger.info(
-                        "chat_mode_input",
-                        channel_identity=reply.channel_identity,
-                        value_length=len(reply.value),
-                    )
-                    await self._chat_mode_handler(reply)
-                    return
-                logger.debug("free_text_reply_dropped", reason="no_active_prompt")
+        # If, after attempted binding and gate evaluation, there is still no
+        # prompt_id, treat this as Chat Mode (free-text turn) or drop it.
+        if not effective_reply.prompt_id:
+            # No active prompt — check conversation state for chat mode
+            if self._chat_mode_handler is not None:
+                logger.info(
+                    "chat_mode_input",
+                    channel_identity=effective_reply.channel_identity,
+                    value_length=len(effective_reply.value),
+                )
+                await self._chat_mode_handler(effective_reply)
                 return
-            reply = resolved
+            logger.debug("free_text_reply_dropped", reason="no_active_prompt")
+            return
 
         log = logger.bind(
-            prompt_id=reply.prompt_id,
-            session_id=reply.session_id[:8] if reply.session_id else "",
-            channel_identity=reply.channel_identity,
+            prompt_id=effective_reply.prompt_id,
+            session_id=effective_reply.session_id[:8] if effective_reply.session_id else "",
+            channel_identity=effective_reply.channel_identity,
         )
 
-        sm = self._machines.get(reply.prompt_id)
+        sm = self._machines.get(effective_reply.prompt_id)
         if sm is None:
             log.debug("reply_ignored", reason="unknown_prompt")
             return
@@ -251,14 +313,15 @@ class PromptRouter:
         # TTL check
         if sm.expire_if_due():
             log.info("reply_rejected", reason="expired")
-            await self._channel.notify(
-                "This prompt has expired. The safe default was used.",
-                session_id=reply.session_id,
-            )
+            if self._channel is not None:
+                await self._channel.notify(
+                    "This prompt has expired. The safe default was used.",
+                    session_id=effective_reply.session_id,
+                )
             return
 
         # Validate session binding
-        if sm.event.session_id != reply.session_id and reply.session_id:
+        if sm.event.session_id != effective_reply.session_id and effective_reply.session_id:
             log.warning(
                 "reply_rejected",
                 reason="session_mismatch",
@@ -267,16 +330,21 @@ class PromptRouter:
             return
 
         # Identity allowlist (channel enforces; double-check here)
-        if not self._channel.is_allowed(reply.channel_identity):
+        if not self._channel.is_allowed(effective_reply.channel_identity):
             log.warning("reply_rejected", reason="identity_not_allowed")
             return
 
         try:
-            sm.transition(PromptStatus.REPLY_RECEIVED, f"reply from {reply.channel_identity}")
+            sm.transition(
+                PromptStatus.REPLY_RECEIVED,
+                f"reply from {effective_reply.channel_identity}",
+            )
 
             if self._interaction_engine is not None:
                 # Use the interaction engine (classify → plan → execute → feedback)
-                result = await self._interaction_engine.handle_prompt_reply(sm.event, reply)
+                result = await self._interaction_engine.handle_prompt_reply(
+                    sm.event, effective_reply
+                )
 
                 if result.success:
                     sm.transition(PromptStatus.INJECTED, "injected via interaction engine")
@@ -293,7 +361,7 @@ class PromptRouter:
                 feedback = result.feedback_message or f"\u2713 Answered: {result.injected_value!r}"
                 session = self._sessions.get_or_none(sm.event.session_id)
                 if session:
-                    msg_id = session.channel_message_ids.get(reply.prompt_id, "")
+                    msg_id = session.channel_message_ids.get(effective_reply.prompt_id, "")
                     if msg_id:
                         await self._channel.edit_prompt_message(
                             msg_id,
@@ -308,7 +376,7 @@ class PromptRouter:
 
                 await adapter.inject_reply(
                     session_id=sm.event.session_id,
-                    value=reply.value,
+                    value=effective_reply.value,
                     prompt_type=sm.event.prompt_type,
                 )
 
@@ -320,13 +388,19 @@ class PromptRouter:
                 # Edit the channel message to show resolution
                 session = self._sessions.get_or_none(sm.event.session_id)
                 if session:
-                    msg_id = session.channel_message_ids.get(reply.prompt_id, "")
+                    msg_id = session.channel_message_ids.get(effective_reply.prompt_id, "")
                     if msg_id:
                         await self._channel.edit_prompt_message(
                             msg_id,
-                            f"\u2713 Answered: {reply.value!r}",
+                            f"\u2713 Answered: {effective_reply.value!r}",
                             session_id=sm.event.session_id,
                         )
+
+            # Send acknowledgement to channel
+            if self._channel is not None:
+                val_display = effective_reply.value[:40]
+                ack = f'Sent: "{val_display}"\nSession: {sm.event.session_id[:8]}'
+                await self._channel.notify(ack, session_id=sm.event.session_id)
 
             # Reset failsafe counter — successful reply means the prompt cycle completed
             self._session_dispatch_counts.pop(sm.event.session_id, None)
@@ -339,13 +413,24 @@ class PromptRouter:
             )
 
             # Bind thread→session in conversation registry
-            if self._conversation_registry is not None and reply.thread_id and sm.event.session_id:
-                ch_name = reply.channel_identity.split(":")[0]
-                self._conversation_registry.bind(ch_name, reply.thread_id, sm.event.session_id)
+            if (
+                self._conversation_registry is not None
+                and effective_reply.thread_id
+                and sm.event.session_id
+            ):
+                ch_name = effective_reply.channel_identity.split(":")[0]
+                self._conversation_registry.bind(
+                    ch_name, effective_reply.thread_id, sm.event.session_id
+                )
 
         except Exception as exc:  # noqa: BLE001
             sm.transition(PromptStatus.FAILED, str(exc))
             log.error("reply_injection_failed", error=str(exc))
+            if self._channel is not None:
+                await self._channel.notify(
+                    "Reply failed. Try again.",
+                    session_id=sm.event.session_id,
+                )
 
     def _evaluate_gate(self, reply: Reply) -> GateDecision | None:
         """Build a GateContext and evaluate the channel message gate.
@@ -375,6 +460,23 @@ class PromptRouter:
             session = self._sessions.get_or_none(session_id)
             if session:
                 active_prompt_id = session.active_prompt_id
+                # The session model is the authoritative source of truth.
+                # The conversation binding state can be stale due to
+                # OutputForwarder transitions, bind() resets, or timing
+                # races between prompt dispatch and reply arrival.
+                #
+                # Two definitive signals that the session is awaiting input:
+                #   1. session.status == AWAITING_REPLY
+                #   2. session.active_prompt_id is set (prompt dispatched,
+                #      reply not yet received)
+                # Either signal overrides any stale binding state.
+                if session.active_prompt_id or session.status == SessionStatus.AWAITING_REPLY:
+                    state = ConversationState.AWAITING_INPUT
+                elif state is None:
+                    if session.status in (SessionStatus.STARTING, SessionStatus.RUNNING):
+                        state = ConversationState.RUNNING
+                    elif session.is_terminal:
+                        state = ConversationState.STOPPED
 
         # Build identity allowlist from channel
         allowlist: frozenset[str] = frozenset()

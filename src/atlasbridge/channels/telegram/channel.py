@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import asyncio
 import secrets
+import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import UTC
 from pathlib import Path
@@ -54,6 +55,8 @@ _BASE_URL = "https://api.telegram.org/bot{token}/{method}"
 _POLL_TIMEOUT = 30  # Long-poll timeout (seconds)
 _RETRY_BASE_S = 1.0
 _RETRY_MAX_S = 60.0
+_CALLBACK_REF_TTL_S = 600.0  # 10 minutes TTL for callback refs
+_TELEGRAM_CALLBACK_MAX = 64  # Telegram callback_data byte limit
 
 
 class TelegramConflictError(Exception):
@@ -90,6 +93,9 @@ class TelegramChannel(BaseChannel):
         self._command_callback = command_callback
         self._locks_dir = locks_dir
         self._poller_lock: Any = None  # PollerLock — created in start()
+        # Server-side callback reference store (Telegram limits callback_data to 64 bytes)
+        self._callback_refs: dict[str, tuple[dict[str, str], float]] = {}
+        self._callback_seq: int = 0
 
     async def start(self) -> None:
         try:
@@ -268,6 +274,10 @@ class TelegramChannel(BaseChannel):
         except (ValueError, AttributeError):
             return False
 
+    def get_allowed_identities(self) -> list[str]:
+        """Return all allowlisted identities in channel:id format."""
+        return [f"telegram:{uid}" for uid in sorted(self._allowed)]
+
     def healthcheck(self) -> dict[str, Any]:
         return {
             "status": "ok" if self._running else "stopped",
@@ -349,13 +359,33 @@ class TelegramChannel(BaseChannel):
             await self._api("answerCallbackQuery", {"callback_query_id": cb["id"]})
             return
 
-        # Parse: ans:{prompt_id}:{session_id}:{nonce}:{value}
+        # Parse callback data — two formats:
+        #   Full:  ans:{prompt_id}:{session_id}:{nonce}:{value}
+        #   Ref:   ref:{key}:{value}  (server-side lookup)
+        prompt_id = session_id = nonce = value = ""
         try:
-            parts = data.split(":", 4)
-            if parts[0] != "ans" or len(parts) != 5:
+            if data.startswith("ref:"):
+                parts = data.split(":", 2)
+                if len(parts) != 3:
+                    return
+                _, ref_key, value = parts
+                ref = self._callback_refs.get(ref_key)
+                if ref is None:
+                    logger.warning("telegram_callback_ref_expired", ref_key=ref_key)
+                    return
+                ref_data, _ = ref
+                prompt_id = ref_data["prompt_id"]
+                session_id = ref_data["session_id"]
+                nonce = ref_data["nonce"]
+            elif data.startswith("ans:"):
+                parts = data.split(":", 4)
+                if len(parts) != 5:
+                    return
+                _, prompt_id, session_id, nonce, value = parts
+            else:
                 return
-            _, prompt_id, session_id, nonce, value = parts
-        except ValueError:
+        except (ValueError, KeyError):
+            logger.warning("telegram_callback_parse_failed", data=data[:64])
             return
 
         reply = Reply(
@@ -369,8 +399,14 @@ class TelegramChannel(BaseChannel):
         )
         await self._reply_queue.put(reply)
 
-        # Acknowledge the callback to remove the spinner on the button
-        await self._api("answerCallbackQuery", {"callback_query_id": cb["id"]})
+        # Acknowledge with a visible toast on the user's phone
+        await self._api(
+            "answerCallbackQuery",
+            {
+                "callback_query_id": cb["id"],
+                "text": f"Sent: {value}",
+            },
+        )
 
     async def _handle_message(self, msg: dict[str, Any]) -> None:
         """Handle free-text reply messages and / commands."""
@@ -460,9 +496,9 @@ class TelegramChannel(BaseChannel):
             Confidence.LOW: "low (ambiguous)",
         }
         response_instructions = {
-            PromptType.TYPE_YES_NO: "Tap <b>Yes</b> or <b>No</b> below.",
+            PromptType.TYPE_YES_NO: "Tap a button or reply <b>yes</b> / <b>no</b>.",
             PromptType.TYPE_CONFIRM_ENTER: "Tap <b>Send Enter</b> below to continue.",
-            PromptType.TYPE_MULTIPLE_CHOICE: "Tap a numbered option below.",
+            PromptType.TYPE_MULTIPLE_CHOICE: ("Tap a button or reply <b>yes</b> / <b>no</b>."),
             PromptType.TYPE_FREE_TEXT: "Type your response and send it as a message.",
         }
         label = type_labels.get(event.prompt_type, event.prompt_type)
@@ -482,7 +518,8 @@ class TelegramChannel(BaseChannel):
         if event.cwd:
             lines.append(f"\nWorkspace:\n{event.cwd}")
 
-        lines.append(f"\nQuestion:\n<pre>{event.excerpt}</pre>")
+        question_html = TelegramChannel._format_question(event)
+        lines.append(f"\nQuestion:\n{question_html}")
 
         if instruction:
             lines.append(f"\nHow to respond:\n{instruction}")
@@ -496,30 +533,119 @@ class TelegramChannel(BaseChannel):
         return "\n".join(lines)
 
     @staticmethod
-    def _build_keyboard(event: PromptEvent) -> list[list[dict[str, str]]]:
+    def _format_question(event: PromptEvent) -> str:
+        """Format the question/excerpt for a phone-first experience.
+
+        Removes terminal-only hints and rewrites Claude's folder trust prompt
+        into a workspace trust confirmation while preserving semantics.
+        """
+        excerpt = event.excerpt or ""
+        lower = excerpt.lower()
+
+        # Special-case Claude's folder trust prompt — present as workspace trust.
+        if "trust" in lower and "folder" in lower:
+            # Build a workspace-centric description and sanitised options.
+            tool_label = (event.tool or "Claude Code").strip()
+            lines: list[str] = []
+            lines.append("Workspace trust confirmation")
+            lines.append("")
+            lines.append(
+                f"{tool_label} is asking to trust this workspace for file access and execution."
+            )
+
+            if event.cwd:
+                lines.append("")
+                lines.append("Workspace:")
+                lines.append(event.cwd)
+
+            # Present numbered options without terminal hints or folder wording.
+            if event.choices:
+                lines.append("")
+                lines.append("Options:")
+                for i, raw_choice in enumerate(event.choices, start=1):
+                    choice = (raw_choice or "").strip()
+                    # Soften CLI phrasing: "folder" → "workspace"
+                    choice = choice.replace("this folder", "this workspace")
+                    choice = choice.replace("folder", "workspace")
+                    lines.append(f"{i}. {choice or i}")
+
+            joined = "\n".join(lines)
+            return f"<pre>{joined}</pre>"
+
+        # Generic path: use centralized terminal hint stripping.
+        from atlasbridge.core.prompt.sanitize import strip_terminal_hints
+
+        cleaned = strip_terminal_hints(excerpt).strip() or excerpt.strip()
+        return f"<pre>{cleaned}</pre>"
+
+    def _make_callback_data(
+        self,
+        prompt_id: str,
+        session_id: str,
+        nonce: str,
+        value: str,
+    ) -> str:
+        """Build callback_data within Telegram's 64-byte limit.
+
+        If the full compound key fits, use it directly. Otherwise, store
+        the routing metadata server-side and return a short reference key.
+        """
+        full = f"ans:{prompt_id}:{session_id}:{nonce}:{value}"
+        if len(full.encode()) <= _TELEGRAM_CALLBACK_MAX:
+            return full
+
+        # Prune expired refs
+        now = time.monotonic()
+        expired = [
+            k for k, (_, ts) in self._callback_refs.items() if (now - ts) > _CALLBACK_REF_TTL_S
+        ]
+        for k in expired:
+            del self._callback_refs[k]
+
+        # Store server-side, return short ref
+        self._callback_seq += 1
+        ref_key = f"r{self._callback_seq}"
+        self._callback_refs[ref_key] = (
+            {"prompt_id": prompt_id, "session_id": session_id, "nonce": nonce},
+            now,
+        )
+        return f"ref:{ref_key}:{value}"
+
+    def _build_keyboard(self, event: PromptEvent) -> list[list[dict[str, str]]]:
         """Build Telegram inline keyboard buttons."""
-        base = f"ans:{event.prompt_id}:{event.session_id}:{event.idempotency_key}"
+        pid = event.prompt_id
+        sid = event.session_id
+        nonce = event.idempotency_key
 
         if event.prompt_type == PromptType.TYPE_YES_NO:
             return [
                 [
-                    {"text": "Yes", "callback_data": f"{base}:y"},
-                    {"text": "No", "callback_data": f"{base}:n"},
+                    {
+                        "text": "Yes",
+                        "callback_data": self._make_callback_data(pid, sid, nonce, "y"),
+                    },
+                    {"text": "No", "callback_data": self._make_callback_data(pid, sid, nonce, "n")},
                 ]
             ]
         if event.prompt_type == PromptType.TYPE_CONFIRM_ENTER:
             return [
                 [
-                    {"text": "Send Enter", "callback_data": f"{base}:enter"},
-                    {"text": "Cancel", "callback_data": f"{base}:cancel"},
+                    {
+                        "text": "Send Enter",
+                        "callback_data": self._make_callback_data(pid, sid, nonce, "enter"),
+                    },
+                    {
+                        "text": "Cancel",
+                        "callback_data": self._make_callback_data(pid, sid, nonce, "cancel"),
+                    },
                 ]
             ]
         if event.prompt_type == PromptType.TYPE_MULTIPLE_CHOICE:
             return [
                 [
                     {
-                        "text": f"{i + 1}. {c[:30]}" if c else str(i + 1),
-                        "callback_data": f"{base}:{i + 1}",
+                        "text": c[:30] if c else str(i + 1),
+                        "callback_data": self._make_callback_data(pid, sid, nonce, str(i + 1)),
                     }
                     for i, c in enumerate(event.choices)
                 ]

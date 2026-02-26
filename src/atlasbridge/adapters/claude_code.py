@@ -31,8 +31,14 @@ _NORMALISE: dict[str, dict[str, bytes]] = {
     PromptType.TYPE_YES_NO: {
         "y": b"y\r",
         "yes": b"y\r",
+        "yeah": b"y\r",
+        "yep": b"y\r",
+        "sure": b"y\r",
+        "yea": b"y\r",
         "n": b"n\r",
         "no": b"n\r",
+        "nah": b"n\r",
+        "nope": b"n\r",
     },
     PromptType.TYPE_CONFIRM_ENTER: {
         "*": b"\r",  # any value → send Enter

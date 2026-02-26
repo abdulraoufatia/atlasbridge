@@ -82,7 +82,7 @@ class TestFormatPrompt:
 class TestFormatPromptResponseInstructions:
     def test_yes_no_instruction(self) -> None:
         text = TelegramChannel._format_prompt(_event(PromptType.TYPE_YES_NO))
-        assert "Tap <b>Yes</b> or <b>No</b> below" in text
+        assert "reply <b>yes</b> / <b>no</b>" in text
 
     def test_confirm_enter_instruction(self) -> None:
         text = TelegramChannel._format_prompt(_event(PromptType.TYPE_CONFIRM_ENTER))
@@ -92,7 +92,7 @@ class TestFormatPromptResponseInstructions:
         text = TelegramChannel._format_prompt(
             _event(PromptType.TYPE_MULTIPLE_CHOICE, choices=["a", "b"])
         )
-        assert "Tap a numbered option below" in text
+        assert "reply <b>yes</b> / <b>no</b>" in text
 
     def test_free_text_instruction(self) -> None:
         text = TelegramChannel._format_prompt(_event(PromptType.TYPE_FREE_TEXT))
@@ -174,10 +174,116 @@ class TestBuildKeyboard:
         kb = ch._build_keyboard(event)
         assert len(kb[0]) == 3
         labels = [b["text"] for b in kb[0]]
-        assert labels == ["1. Alpha", "2. Beta", "3. Gamma"]
+        assert labels == ["Alpha", "Beta", "Gamma"]
 
     def test_free_text_no_buttons(self) -> None:
         ch = _channel()
         event = _event(PromptType.TYPE_FREE_TEXT)
         kb = ch._build_keyboard(event)
         assert kb == []
+
+
+class TestCallbackDataSizing:
+    """All generated callback_data must fit in Telegram's 64-byte limit."""
+
+    def test_yes_no_within_64_bytes(self) -> None:
+        ch = _channel()
+        event = _event(PromptType.TYPE_YES_NO)
+        kb = ch._build_keyboard(event)
+        for btn in kb[0]:
+            assert len(btn["callback_data"].encode()) <= 64
+
+    def test_confirm_enter_within_64_bytes(self) -> None:
+        ch = _channel()
+        event = _event(PromptType.TYPE_CONFIRM_ENTER)
+        kb = ch._build_keyboard(event)
+        for btn in kb[0]:
+            assert len(btn["callback_data"].encode()) <= 64
+
+    def test_multiple_choice_within_64_bytes(self) -> None:
+        ch = _channel()
+        event = _event(PromptType.TYPE_MULTIPLE_CHOICE, choices=["A", "B", "C", "D"])
+        kb = ch._build_keyboard(event)
+        for btn in kb[0]:
+            assert len(btn["callback_data"].encode()) <= 64
+
+
+class TestCallbackRefFallback:
+    """When full callback data exceeds 64 bytes, ref format is used."""
+
+    def test_ref_format_used_when_too_long(self) -> None:
+        ch = _channel()
+        # Use a very long session_id to force ref fallback
+        event = _event(PromptType.TYPE_YES_NO)
+        event.session_id = "a" * 80  # Much longer than normal UUID
+        kb = ch._build_keyboard(event)
+        # At least one button should use ref: format
+        data_values = [btn["callback_data"] for btn in kb[0]]
+        assert any(d.startswith("ref:") for d in data_values)
+
+    def test_ref_roundtrip(self) -> None:
+        ch = _channel()
+        pid = "abcdef1234567890abcdef12"
+        sid = "12345678-1234-1234-1234-123456789abc"
+        nonce = "deadbeef01234567"
+        value = "y"
+
+        data = ch._make_callback_data(pid, sid, nonce, value)
+
+        # Parse the callback data back
+        if data.startswith("ref:"):
+            parts = data.split(":", 2)
+            assert len(parts) == 3
+            ref_key = parts[1]
+            parsed_value = parts[2]
+            assert parsed_value == value
+            ref = ch._callback_refs.get(ref_key)
+            assert ref is not None
+            ref_data, _ = ref
+            assert ref_data["prompt_id"] == pid
+            assert ref_data["session_id"] == sid
+            assert ref_data["nonce"] == nonce
+        else:
+            # Full format — verify it parses
+            assert data.startswith("ans:")
+            _, parsed_pid, parsed_sid, parsed_nonce, parsed_value = data.split(":", 4)
+            assert parsed_pid == pid
+            assert parsed_sid == sid
+            assert parsed_nonce == nonce
+            assert parsed_value == value
+
+    def test_ref_within_64_bytes(self) -> None:
+        ch = _channel()
+        # Force ref format with long IDs
+        data = ch._make_callback_data("a" * 30, "b" * 40, "c" * 20, "y")
+        assert len(data.encode()) <= 64
+
+
+class TestReplyAliasesRemovedFromChannel:
+    """Reply aliases removed from channel — normalization is in the interaction layer."""
+
+    def test_no_reply_aliases_in_channel(self) -> None:
+        import atlasbridge.channels.telegram.channel as mod
+
+        assert not hasattr(mod, "_REPLY_ALIASES")
+
+    def test_raw_reply_preserved(self) -> None:
+        """Channel should pass raw user text without alias normalization."""
+        from atlasbridge.core.interaction.normalizer import NO_SYNONYMS, YES_SYNONYMS
+
+        assert "yes" in YES_SYNONYMS
+        assert "yeah" in YES_SYNONYMS
+        assert "nope" in NO_SYNONYMS
+        assert "nah" in NO_SYNONYMS
+
+
+class TestGetAllowedIdentities:
+    def test_returns_formatted_identities(self) -> None:
+        ch = _channel()
+        ids = ch.get_allowed_identities()
+        assert ids == ["telegram:12345"]
+
+    def test_multiple_users(self) -> None:
+        ch = TelegramChannel(bot_token=_VALID_TOKEN, allowed_user_ids=[999, 111, 555])
+        ids = ch.get_allowed_identities()
+        assert ids == ["telegram:111", "telegram:555", "telegram:999"]

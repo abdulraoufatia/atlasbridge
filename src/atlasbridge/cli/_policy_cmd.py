@@ -10,7 +10,12 @@ import sys
 import click
 
 from atlasbridge.core.policy.evaluator import evaluate
-from atlasbridge.core.policy.explain import debug_policy, explain_decision, explain_policy
+from atlasbridge.core.policy.explain import (
+    debug_policy,
+    explain_decision,
+    explain_policy,
+    full_explain,
+)
 from atlasbridge.core.policy.parser import PolicyParseError, load_policy
 
 
@@ -280,3 +285,85 @@ def policy_coverage(policy_file: str) -> None:
 
     report = analyze_coverage(policy)
     click.echo(format_coverage(report))
+
+
+@policy_group.command("explain")
+@click.argument("policy_file", type=click.Path(exists=True, dir_okay=False))
+@click.option("--prompt", "prompt_text", required=True, help="Prompt text excerpt.")
+@click.option(
+    "--type",
+    "prompt_type",
+    default="yes_no",
+    show_default=True,
+    help="Prompt type: yes_no, confirm_enter, multiple_choice, free_text.",
+)
+@click.option(
+    "--confidence",
+    default="high",
+    show_default=True,
+    help="Confidence level: high, medium, low.",
+)
+@click.option("--tool", "tool_id", default="*", show_default=True, help="Tool/adapter name.")
+@click.option("--repo", default="", help="Session working directory.")
+@click.option("--session-tag", "session_tag", default="", help="Session label (v1 only).")
+@click.option("--branch", default="", help="Git branch (for risk classification).")
+@click.option("--ci-status", "ci_status", default="", help="CI status: passing, failing, unknown.")
+@click.option(
+    "--file-scope",
+    "file_scope",
+    default="",
+    help="File scope: general, config, infrastructure, secrets.",
+)
+@click.option("--environment", default="", help="Environment: dev, staging, production.")
+@click.option("--json", "output_json", is_flag=True, default=False, help="Output as JSON.")
+def policy_explain_cmd(
+    policy_file: str,
+    prompt_text: str,
+    prompt_type: str,
+    confidence: str,
+    tool_id: str,
+    repo: str,
+    session_tag: str,
+    branch: str,
+    ci_status: str,
+    file_scope: str,
+    environment: str,
+    output_json: bool,
+) -> None:
+    """
+    Full policy explain — matched rule, failed rules, risk, and alternative outcomes.
+
+    Shows the complete reasoning chain for a governance decision:
+    all rules evaluated (with failure reasons), risk assessment,
+    and what would change at different confidence levels.
+
+    Example::
+
+        atlasbridge policy explain policy.yaml \\
+            --prompt "Deploy to prod? [y/n]" --type yes_no \\
+            --branch main --ci-status failing --json
+    """
+    try:
+        policy = load_policy(policy_file)
+    except PolicyParseError as exc:
+        click.echo(str(exc), err=True)
+        sys.exit(1)
+
+    result = full_explain(
+        policy=policy,
+        prompt_text=prompt_text,
+        prompt_type=prompt_type,
+        confidence=confidence,
+        tool_id=tool_id,
+        repo=repo,
+        session_tag=session_tag,
+        branch=branch,
+        ci_status=ci_status,
+        file_scope=file_scope,
+        environment=environment,
+    )
+
+    if output_json:
+        click.echo(result.to_json())
+    else:
+        click.echo(result.to_text())

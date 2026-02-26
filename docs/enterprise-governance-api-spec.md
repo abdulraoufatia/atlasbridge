@@ -3,7 +3,7 @@
 # Enterprise Governance API — Specification
 
 **Maturity:** Design Document — No Implementation
-**Phase:** C (SaaS Dashboard)
+**Phase:** C (Enterprise Dashboard)
 **Trust model:** Cloud OBSERVES, local EXECUTES.
 **Base URL (design):** `https://api.atlasbridge.io/v1`
 

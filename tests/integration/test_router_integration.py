@@ -39,6 +39,8 @@ def mock_channel() -> AsyncMock:
     channel = AsyncMock()
     channel.send_prompt.return_value = "msg-200"
     channel.is_allowed = MagicMock(return_value=True)
+    channel.get_allowed_identities = MagicMock(return_value=["telegram:12345"])
+    channel.channel_name = "telegram"
     return channel
 
 

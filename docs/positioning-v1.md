@@ -20,12 +20,12 @@ It is a deterministic, policy-enforced execution layer for AI CLI agents. Operat
 
 ## What AtlasBridge v1.0 IS NOT
 
-- **Not SaaS** — there is no hosted service; the runtime runs on your machine
+- **Not hosted** — there is no hosted service; the runtime runs on your machine
 - **Not multi-tenant** — there is one operator, one machine, one policy
 - **Not authenticated** — the dashboard has no login; network isolation is the access control
-- **Not cloud-controlled** — no remote entity can trigger execution or override policy
+- **Not remotely controlled** — no remote entity can trigger execution or override policy
 - **Not SSO-integrated** — there is no identity provider integration
-- **Not enterprise-ready (yet)** — enterprise features (RBAC, multi-tenant, SaaS) are experimental or design-only
+- **Not enterprise-ready (yet)** — enterprise features (RBAC, multi-tenant) are experimental or design-only
 
 These are roadmap items, not v1.0 deliverables.
 
@@ -91,6 +91,6 @@ Changes to any frozen surface require updating the corresponding safety test, in
 
 ## Future Roadmap
 
-Future direction includes SaaS, multi-tenant, authentication, cloud control, enterprise SSO, and a hosted dashboard — but these are roadmap phases, not part of v1.0.
+Future direction includes multi-tenant support, authentication, enterprise SSO, and an extended dashboard — but these are roadmap phases, not part of v1.0.
 
-The v1.0 release is strictly local-first. All future cloud features will preserve the "Cloud OBSERVES, local EXECUTES" invariant.
+The v1.0 release is strictly local-first.

@@ -18,6 +18,14 @@ def _session(tool: str = "claude") -> Session:
     return Session(session_id=str(uuid.uuid4()), tool=tool)
 
 
+def _mock_store() -> MagicMock:
+    """Create a store mock with delivery tracking methods properly configured."""
+    store = MagicMock()
+    store.was_delivered.return_value = False
+    store.record_delivery.return_value = True
+    return store
+
+
 def _event(
     session_id: str,
     confidence: Confidence = Confidence.HIGH,
@@ -55,6 +63,9 @@ def mock_channel() -> AsyncMock:
     channel.send_prompt.return_value = "msg-100"
     # is_allowed is a sync method — use MagicMock so it doesn't return a coroutine
     channel.is_allowed = MagicMock(return_value=True)
+    # get_allowed_identities is sync — use MagicMock
+    channel.get_allowed_identities = MagicMock(return_value=["telegram:12345"])
+    channel.channel_name = "telegram"
     return channel
 
 
@@ -76,7 +87,7 @@ def router(session_manager: SessionManager, mock_channel: AsyncMock) -> PromptRo
         session_manager=session_manager,
         channel=mock_channel,
         adapter_map={},
-        store=MagicMock(),
+        store=_mock_store(),
     )
 
 
@@ -239,7 +250,7 @@ class TestInteractionEngineIntegration:
             session_manager=session_manager,
             channel=mock_channel,
             adapter_map={},
-            store=MagicMock(),
+            store=_mock_store(),
             interaction_engine=mock_engine,
         )
 
@@ -273,7 +284,7 @@ class TestInteractionEngineIntegration:
             session_manager=session_manager,
             channel=mock_channel,
             adapter_map={},
-            store=MagicMock(),
+            store=_mock_store(),
             interaction_engine=mock_engine,
         )
 
@@ -306,7 +317,7 @@ class TestInteractionEngineIntegration:
             session_manager=session_manager,
             channel=mock_channel,
             adapter_map={},
-            store=MagicMock(),
+            store=_mock_store(),
             interaction_engine=mock_engine,
         )
 
@@ -339,7 +350,7 @@ class TestChatModeHandler:
             session_manager=session_manager,
             channel=mock_channel,
             adapter_map={},
-            store=MagicMock(),
+            store=_mock_store(),
             chat_mode_handler=chat_handler,
         )
 
@@ -373,7 +384,7 @@ class TestChatModeHandler:
             session_manager=session_manager,
             channel=mock_channel,
             adapter_map={session.session_id: mock_adapter},
-            store=MagicMock(),
+            store=_mock_store(),
             chat_mode_handler=chat_handler,
         )
 
@@ -458,7 +469,7 @@ class TestPlanResponse:
             session_manager=session_manager,
             channel=mock_channel,
             adapter_map={},
-            store=MagicMock(),
+            store=_mock_store(),
         )
         s = _session()
         session_manager.register(s)
@@ -476,7 +487,7 @@ class TestPlanResponse:
             session_manager=session_manager,
             channel=mock_channel,
             adapter_map={},
-            store=MagicMock(),
+            store=_mock_store(),
         )
         s = _session()
         session_manager.register(s)
@@ -495,7 +506,7 @@ class TestPlanResponse:
             session_manager=session_manager,
             channel=mock_channel,
             adapter_map={},
-            store=MagicMock(),
+            store=_mock_store(),
             chat_mode_handler=chat_handler,
         )
         s = _session()
@@ -516,7 +527,7 @@ class TestPlanResponse:
             session_manager=session_manager,
             channel=mock_channel,
             adapter_map={},
-            store=MagicMock(),
+            store=_mock_store(),
         )
         s = _session()
         session_manager.register(s)
@@ -608,7 +619,7 @@ class TestSpamPrevention:
             session_manager=session_manager,
             channel=mock_channel,
             adapter_map={s.session_id: mock_adapter},
-            store=MagicMock(),
+            store=_mock_store(),
         )
 
         # Dispatch 3 events
@@ -627,6 +638,232 @@ class TestSpamPrevention:
         assert s.session_id not in router._session_dispatch_counts
 
     @pytest.mark.asyncio
+    async def test_dispatch_creates_conversation_binding(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+    ) -> None:
+        """Dispatching a prompt binds the channel thread to the session."""
+        from atlasbridge.core.conversation.session_binding import (
+            ConversationRegistry,
+            ConversationState,
+        )
+
+        registry = ConversationRegistry()
+        s = _session()
+        session_manager.register(s)
+
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},
+            store=_mock_store(),
+            conversation_registry=registry,
+        )
+
+        event = _event(s.session_id)
+        await router.route_event(event)
+
+        # The binding should exist for the allowed identity's thread
+        binding = registry.get_binding("telegram", "12345")
+        assert binding is not None
+        assert binding.session_id == s.session_id
+        assert binding.state == ConversationState.AWAITING_INPUT
+
+    @pytest.mark.asyncio
+    async def test_dispatch_binding_allows_gate_pass(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+        mock_adapter: AsyncMock,
+    ) -> None:
+        """A free-text reply passes the gate after dispatch creates the binding."""
+        from atlasbridge.core.conversation.session_binding import ConversationRegistry
+
+        registry = ConversationRegistry()
+        s = _session()
+        session_manager.register(s)
+
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={s.session_id: mock_adapter},
+            store=_mock_store(),
+            conversation_registry=registry,
+        )
+
+        event = _event(s.session_id)
+        await router.route_event(event)
+
+        # Free-text reply (like typing "yes" in Telegram)
+        from datetime import datetime
+
+        reply = Reply(
+            prompt_id="",
+            session_id="",
+            value="y",
+            nonce="test-nonce",
+            channel_identity="telegram:12345",
+            timestamp=datetime.now(UTC).isoformat(),
+            thread_id="12345",
+        )
+        await router.handle_reply(reply)
+
+        # Should have been injected (gate passed, resolved to active prompt)
+        mock_adapter.inject_reply.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_gate_overrides_stale_binding_with_session_status(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+        mock_adapter: AsyncMock,
+    ) -> None:
+        """Session status AWAITING_REPLY overrides a stale RUNNING binding state.
+
+        This simulates the scenario where OutputForwarder set the binding to
+        RUNNING before the prompt was detected, but the session has since
+        transitioned to AWAITING_REPLY.  The gate must still accept the reply.
+        """
+        from atlasbridge.core.conversation.session_binding import (
+            ConversationRegistry,
+            ConversationState,
+        )
+
+        registry = ConversationRegistry()
+        s = _session()
+        session_manager.register(s)
+
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={s.session_id: mock_adapter},
+            store=_mock_store(),
+            conversation_registry=registry,
+        )
+
+        # Dispatch prompt → creates binding with AWAITING_INPUT
+        event = _event(s.session_id)
+        await router.route_event(event)
+
+        # Simulate OutputForwarder overwriting the state to RUNNING
+        # (this is the bug scenario — forwarder sets stale state)
+        registry.update_state("telegram", "12345", ConversationState.RUNNING)
+
+        binding = registry.get_binding("telegram", "12345")
+        assert binding is not None
+        assert binding.state == ConversationState.RUNNING  # stale state
+
+        # Reply should still pass the gate because session status is AWAITING_REPLY
+        from datetime import datetime
+
+        reply = Reply(
+            prompt_id="",
+            session_id="",
+            value="y",
+            nonce="test-nonce",
+            channel_identity="telegram:12345",
+            timestamp=datetime.now(UTC).isoformat(),
+            thread_id="12345",
+        )
+        await router.handle_reply(reply)
+
+        # Gate used session status as authority → injection succeeded
+        mock_adapter.inject_reply.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_gate_accepts_natural_text_yes_for_numbered_choice(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+        mock_adapter: AsyncMock,
+    ) -> None:
+        """Free-text 'yes' passes gate and reaches injection for normalizer."""
+        from atlasbridge.core.conversation.session_binding import ConversationRegistry
+
+        registry = ConversationRegistry()
+        s = _session()
+        session_manager.register(s)
+
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={s.session_id: mock_adapter},
+            store=_mock_store(),
+            conversation_registry=registry,
+        )
+
+        event = _event(s.session_id)
+        await router.route_event(event)
+
+        from datetime import datetime
+
+        reply = Reply(
+            prompt_id="",
+            session_id="",
+            value="yes",
+            nonce="test-nonce",
+            channel_identity="telegram:12345",
+            timestamp=datetime.now(UTC).isoformat(),
+            thread_id="12345",
+        )
+        await router.handle_reply(reply)
+
+        # Natural text 'yes' passed the gate and was injected
+        mock_adapter.inject_reply.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_gate_accepts_with_active_prompt_id(
+        self,
+        session_manager: SessionManager,
+        mock_channel: AsyncMock,
+        mock_adapter: AsyncMock,
+    ) -> None:
+        """Gate accepts reply when session.active_prompt_id is set,
+        even if binding state is stale STREAMING."""
+        from atlasbridge.core.conversation.session_binding import (
+            ConversationRegistry,
+            ConversationState,
+        )
+
+        registry = ConversationRegistry()
+        s = _session()
+        session_manager.register(s)
+
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={s.session_id: mock_adapter},
+            store=_mock_store(),
+            conversation_registry=registry,
+        )
+
+        event = _event(s.session_id)
+        await router.route_event(event)
+
+        # Simulate stale STREAMING state on binding
+        registry.update_state("telegram", "12345", ConversationState.STREAMING)
+        binding = registry.get_binding("telegram", "12345")
+        assert binding is not None
+        assert binding.state == ConversationState.STREAMING
+
+        from datetime import datetime
+
+        reply = Reply(
+            prompt_id="",
+            session_id="",
+            value="allow",
+            nonce="test-nonce",
+            channel_identity="telegram:12345",
+            timestamp=datetime.now(UTC).isoformat(),
+            thread_id="12345",
+        )
+        await router.handle_reply(reply)
+
+        # active_prompt_id on session overrides stale STREAMING → injection succeeded
+        mock_adapter.inject_reply.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_dedup_allows_after_resolution(
         self,
         session_manager: SessionManager,
@@ -641,7 +878,7 @@ class TestSpamPrevention:
             session_manager=session_manager,
             channel=mock_channel,
             adapter_map={s.session_id: mock_adapter},
-            store=MagicMock(),
+            store=_mock_store(),
         )
 
         # First event

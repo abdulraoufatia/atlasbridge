@@ -41,7 +41,7 @@ class DoctorScreen(Screen):
         self.call_after_refresh(self._run_checks)
 
     def _run_checks(self) -> None:
-        from atlasbridge.tui.services import DoctorService
+        from atlasbridge.ui.services import DoctorService
 
         checks = DoctorService.run_checks()
         lines = []

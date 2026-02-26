@@ -161,7 +161,8 @@ class TestAwaitingInputPath:
         assert decision.action == "reject"
         assert decision.reason_code == GateRejectReason.REJECT_UNSAFE_INPUT_TYPE
 
-    def test_invalid_choice_rejected(self):
+    def test_free_text_choice_accepted_for_normalizer(self):
+        """Gate accepts free-text replies; normalizer handles choice mapping."""
         decision = evaluate_gate(
             _ctx(
                 interaction_class=InteractionClass.NUMBERED_CHOICE,
@@ -170,8 +171,9 @@ class TestAwaitingInputPath:
                 message_hash=_hash("5"),
             )
         )
-        assert decision.action == "reject"
-        assert decision.reason_code == GateRejectReason.REJECT_INVALID_CHOICE
+        # Gate no longer validates choices — the normalizer maps
+        # natural language replies to option numbers post-gate.
+        assert decision.action == "accept"
 
     def test_valid_choice_accepted(self):
         decision = evaluate_gate(
@@ -195,6 +197,32 @@ class TestAwaitingInputPath:
         )
         assert decision.action == "accept"
         assert decision.injection_payload == "my commit message"
+
+    def test_natural_text_yes_accepted_for_numbered_choice(self):
+        """Natural language 'yes' passes gate for normalizer to handle."""
+        decision = evaluate_gate(
+            _ctx(
+                interaction_class=InteractionClass.NUMBERED_CHOICE,
+                valid_choices=("1", "2"),
+                message_body="yes",
+                message_hash=_hash("yes"),
+            )
+        )
+        assert decision.action == "accept"
+        assert decision.injection_payload == "yes"
+
+    def test_natural_text_allow_accepted_for_numbered_choice(self):
+        """Natural language 'allow' passes gate for normalizer to handle."""
+        decision = evaluate_gate(
+            _ctx(
+                interaction_class=InteractionClass.NUMBERED_CHOICE,
+                valid_choices=("1", "2"),
+                message_body="allow",
+                message_hash=_hash("allow"),
+            )
+        )
+        assert decision.action == "accept"
+        assert decision.injection_payload == "allow"
 
     def test_confirm_enter_accepted(self):
         decision = evaluate_gate(

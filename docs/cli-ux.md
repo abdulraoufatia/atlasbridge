@@ -72,7 +72,7 @@ atlasbridge ui     # explicit TUI launch
 
 ```
 AtlasBridge
-Human-in-the-loop control plane for AI developer agents
+Autonomous runtime for AI developer agents with human oversight
 
 You're not set up yet. Let's fix that.
 
@@ -95,7 +95,7 @@ Setup takes ~2 minutes:
 
 ```
 AtlasBridge
-Human-in-the-loop control plane for AI developer agents
+Autonomous runtime for AI developer agents with human oversight
 
 AtlasBridge is ready.
 

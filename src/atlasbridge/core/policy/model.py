@@ -44,6 +44,7 @@ class PromptTypeFilter(str, Enum):
     CONFIRM_ENTER = "confirm_enter"
     MULTIPLE_CHOICE = "multiple_choice"
     FREE_TEXT = "free_text"
+    TOOL_USE = "tool_use"
     ANY = "*"
 
 
@@ -207,6 +208,9 @@ class MatchCriteria(BaseModel):
     prompt_type: list[PromptTypeFilter] | None = None
     """List of prompt types that trigger this rule. Omit = match any type."""
 
+    tool_name: str | None = None
+    """Match on the tool being invoked (chat mode only). Supports regex if contains_is_regex=true."""
+
     contains: str | None = None
     """Substring or regex pattern to match against the prompt excerpt."""
 
@@ -357,6 +361,9 @@ class PolicyDecision:
         "prompt_type",
         "autonomy_mode",
         "timestamp",
+        "risk_score",
+        "risk_category",
+        "risk_factors",
     )
 
     def __init__(
@@ -371,6 +378,9 @@ class PolicyDecision:
         confidence: str,
         prompt_type: str,
         autonomy_mode: str,
+        risk_score: int | None = None,
+        risk_category: str | None = None,
+        risk_factors: list[dict[str, Any]] | None = None,
     ) -> None:
         self.prompt_id = prompt_id
         self.session_id = session_id
@@ -384,13 +394,16 @@ class PolicyDecision:
         self.prompt_type = prompt_type
         self.autonomy_mode = autonomy_mode
         self.timestamp = datetime.now(UTC).isoformat()
+        self.risk_score = risk_score
+        self.risk_category = risk_category
+        self.risk_factors = risk_factors or []
 
         # Idempotency key: SHA-256(policy_hash + prompt_id + session_id)[:16]
         raw = f"{policy_hash}:{prompt_id}:{session_id}"
         self.idempotency_key = hashlib.sha256(raw.encode()).hexdigest()[:16]
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        d: dict[str, Any] = {
             "timestamp": self.timestamp,
             "idempotency_key": self.idempotency_key,
             "prompt_id": self.prompt_id,
@@ -404,6 +417,11 @@ class PolicyDecision:
             "autonomy_mode": self.autonomy_mode,
             "explanation": self.explanation,
         }
+        if self.risk_score is not None:
+            d["risk_score"] = self.risk_score
+            d["risk_category"] = self.risk_category
+            d["risk_factors"] = self.risk_factors
+        return d
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), ensure_ascii=False)

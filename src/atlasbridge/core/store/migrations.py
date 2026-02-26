@@ -13,7 +13,7 @@ Migration contract:
 
 Version history:
   0 → 1: Initial schema (sessions, prompts, replies, audit_events with timestamp cols)
-  1 → 2: (reserved for future use)
+  1 → 2: Delivery tracking (prompt_deliveries table for idempotent channel sends)
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ import structlog
 logger = structlog.get_logger()
 
 # Bump this when adding a new migration.
-LATEST_SCHEMA_VERSION = 1
+LATEST_SCHEMA_VERSION = 2
 
 
 # ---------------------------------------------------------------------------
@@ -144,8 +144,30 @@ def _migrate_0_to_1(conn: sqlite3.Connection) -> None:
 # Migration registry (version_from → callable)
 # ---------------------------------------------------------------------------
 
+
+def _migrate_1_to_2(conn: sqlite3.Connection) -> None:
+    """Version 1 → 2: add prompt_deliveries table for idempotent channel sends."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS prompt_deliveries (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            prompt_id        TEXT NOT NULL,
+            session_id       TEXT NOT NULL,
+            channel          TEXT NOT NULL,
+            channel_identity TEXT NOT NULL,
+            message_id       TEXT NOT NULL DEFAULT '',
+            delivered_at     TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(prompt_id, channel, channel_identity)
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_deliveries_prompt
+            ON prompt_deliveries(prompt_id)
+    """)
+
+
 _MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     0: _migrate_0_to_1,
+    1: _migrate_1_to_2,
 }
 
 

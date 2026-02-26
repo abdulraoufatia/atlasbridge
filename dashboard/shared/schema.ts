@@ -157,6 +157,13 @@ export interface SettingsData {
   featureFlags: Record<string, boolean>;
 }
 
+export interface VersionInfo {
+  current: string;
+  latest: string | null;
+  updateAvailable: boolean;
+  upgradeCommand: string;
+}
+
 // --- Dashboard settings tables (read-write, dashboard.db) ---
 
 export const users = sqliteTable("users", {

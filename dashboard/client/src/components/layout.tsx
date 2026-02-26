@@ -1,12 +1,15 @@
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "./theme-provider";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard, MonitorDot, MessageSquare, GitBranch,
-  ShieldCheck, FileText, Settings, Sun, Moon, Menu, X, Plug, Terminal, FileCheck
+  ShieldCheck, FileText, Settings, Sun, Moon, Menu, X, Plug, Terminal, FileCheck,
+  ArrowUpCircle
 } from "lucide-react";
 import { useState } from "react";
+import type { VersionInfo } from "@shared/schema";
 
 const navItems = [
   { path: "/", label: "Overview", icon: LayoutDashboard },
@@ -30,6 +33,36 @@ function HeaderBanner() {
       </span>
       <span className="hidden sm:inline text-[#A8B3BD]" aria-hidden="true">|</span>
       <span className="hidden sm:inline text-[#A8B3BD] italic">Cloud observes, local executes</span>
+    </div>
+  );
+}
+
+function UpdateBanner() {
+  const { data } = useQuery<VersionInfo>({
+    queryKey: ["/api/version"],
+    refetchInterval: 3600000, // 1 hour
+  });
+  const [dismissed, setDismissed] = useState(false);
+
+  if (!data?.updateAvailable || dismissed) return null;
+
+  return (
+    <div
+      className="bg-amber-500/10 border-b border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs font-mono flex items-center justify-center gap-4 py-1.5 px-4"
+      data-testid="update-banner"
+    >
+      <ArrowUpCircle className="w-3.5 h-3.5 shrink-0" />
+      <span>Update available: {data.current} &rarr; {data.latest}</span>
+      <code className="bg-amber-500/10 px-2 py-0.5 rounded text-[11px]">
+        {data.upgradeCommand}
+      </code>
+      <button
+        onClick={() => setDismissed(true)}
+        className="ml-2 opacity-60 hover:opacity-100 transition-opacity"
+        aria-label="Dismiss update notification"
+      >
+        <X className="w-3 h-3" />
+      </button>
     </div>
   );
 }
@@ -131,6 +164,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <HeaderBanner />
+      <UpdateBanner />
       <TopNav />
       <main className="flex-1 overflow-auto">
         <div className="w-full px-4 sm:px-6 lg:px-8 py-6">

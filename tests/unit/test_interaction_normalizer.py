@@ -8,6 +8,7 @@ from atlasbridge.core.interaction.normalizer import (
     NO_SYNONYMS,
     YES_SYNONYMS,
     BinaryMenu,
+    build_binary_menu_from_choices,
     detect_binary_menu,
     normalize_reply,
 )
@@ -232,3 +233,61 @@ class TestSynonymSets:
         assert "y" in YES_SYNONYMS
         assert "no" in NO_SYNONYMS
         assert "n" in NO_SYNONYMS
+
+    def test_colloquial_synonyms_present(self):
+        assert "yeah" in YES_SYNONYMS
+        assert "yep" in YES_SYNONYMS
+        assert "sure" in YES_SYNONYMS
+        assert "yea" in YES_SYNONYMS
+        assert "nah" in NO_SYNONYMS
+        assert "nope" in NO_SYNONYMS
+
+
+class TestBuildBinaryMenuFromChoices:
+    """Build a BinaryMenu from parsed event.choices when excerpt is truncated."""
+
+    def test_trust_folder_choices(self):
+        menu = build_binary_menu_from_choices(["Yes, I trust this folder", "No, exit"])
+        assert menu is not None
+        assert menu.yes_option == "1"
+        assert menu.no_option == "2"
+
+    def test_trust_dont_trust(self):
+        menu = build_binary_menu_from_choices(["Trust this folder", "Don't Trust"])
+        assert menu is not None
+        assert menu.yes_option == "1"
+        assert menu.no_option == "2"
+
+    def test_reversed_deny_allow(self):
+        menu = build_binary_menu_from_choices(["Deny", "Allow"])
+        assert menu is not None
+        assert menu.yes_option == "2"
+        assert menu.no_option == "1"
+
+    def test_three_options_returns_none(self):
+        assert build_binary_menu_from_choices(["A", "B", "C"]) is None
+
+    def test_empty_returns_none(self):
+        assert build_binary_menu_from_choices([]) is None
+
+    def test_single_option_returns_none(self):
+        assert build_binary_menu_from_choices(["Yes"]) is None
+
+    def test_non_semantic_returns_none(self):
+        assert build_binary_menu_from_choices(["Option A", "Option B"]) is None
+
+    def test_labels_preserved(self):
+        menu = build_binary_menu_from_choices(["Accept changes", "Reject changes"])
+        assert menu is not None
+        assert menu.yes_label == "Accept changes"
+        assert menu.no_label == "Reject changes"
+
+    def test_normalize_yeah_maps_to_yes_option(self):
+        menu = build_binary_menu_from_choices(["Yes, I trust this folder", "No, exit"])
+        assert menu is not None
+        assert normalize_reply(menu, "yeah") == "1"
+
+    def test_normalize_nope_maps_to_no_option(self):
+        menu = build_binary_menu_from_choices(["Yes, I trust this folder", "No, exit"])
+        assert menu is not None
+        assert normalize_reply(menu, "nope") == "2"

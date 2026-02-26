@@ -27,6 +27,10 @@ YES_SYNONYMS: frozenset[str] = frozenset(
         "continue",
         "accept",
         "confirm",
+        "yeah",
+        "yep",
+        "sure",
+        "yea",
     }
 )
 
@@ -41,6 +45,8 @@ NO_SYNONYMS: frozenset[str] = frozenset(
         "reject",
         "quit",
         "stop",
+        "nah",
+        "nope",
     }
 )
 
@@ -125,6 +131,33 @@ def normalize_reply(menu: BinaryMenu, reply: str) -> str | None:
         return menu.yes_option
     if stripped in NO_SYNONYMS:
         return menu.no_option
+
+    return None
+
+
+def build_binary_menu_from_choices(choices: list[str]) -> BinaryMenu | None:
+    """Build a BinaryMenu from a parsed choices list (e.g. event.choices).
+
+    Handles the case where detect_binary_menu() fails due to excerpt truncation
+    but the prompt detector already parsed the options into event.choices.
+    """
+    if len(choices) != 2:
+        return None
+
+    lower_0 = choices[0].lower()
+    lower_1 = choices[1].lower()
+
+    yes_keywords = {"yes", "allow", "approve", "trust", "accept", "confirm", "continue"}
+    no_keywords = {"no", "deny", "reject", "cancel", "abort", "exit", "quit", "stop"}
+
+    if any(kw in lower_0 for kw in yes_keywords):
+        return BinaryMenu(yes_option="1", no_option="2", yes_label=choices[0], no_label=choices[1])
+    if any(kw in lower_1 for kw in yes_keywords):
+        return BinaryMenu(yes_option="2", no_option="1", yes_label=choices[1], no_label=choices[0])
+    if any(kw in lower_0 for kw in no_keywords):
+        return BinaryMenu(yes_option="2", no_option="1", yes_label=choices[1], no_label=choices[0])
+    if any(kw in lower_1 for kw in no_keywords):
+        return BinaryMenu(yes_option="1", no_option="2", yes_label=choices[0], no_label=choices[1])
 
     return None
 

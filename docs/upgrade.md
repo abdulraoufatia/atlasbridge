@@ -1,5 +1,15 @@
 # Upgrading AtlasBridge
 
+## Checking for Updates
+
+AtlasBridge automatically checks for new versions and notifies you across all interfaces:
+
+- **CLI** — run `atlasbridge version` to see if an update is available
+- **Dashboard** — an amber banner appears at the top of the page when a newer version exists
+- **Console** — the status line shows an update notice
+
+Version checks are cached locally for 24 hours and never block normal operation. No data is sent to PyPI beyond a standard package metadata request.
+
 ## Quick Upgrade
 
 ```bash

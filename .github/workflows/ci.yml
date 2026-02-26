@@ -88,14 +88,14 @@ jobs:
       - name: atlasbridge autopilot --help
         run: atlasbridge autopilot --help
 
-      - name: atlasbridge edition --help
-        run: atlasbridge edition --help
-
-      - name: atlasbridge features --help
-        run: atlasbridge features --help
-
       - name: atlasbridge cloud --help
         run: atlasbridge cloud --help
+
+      - name: atlasbridge cloud edition --help
+        run: atlasbridge cloud edition --help
+
+      - name: atlasbridge cloud features --help
+        run: atlasbridge cloud features --help
 
       - name: atlasbridge lab --help
         run: atlasbridge lab --help
@@ -103,20 +103,29 @@ jobs:
       - name: atlasbridge db --help
         run: atlasbridge db --help
 
-      - name: atlasbridge adapters --help
-        run: atlasbridge adapters --help
+      - name: atlasbridge audit --help
+        run: atlasbridge audit --help
 
-      - name: atlasbridge pause --help
-        run: atlasbridge pause --help
+      - name: atlasbridge audit export --help
+        run: atlasbridge audit export --help
 
-      - name: atlasbridge resume --help
-        run: atlasbridge resume --help
+      - name: atlasbridge replay --help
+        run: atlasbridge replay --help
+
+      - name: atlasbridge risk --help
+        run: atlasbridge risk --help
+
+      - name: atlasbridge dashboard --help
+        run: atlasbridge dashboard --help
 
       - name: atlasbridge console --help
         run: atlasbridge console --help
 
       - name: atlasbridge profile --help
         run: atlasbridge profile --help
+
+      - name: atlasbridge chat --help
+        run: atlasbridge chat --help
 
   lint:
     name: Lint & Type Check
@@ -176,7 +185,7 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Run tests with coverage
-        timeout-minutes: 10
+        timeout-minutes: 15
         run: |
           pytest --cov=atlasbridge --cov-report=xml --cov-report=term-missing -v
 

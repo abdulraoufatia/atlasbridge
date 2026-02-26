@@ -45,7 +45,7 @@ class SlackMultipleChoiceScenario(LabScenario):
         elements = actions["elements"]
         assert len(elements) == 3
         labels = [e["text"]["text"] for e in elements]
-        assert labels == ["1. Fast", "2. Balanced", "3. Thorough"]
+        assert labels == ["Fast", "Balanced", "Thorough"]
         values = [e["value"] for e in elements]
         assert values[0].endswith(":1")
         assert values[1].endswith(":2")

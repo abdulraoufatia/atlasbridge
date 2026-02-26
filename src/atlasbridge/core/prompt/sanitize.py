@@ -35,8 +35,9 @@ _ANSI_RE = re.compile(
 # ---------------------------------------------------------------------------
 
 # Numbered choices: "1) Fast", "2. Balanced", "3: Thorough"
+# Also handles Unicode bullets/arrows before digits: "❯ 1. Yes, I trust this folder"
 _NUMBERED_CHOICE_RE = re.compile(
-    r"^\s*(\d+)\s*[).\]:]\s+(.+?)$",
+    r"^\s*\S?\s*(\d+)\s*[).\]:]\s+(.+?)$",
     re.MULTILINE,
 )
 
@@ -86,6 +87,66 @@ def sanitize_terminal_output(text: str) -> str:
         rebuilt.append(line)
     joined = "\n".join(rebuilt)
     return strip_ansi(joined)
+
+
+# ---------------------------------------------------------------------------
+# Terminal hint phrases (keyboard shortcuts, IDE references, navigation)
+# ---------------------------------------------------------------------------
+# These are terminal-only UI hints that are meaningless on mobile (Telegram/Slack).
+# Used by strip_terminal_hints() to clean output before channel delivery.
+_TERMINAL_HINT_PHRASES: tuple[str, ...] = (
+    # Confirmation / navigation
+    "enter to confirm",
+    "press enter",
+    "esc to cancel",
+    "escape to cancel",
+    "use the arrow keys",
+    "use arrow keys",
+    "use ↑/↓",
+    "↑ ↓ to navigate",
+    "↑/↓",
+    # Tab / space
+    "tab to cycle",
+    "shift+tab",
+    "space to select",
+    "space to toggle",
+    # Ctrl shortcuts
+    "ctrl+g",
+    "ctrl+c to cancel",
+    "ctrl+d to submit",
+    "ctrl+a to select",
+    # IDE / editor references
+    "vs code",
+    "vscode",
+    "open in editor",
+    "edit in vs",
+    # Vim-style
+    "use j/k",
+    "press q to quit",
+    # Filter / search
+    "type to filter",
+    "type to search",
+)
+
+
+def strip_terminal_hints(text: str) -> str:
+    """Remove terminal-only UI hints from text for phone-first rendering.
+
+    Strips entire lines that contain terminal-specific hints (keyboard shortcuts,
+    editor references, navigation instructions) that are meaningless on mobile.
+    Preserves all other content including blank lines for readability.
+    """
+    lines: list[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            lines.append(line)
+            continue
+        lower = stripped.lower()
+        if any(phrase in lower for phrase in _TERMINAL_HINT_PHRASES):
+            continue
+        lines.append(line)
+    return "\n".join(lines)
 
 
 def extract_choices(text: str) -> list[str]:

@@ -18,6 +18,164 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.0] — 2026-02-26
+
+### Removed
+- **Legacy `tui/` module** — consolidated all state and services into `ui/`
+- **CLI aliases** — removed `adapters`, `pause`, `resume` top-level commands; nested `edition`/`features` under `cloud`
+
+### Added
+- **Doctor LLM provider check** — validates API key and model access with minimal 1-token call
+- **Keyring-first API key storage** — setup defaults to OS keyring when available, `--no-keyring` to opt out
+- **Doctor plaintext token warning** — warns when plaintext tokens found in config and keyring is available
+- **Audit export command** — `audit export` with `--format jsonl|json|csv`, `--session`, `--since`, `--until` for SIEM ingestion
+- **Environment tagging** — `RuntimeConfig.environment` (dev/staging/production), `ATLASBRIDGE_ENVIRONMENT` env var, policy match criteria, status + dashboard display
+
+---
+
+## [1.4.1] — 2026-02-26
+
+### Changed
+- Flatten `assets/` directory structure and remove unused placeholder files (#348)
+
+---
+
+## [1.4.0] — 2026-02-26
+
+### Added
+- **Direct LLM chat mode** — new `atlasbridge chat` command lets users talk to LLMs directly via Telegram/Slack, with the policy engine governing tool use (#347)
+- **Provider framework** — `BaseProvider` ABC + `ProviderRegistry` with httpx-only implementations for Anthropic (Claude), OpenAI (GPT-4o), and Google (Gemini) — no SDK dependencies
+- **Built-in tool system** — 5 policy-governed tools: `read_file`, `list_directory`, `search_files` (safe), `write_file` (moderate), `run_command` (dangerous)
+- **ChatEngine** — conversation loop with streaming, tool call handling, and edit-in-place Telegram UX
+- **Policy integration for tool use** — `TOOL_USE` prompt type and `tool_name` match criteria enable targeted tool governance through existing policy evaluator
+- **LLM provider setup** — `atlasbridge setup` wizard now includes provider selection step (pick LLM, enter API key, choose model)
+- **Config support** — `ProviderConfig`, `ChatConfig` in `AtlasBridgeConfig`; env var overrides: `ATLASBRIDGE_LLM_PROVIDER`, `ATLASBRIDGE_LLM_API_KEY`, `ATLASBRIDGE_LLM_MODEL`
+
+---
+
+## [1.3.2] — 2026-02-26
+
+### Fixed
+- **Trust prompt misclassified as FREE_TEXT** — Claude Code's folder trust prompt (with Unicode bullet `❯` before numbered items) was detected as FREE_TEXT with medium confidence instead of MULTIPLE_CHOICE with high confidence, causing reply injection to fail (#345)
+- **Choice extraction failed on Unicode bullets** — `extract_choices()` regex now handles `❯ 1. Yes, I trust this folder` style lines (#345)
+- **Trust pattern gap too narrow** — widened `trust…folder` regex gap from 80 to 200 chars to match Claude Code's verbose safety message (#345)
+
+---
+
+## [1.3.1] — 2026-02-26
+
+### Fixed
+- **"Agent is busy" on valid replies** — gate now uses `session.active_prompt_id` as definitive `AWAITING_INPUT` signal, overriding stale conversation binding state from OutputForwarder races (#344)
+- **Natural text replies rejected** — gate no longer validates choices; normalizer maps "yes", "allow", "trust" etc. to option numbers post-gate (#344)
+
+### Changed
+- **Phone-first prompt UX** — Telegram/Slack prompts now say "Tap a button or reply yes / no" instead of "Reply 1 or 2"; button labels show choice text without numbered prefixes (#344)
+- 4 new tests (2431 total)
+
+---
+
+## [1.3.0] — 2026-02-25
+
+### Added
+- **Automatic update check** — AtlasBridge now checks PyPI for newer versions with a 24h file-based cache. Notifications appear across all interfaces (#343):
+  - CLI: `atlasbridge version` shows "Update available: X.Y.Z → A.B.C"
+  - Dashboard: dismissable amber banner between header and nav
+  - Console: update notice in the operator status line
+- New `/api/version` endpoint in the React dashboard
+- `VersionInfo` schema type for dashboard frontend
+- 14 new tests for version checker (2427 total)
+
+### Fixed
+- **Dashboard hardcoded version** — `atlasbridge-repo.ts` returned "1.1.4" instead of the actual installed version. Now reads dynamically from the Python package (#343)
+
+### Changed
+- `AppState` extended with `update_available` and `latest_version` fields
+- `poll_state()` includes version check on each poll cycle (cached, effectively free)
+- Updated `docs/upgrade.md` with "Checking for Updates" section
+- Updated `README.md` with "Update" section
+
+---
+
+## [1.2.1] — 2026-02-25
+
+### Fixed
+- **FOLDER_TRUST normalization** — ML-classified FOLDER_TRUST interactions now correctly normalize "yes" → "1" and "no" → "2", matching NUMBERED_CHOICE behavior. Previously, the normalization guard only checked for NUMBERED_CHOICE, so FOLDER_TRUST replies were injected raw (#342)
+- **Dashboard static path** — fixed `static.ts` dist path resolution to correctly find built assets (#342)
+- **Old repo name reference** — removed stale `atlasbridge-cli` reference in automation docs (#342)
+- **Favicon** — replaced Replit favicon with AtlasBridge brand favicon (#342)
+
+### Added
+- 2 new tests for FOLDER_TRUST normalization with mocked fuser (2413 total)
+
+---
+
+## [1.2.0] — 2026-02-25
+
+### Fixed
+- **Trust prompt reply semantics** — "yes" now correctly maps to option "1" for numbered-choice prompts (e.g. Claude Code folder trust). Root cause: Telegram channel alias normalization destroyed semantic information before the interaction normalizer could map it (#341)
+- **Choices fallback for truncated excerpts** — when `detect_binary_menu()` fails due to 200-char excerpt truncation, `build_binary_menu_from_choices()` uses the parsed `event.choices` list as fallback (#341)
+- **Reply alias layer removed from Telegram channel** — normalization now handled exclusively in the interaction layer where prompt context is available (#341)
+
+### Added
+- Expanded synonym sets: "yeah", "yep", "sure", "yea" (yes); "nah", "nope" (no)
+- Colloquial forms added to `_NORMALISE[TYPE_YES_NO]` in ClaudeCodeAdapter
+- 16 new tests (2411 total)
+
+---
+
+## [1.1.9] — 2026-02-25
+
+### Changed
+- Version bump release
+
+---
+
+## [1.1.8] — 2026-02-25
+
+### Fixed
+- **"Agent is busy" on valid Telegram replies** — OutputForwarder no longer overwrites `AWAITING_INPUT` state to `STREAMING`/`RUNNING`, so user replies are accepted immediately instead of being rejected as "Agent is busy" (#336, #340)
+- **Gate session status authority** — gate evaluation now uses session status `AWAITING_REPLY` as authoritative source, overriding stale conversation binding state (#340)
+- 5 new tests (2393 total)
+
+---
+
+## [1.1.7] — 2026-02-25
+
+### Fixed
+- **"No active session" on Telegram reply** — conversation binding now created at dispatch time so the gate resolves the session on the very first reply to any prompt (#336, #339)
+- **Telegram polling conflict** — `atlasbridge run` now auto-stops any existing standalone daemon to prevent two processes competing for the Telegram long-poll (#339)
+- 7 new tests (2388 total)
+
+---
+
+## [1.1.6] — 2026-02-25
+
+### Added
+- **GA core runtime features** — deterministic risk classification, policy explain with `autopilot explain --explain`, and session replay engine with `atlasbridge replay` (#268, #270, #272, #337)
+- **Prompt delivery dedup** — `prompt_deliveries` table (schema v2) with `UNIQUE(prompt_id, channel, channel_identity)` constraint; prompts survive daemon restarts without re-sending (#336, #338)
+- **Callback ref store** — server-side reference store for callback_data exceeding Telegram's 64-byte limit; short `ref:{key}:{value}` format with 10-minute TTL cleanup (#336)
+- **Terminal hint stripping** — centralized `strip_terminal_hints()` with 28 phrases (ctrl shortcuts, arrow keys, VS Code references, vim hints) for phone-first UX (#336)
+- **Reply alias normalization** — `yes/yeah/yep → y`, `no/nah/nope → n` for natural-language Telegram replies (#336)
+- **Reply acknowledgements** — visible toast on button tap and channel notification after successful injection (#336)
+- **Rate-limit collapse message** — sends user-visible "Rate limit" message instead of silently dropping (#336)
+- **Documentation** — GA boundary scope (`ga-boundary.md`), product thesis (`product-thesis.md`), 12-month roadmap (`roadmap-12month.md`)
+- 44 new tests (2391 total)
+
+### Fixed
+- **Telegram callback_data overflow** — compound key (84+ bytes) silently broke inline keyboard buttons; now always fits within 64-byte limit (#336)
+- **mypy errors** in `explain.py` and replay engine (#337)
+
+---
+
+## [1.1.5] — 2026-02-25
+
+### Fixed
+- **Claude trust prompt relay** — workspace trust prompts forwarded to Telegram are now phone-first and workspace-centric instead of terminal/folder-centric (#316, #333)
+- **Free-text reply binding** — `yes`/`no`/`1`/`2` replies from Telegram are now bound to the active prompt before gate evaluation, eliminating spurious "No active session" errors (#333)
+- **Terminal hint stripping** — strips 7 terminal-only hints from relayed questions while preserving deterministic mapping to injected values (#333)
+
+---
+
 ## [1.1.4] — 2026-02-24
 
 ### Added
@@ -629,7 +787,22 @@ AtlasBridge v1.0.0 is the first stable release. All 8 contract surfaces are froz
 
 ---
 
-[Unreleased]: https://github.com/abdulraoufatia/atlasbridge/compare/v0.9.6...HEAD
+[Unreleased]: https://github.com/abdulraoufatia/atlasbridge/compare/v1.1.6...HEAD
+[1.1.7]: https://github.com/abdulraoufatia/atlasbridge/compare/v1.1.6...v1.1.7
+[1.1.6]: https://github.com/abdulraoufatia/atlasbridge/compare/v1.1.5...v1.1.6
+[1.1.5]: https://github.com/abdulraoufatia/atlasbridge/compare/v1.1.4...v1.1.5
+[1.1.4]: https://github.com/abdulraoufatia/atlasbridge/compare/v1.1.3...v1.1.4
+[1.1.3]: https://github.com/abdulraoufatia/atlasbridge/compare/v1.1.2...v1.1.3
+[1.1.2]: https://github.com/abdulraoufatia/atlasbridge/compare/v1.1.1...v1.1.2
+[1.1.1]: https://github.com/abdulraoufatia/atlasbridge/compare/v1.1.0...v1.1.1
+[1.1.0]: https://github.com/abdulraoufatia/atlasbridge/compare/v1.0.1...v1.1.0
+[1.0.1]: https://github.com/abdulraoufatia/atlasbridge/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/abdulraoufatia/atlasbridge/compare/v0.10.1...v1.0.0
+[0.10.1]: https://github.com/abdulraoufatia/atlasbridge/compare/v0.10.0...v0.10.1
+[0.10.0]: https://github.com/abdulraoufatia/atlasbridge/compare/v0.9.9...v0.10.0
+[0.9.9]: https://github.com/abdulraoufatia/atlasbridge/compare/v0.9.8...v0.9.9
+[0.9.8]: https://github.com/abdulraoufatia/atlasbridge/compare/v0.9.7...v0.9.8
+[0.9.7]: https://github.com/abdulraoufatia/atlasbridge/compare/v0.9.6...v0.9.7
 [0.9.6]: https://github.com/abdulraoufatia/atlasbridge/compare/v0.9.5...v0.9.6
 [0.9.5]: https://github.com/abdulraoufatia/atlasbridge/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/abdulraoufatia/atlasbridge/compare/v0.9.3...v0.9.4

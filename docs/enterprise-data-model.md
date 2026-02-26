@@ -3,7 +3,7 @@
 # Enterprise Data Model
 
 **Maturity:** Design Document — No Implementation
-**Phase:** C (SaaS Dashboard)
+**Phase:** C (Enterprise Dashboard)
 **Trust model:** Cloud OBSERVES, local EXECUTES.
 **Database (design):** PostgreSQL 16+ with Row-Level Security
 

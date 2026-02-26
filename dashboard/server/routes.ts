@@ -101,6 +101,29 @@ export async function registerRoutes(
   });
 
   // -----------------------------------------------------------------------
+  // Version check endpoint
+  // -----------------------------------------------------------------------
+
+  app.get("/api/version", async (_req, res) => {
+    const current = repo.getSettings().version;
+    try {
+      const response = await fetch("https://pypi.org/pypi/atlasbridge/json", {
+        signal: AbortSignal.timeout(5000),
+      });
+      const data = await response.json() as { info: { version: string } };
+      const latest = data.info.version;
+      res.json({
+        current,
+        latest,
+        updateAvailable: latest !== current,
+        upgradeCommand: "pip install --upgrade atlasbridge",
+      });
+    } catch {
+      res.json({ current, latest: null, updateAvailable: false, upgradeCommand: "pip install --upgrade atlasbridge" });
+    }
+  });
+
+  // -----------------------------------------------------------------------
   // Operational endpoints — read from AtlasBridge DB via repo
   // -----------------------------------------------------------------------
 

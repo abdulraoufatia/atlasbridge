@@ -130,7 +130,7 @@ To disable all automation immediately: set the `DISABLE_PROJECT_AUTOMATION` repo
 ### Setup
 
 1. Create a Fine-Grained PAT at `github.com/settings/tokens`
-2. Grant scopes: `project: read/write`, `issues: read` for the `atlasbridge-cli` repository
+2. Grant scopes: `project: read/write`, `issues: read` for the `atlasbridge` repository
 3. Add as repository secret: Settings > Secrets and variables > Actions > `PROJECT_AUTOMATION_TOKEN`
 
 ---

@@ -209,13 +209,10 @@ def evaluate_gate(ctx: GateContext) -> GateDecision:
         if ctx.interaction_class == InteractionClass.PASSWORD_INPUT:
             return _reject(GateRejectReason.REJECT_UNSAFE_INPUT_TYPE)
 
-        # 4d. Input validation for multiple choice
-        if (
-            ctx.interaction_class == InteractionClass.NUMBERED_CHOICE
-            and ctx.valid_choices
-            and ctx.message_body.strip() not in ctx.valid_choices
-        ):
-            return _reject(GateRejectReason.REJECT_INVALID_CHOICE)
+        # 4d. Choice validation is handled post-gate by the interaction
+        # engine's normalizer, which maps natural language synonyms
+        # (yes, allow, trust, etc.) to the correct option number.
+        # The gate no longer rejects free-text replies here.
 
         # Accept
         return _accept(ctx.message_body)

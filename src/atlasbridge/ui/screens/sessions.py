@@ -43,7 +43,7 @@ class SessionsScreen(Screen):
         self.call_after_refresh(self._load_sessions)
 
     def _load_sessions(self) -> None:
-        from atlasbridge.tui.services import SessionService
+        from atlasbridge.ui.services import SessionService
 
         rows = SessionService.list_sessions()
         try:

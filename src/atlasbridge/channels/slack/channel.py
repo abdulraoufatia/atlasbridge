@@ -467,9 +467,9 @@ class SlackChannel(BaseChannel):
             Confidence.LOW: "low (ambiguous)",
         }
         response_instructions = {
-            PromptType.TYPE_YES_NO: "Tap *Yes* or *No* below.",
+            PromptType.TYPE_YES_NO: "Tap a button or reply *yes* / *no*.",
             PromptType.TYPE_CONFIRM_ENTER: "Tap *Send Enter* below to continue.",
-            PromptType.TYPE_MULTIPLE_CHOICE: "Tap a numbered option below.",
+            PromptType.TYPE_MULTIPLE_CHOICE: "Tap a button or reply *yes* / *no*.",
             PromptType.TYPE_FREE_TEXT: "Type your response and send it as a message.",
         }
         label = type_labels.get(event.prompt_type, event.prompt_type)
@@ -578,7 +578,7 @@ class SlackChannel(BaseChannel):
                     "type": "button",
                     "text": {
                         "type": "plain_text",
-                        "text": f"{i + 1}. {c[:40]}" if c else str(i + 1),
+                        "text": c[:40] if c else str(i + 1),
                     },
                     "value": f"{base}:{i + 1}",
                     "action_id": f"atlasbridge_choice_{i + 1}",

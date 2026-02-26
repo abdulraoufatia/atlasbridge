@@ -45,6 +45,18 @@ def version_cmd(as_json: bool, verbose: bool) -> None:
     # Resolve commit SHA from package metadata (populated by setuptools-scm if used)
     commit_sha = "n/a"
 
+    # Check for updates
+    update_available = False
+    latest_version = ""
+    try:
+        from atlasbridge.core.version_check import check_version
+
+        vs = check_version()
+        update_available = vs.update_available
+        latest_version = vs.latest or ""
+    except Exception:  # noqa: BLE001
+        pass
+
     if as_json:
         import json
 
@@ -59,6 +71,9 @@ def version_cmd(as_json: bool, verbose: bool) -> None:
             data["install_path"] = install_path
             data["config_path"] = config_path
             data["commit"] = commit_sha
+        if update_available:
+            data["update_available"] = True
+            data["latest_version"] = latest_version
         click.echo(json.dumps(data, indent=2))
     else:
         console.print(f"atlasbridge {__version__}")
@@ -72,3 +87,7 @@ def version_cmd(as_json: bool, verbose: bool) -> None:
         for flag, enabled in flags.items():
             status = "[green]enabled[/green]" if enabled else "[dim]disabled[/dim]"
             console.print(f"  {flag:<22} {status}")
+
+        if update_available:
+            console.print(f"\n[yellow]Update available:[/yellow] {__version__} → {latest_version}")
+            console.print("[dim]  pip install --upgrade atlasbridge[/dim]")

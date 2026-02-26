@@ -301,7 +301,7 @@ class SetupWizardScreen(Screen):
             self._show_error(err)
             return
         try:
-            from atlasbridge.tui.services import ConfigService
+            from atlasbridge.ui.services import ConfigService
 
             ConfigService.save(self._wizard.build_config_data())
             self._clear_error()

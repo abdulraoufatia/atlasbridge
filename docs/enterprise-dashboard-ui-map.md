@@ -3,7 +3,7 @@
 # Enterprise Dashboard — UI Screen Map
 
 **Maturity:** Design Document — No Implementation
-**Phase:** C (SaaS Dashboard)
+**Phase:** C (Enterprise Dashboard)
 **Trust model:** Cloud OBSERVES, local EXECUTES.
 **Canonical source:** enterprise-saas-architecture.md § Dashboard UI Screens
 

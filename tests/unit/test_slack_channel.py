@@ -203,7 +203,7 @@ class TestBuildBlocks:
         elements = actions["elements"]
         assert len(elements) == 3
         labels = [e["text"]["text"] for e in elements]
-        assert labels == ["1. alpha", "2. beta", "3. gamma"]
+        assert labels == ["alpha", "beta", "gamma"]
 
     def test_free_text_has_no_actions_block(self) -> None:
         blocks = SlackChannel._build_blocks(
@@ -261,7 +261,7 @@ class TestBuildBlocksResponseInstructions:
         blocks = SlackChannel._build_blocks(_make_event(PromptType.TYPE_YES_NO))
         sections = _find_all_blocks(blocks, "section")
         all_text = " ".join(s["text"]["text"] for s in sections)
-        assert "Tap *Yes* or *No* below" in all_text
+        assert "Tap a button or reply *yes* / *no*" in all_text
 
     def test_confirm_enter_instruction(self) -> None:
         blocks = SlackChannel._build_blocks(_make_event(PromptType.TYPE_CONFIRM_ENTER))
@@ -275,7 +275,7 @@ class TestBuildBlocksResponseInstructions:
         )
         sections = _find_all_blocks(blocks, "section")
         all_text = " ".join(s["text"]["text"] for s in sections)
-        assert "Tap a numbered option below" in all_text
+        assert "Tap a button or reply *yes* / *no*" in all_text
 
     def test_free_text_instruction(self) -> None:
         blocks = SlackChannel._build_blocks(_make_event(PromptType.TYPE_FREE_TEXT))

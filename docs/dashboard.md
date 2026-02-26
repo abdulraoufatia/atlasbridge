@@ -1,6 +1,6 @@
 # Dashboard — Deployment & Usage Guide
 
-AtlasBridge ships a **local, read-only governance dashboard** for viewing sessions, prompts, decision traces, and audit integrity. It runs on your machine and connects to the local SQLite database — no cloud, no SaaS, no external dependencies.
+AtlasBridge ships a **local, read-only governance dashboard** for viewing sessions, prompts, decision traces, and audit integrity. It runs on your machine and connects to the local SQLite database — no external dependencies.
 
 > **The dashboard has NO built-in authentication.** Do not expose it to the public internet without adding your own auth layer.
 

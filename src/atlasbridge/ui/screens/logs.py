@@ -41,7 +41,7 @@ class LogsScreen(Screen):
         self.call_after_refresh(self._load_logs)
 
     def _load_logs(self) -> None:
-        from atlasbridge.tui.services import LogsService
+        from atlasbridge.ui.services import LogsService
 
         events = LogsService.read_recent(100)
         try:
