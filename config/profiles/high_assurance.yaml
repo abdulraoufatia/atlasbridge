@@ -1,0 +1,93 @@
+# AtlasBridge Deployment Profile: high_assurance
+#
+# The high_assurance profile applies stricter defaults for environments
+# that require stronger operational guarantees — CI/CD pipelines,
+# regulated workflows, or security-sensitive deployments.
+#
+# All invariants are preserved. This profile tightens defaults only.
+# No code path is disabled or bypassed.
+#
+# To use: set ATLASBRIDGE_PROFILE=high_assurance or pass --profile high_assurance.
+# See docs/deployment-profiles.md for the full reference.
+
+profile: high_assurance
+
+# ---------------------------------------------------------------------------
+# Autonomy
+# ---------------------------------------------------------------------------
+autonomy:
+  # High-assurance deployments default to OFF — every action is escalated.
+  # Override by explicit policy file only; never by env var alone.
+  default_mode: off
+
+  # Tighter auto-reply cap — human is consulted more frequently
+  max_auto_replies_per_rule: 3
+
+  # Kill switch state persists and cannot be reset without explicit command
+  kill_switch_persistent: true
+
+# ---------------------------------------------------------------------------
+# Escalation
+# ---------------------------------------------------------------------------
+escalation:
+  # Strict defaults — no-match always requires human, never auto-denies
+  no_match_action: require_human
+
+  # LOW confidence always escalates; never auto-injected
+  low_confidence_action: require_human
+
+  # Shorter timeout — faster fail-safe
+  timeout_seconds: 120
+
+  # On timeout, escalation is required (never auto-approve)
+  timeout_action: require_human
+
+# ---------------------------------------------------------------------------
+# Rate limiting
+# ---------------------------------------------------------------------------
+rate_limiting:
+  # Stricter escalation rate — detect runaway loops faster
+  max_escalations_per_minute: 5
+
+  # Shorter circuit breaker trip
+  consecutive_escalation_limit: 10
+
+# ---------------------------------------------------------------------------
+# Audit
+# ---------------------------------------------------------------------------
+audit:
+  # Hash chain always enabled — non-negotiable in high_assurance
+  hash_chain_enabled: true
+
+  # Rotate more aggressively to limit blast radius of file-level tampering
+  max_log_bytes: 5242880  # 5 MB
+
+  # Retain all archives indefinitely for compliance evidence
+  retention_days: 0
+
+# ---------------------------------------------------------------------------
+# Replay
+# ---------------------------------------------------------------------------
+replay:
+  # Replay enabled with strict hash validation
+  enabled: true
+
+  # Strict mode: replay fails if hash chain cannot be fully verified
+  hash_validation: strict
+
+# ---------------------------------------------------------------------------
+# Policy
+# ---------------------------------------------------------------------------
+policy:
+  # Require a policy file — do not fall back to built-in defaults
+  require_policy_file: true
+
+  # Reject unknown/unrecognised policy versions
+  reject_unknown_versions: true
+
+# ---------------------------------------------------------------------------
+# Telemetry
+# ---------------------------------------------------------------------------
+telemetry:
+  # No external telemetry
+  enabled: false

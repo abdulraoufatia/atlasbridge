@@ -561,7 +561,7 @@ class DaemonManager:
         # Consume channel messages and forward to ChatEngine
         try:
             async for reply in self._channel.receive_replies():
-                text = reply.text if hasattr(reply, "text") else str(reply)
+                text = reply.value
                 if not text or not text.strip():
                     continue
                 try:
