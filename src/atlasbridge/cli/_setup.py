@@ -22,7 +22,17 @@ console = Console()
 )
 @click.option("--token", default="", help="Telegram bot token (non-interactive mode)")
 @click.option("--users", default="", help="Comma-separated allowed Telegram user IDs")
-def setup_cmd(channel: str, non_interactive: bool, from_env: bool, token: str, users: str) -> None:
+@click.option(
+    "--no-keyring", is_flag=True, default=False, help="Store tokens in config file, not OS keyring"
+)
+def setup_cmd(
+    channel: str,
+    non_interactive: bool,
+    from_env: bool,
+    token: str,
+    users: str,
+    no_keyring: bool,
+) -> None:
     """Interactive first-time configuration wizard."""
     run_setup(
         channel=channel,
@@ -31,6 +41,7 @@ def setup_cmd(channel: str, non_interactive: bool, from_env: bool, token: str, u
         token=token,
         users=users,
         from_env=from_env,
+        no_keyring=no_keyring,
     )
 
 
@@ -76,10 +87,10 @@ def run_setup(
     token: str = "",  # nosec B107 — empty default, not a hardcoded credential
     users: str = "",
     from_env: bool = False,
+    no_keyring: bool = False,
 ) -> None:
     """Run the AtlasBridge setup wizard."""
     from atlasbridge.core.config import _config_file_path, atlasbridge_dir, save_config
-    from atlasbridge.core.exceptions import ConfigError
 
     console.print("[bold]AtlasBridge Setup[/bold]")
 
@@ -118,13 +129,36 @@ def run_setup(
         console.print(f"[red]Unknown channel: {channel!r}[/red]")
         sys.exit(1)
 
+    # Auto-enable keyring when available (unless --no-keyring)
+    use_keyring = False
+    if not no_keyring:
+        try:
+            from atlasbridge.core.keyring_store import is_keyring_available
+
+            use_keyring = is_keyring_available()
+        except ImportError:
+            pass
+
     try:
-        cfg_path = save_config(config_data)
-    except ConfigError as exc:
-        console.print(f"[red]Failed to save config: {exc}[/red]")
-        sys.exit(1)
+        cfg_path = save_config(config_data, use_keyring=use_keyring)
+    except Exception as exc:
+        if use_keyring:
+            # Keyring storage failed — fall back to plaintext
+            use_keyring = False
+            try:
+                cfg_path = save_config(config_data, use_keyring=False)
+            except Exception as exc2:
+                console.print(f"[red]Failed to save config: {exc2}[/red]")
+                sys.exit(1)
+        else:
+            console.print(f"[red]Failed to save config: {exc}[/red]")
+            sys.exit(1)
 
     console.print(f"\n[green]Config saved:[/green] {cfg_path}")
+    if use_keyring:
+        console.print("  Tokens stored in OS keyring (secure)")
+    else:
+        console.print("  Tokens stored in config file")
     console.print(f"AtlasBridge dir:    {atlasbridge_dir()}")
 
     # Linux: offer systemd service installation (Telegram only for now)

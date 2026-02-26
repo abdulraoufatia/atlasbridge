@@ -642,6 +642,57 @@ def _check_llm_provider() -> dict | None:
         return None
 
 
+def _check_plaintext_tokens() -> dict | None:
+    """Warn if plaintext tokens exist in config and keyring is available."""
+    try:
+        from atlasbridge.core.keyring_store import is_keyring_available, is_keyring_placeholder
+    except ImportError:
+        return None
+
+    if not is_keyring_available():
+        return None
+
+    try:
+        try:
+            import tomllib
+        except ModuleNotFoundError:
+            import tomli as tomllib  # type: ignore[no-redef]
+
+        cfg_path = _config_path()
+        if not cfg_path.exists():
+            return None
+        with open(cfg_path, "rb") as f:
+            data = tomllib.load(f)
+    except Exception:  # noqa: BLE001
+        return None
+
+    plaintext_fields: list[str] = []
+    for section, key in [("telegram", "bot_token"), ("slack", "bot_token"), ("slack", "app_token")]:
+        val = data.get(section, {}).get(key, "")
+        if val and not is_keyring_placeholder(val):
+            plaintext_fields.append(f"{section}.{key}")
+
+    # Check nested chat.provider.api_key
+    api_key = data.get("chat", {}).get("provider", {}).get("api_key", "")
+    if api_key and not is_keyring_placeholder(api_key):
+        plaintext_fields.append("chat.provider.api_key")
+
+    if plaintext_fields:
+        return {
+            "name": "Token storage",
+            "status": "warn",
+            "detail": (
+                f"plaintext tokens in config: {', '.join(plaintext_fields)}. "
+                "Re-run `atlasbridge setup` to migrate to OS keyring"
+            ),
+        }
+    return {
+        "name": "Token storage",
+        "status": "pass",
+        "detail": "all tokens stored in OS keyring",
+    }
+
+
 def cmd_doctor(fix: bool, as_json: bool, console: Console) -> None:
     if fix:
         _fix_config(console)
@@ -659,6 +710,7 @@ def cmd_doctor(fix: bool, as_json: bool, console: Console) -> None:
         _check_database(),
         _check_adapters(),
         _check_llm_provider(),
+        _check_plaintext_tokens(),
         _check_ui_assets(),
         _check_stale_pid(),
         _check_permissions(),
