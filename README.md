@@ -429,6 +429,7 @@ See [CHANGELOG.md](CHANGELOG.md) for full version history.
 | v0.9.8 | Released | Conversation UX v2 — interaction pipeline, ML classifier protocol, session binding, output router |
 | v0.9.9 | Released | Chat mode UX — per-plan escalation, folder trust detection, no more "arrow keys" messages |
 | v0.10.0 | Released | Full conversational agent mode — streaming state, plan detection, secret redaction |
+| v1.5.0 | Released | Q1 Foundations — remove tui/, simplify CLI, doctor LLM check, keyring-first, audit export, environment tagging |
 | v1.4.1 | Released | Flatten assets directory, remove unused placeholders |
 | v1.4.0 | Released | Direct LLM chat mode — talk to Claude/GPT-4o/Gemini via Telegram with policy-governed tool use |
 | v1.3.2 | Released | Fix trust prompt detection — Unicode bullet handling in detector and choice extractor |

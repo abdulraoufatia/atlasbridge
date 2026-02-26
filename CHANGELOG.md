@@ -11,6 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.0] — 2026-02-26
+
+### Removed
+- **Legacy `tui/` module** — consolidated all state and services into `ui/`
+- **CLI aliases** — removed `adapters`, `pause`, `resume` top-level commands; nested `edition`/`features` under `cloud`
+
+### Added
+- **Doctor LLM provider check** — validates API key and model access with minimal 1-token call
+- **Keyring-first API key storage** — setup defaults to OS keyring when available, `--no-keyring` to opt out
+- **Doctor plaintext token warning** — warns when plaintext tokens found in config and keyring is available
+- **Audit export command** — `audit export` with `--format jsonl|json|csv`, `--session`, `--since`, `--until` for SIEM ingestion
+- **Environment tagging** — `RuntimeConfig.environment` (dev/staging/production), `ATLASBRIDGE_ENVIRONMENT` env var, policy match criteria, status + dashboard display
+
+---
+
 ## [1.4.1] — 2026-02-26
 
 ### Changed
