@@ -271,6 +271,7 @@ exclude_dirs = ["tests"]
 skips = [
     "B101",
     "B105",  # hardcoded_password_string — false positive on empty default token fields
+    "B107",  # hardcoded_password_default — false positive on empty string defaults for token params
     "B110",
     "B112",  # try_except_continue — used in health check loop over endpoints
     "B310",  # urllib_urlopen — only hits localhost (127.0.0.1) for dashboard health check

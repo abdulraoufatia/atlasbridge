@@ -22,7 +22,9 @@ def channel_group() -> None:
 @click.option("--users", default="", help="Comma-separated user IDs")
 def channel_add_cmd(channel_type: str, token: str, app_token: str, users: str) -> None:
     """Add or reconfigure a notification channel."""
-    cmd_channel_add(channel_type=channel_type, token=token, app_token=app_token, users=users, console=console)
+    cmd_channel_add(
+        channel_type=channel_type, token=token, app_token=app_token, users=users, console=console
+    )
 
 
 @channel_group.command("remove")
@@ -68,7 +70,9 @@ def channel_remove_cmd(channel_type: str) -> None:
     console.print(f"[green]{channel_type.capitalize()} channel removed.[/green]")
 
 
-def cmd_channel_add(channel_type: str, token: str, app_token: str, users: str, console: Console) -> None:
+def cmd_channel_add(
+    channel_type: str, token: str, app_token: str, users: str, console: Console
+) -> None:
     """Add or reconfigure a notification channel in the existing config."""
     from atlasbridge.core.config import load_config, save_config
     from atlasbridge.core.exceptions import ConfigError, ConfigNotFoundError
