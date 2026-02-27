@@ -23,10 +23,10 @@ These artefacts are generated deterministically from local SQLite and JSONL file
 
 AtlasBridge does not:
 
-- Certify SOC 2, ISO 27001, HIPAA, GDPR, or any other compliance framework
+- Certify compliance with any external framework
 - Produce attestation reports
-- Replace a compliance programme or auditor
-- Guarantee regulatory compliance
+- Replace an audit programme or auditor
+- Provide regulatory compliance
 
 The disclaimer appears on every export and in the dashboard UI.
 
@@ -112,9 +112,7 @@ The Policy Packs tab provides pre-configured policy bundles designed to support 
 - Includes an explicit disclaimer
 - Lists the specific rule behaviours (enforce, require_human, advisory)
 
-Available packs: SOC 2, ISO 27001, HIPAA, GDPR.
-
-**These packs do not certify compliance.** Applying a pack produces governance evidence that _may support_ an audit narrative. Users are responsible for their compliance programmes.
+**These packs do not certify compliance with any framework.** Applying a pack produces decision evidence that _may support_ an audit narrative. Users are responsible for their own programmes.
 
 ---
 

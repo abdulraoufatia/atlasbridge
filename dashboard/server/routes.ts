@@ -8,10 +8,10 @@ import { WebSocketServer, WebSocket } from "ws";
 import { repo } from "./atlasbridge-repo";
 import { storage } from "./storage";
 import { seedDatabase } from "./seed";
-import { runComplianceScan } from "./compliance-engine";
+import { runQualityScan } from "./compliance-engine";
 import {
   generateEvidenceJSON, generateEvidenceCSV, generateFullBundle,
-  computeGovernanceScore, compliancePacks, listGeneratedBundles, addGeneratedBundle,
+  computeGovernanceScore, policyPacks, listGeneratedBundles, addGeneratedBundle,
 } from "./evidence-engine";
 import { handleTerminalConnection } from "./terminal";
 import { requireCsrf } from "./middleware/csrf";
@@ -169,20 +169,20 @@ function ensureAutopilotReady(): void {
 }
 
 // Static org settings (stored in dashboard DB via seed, not in AtlasBridge DB)
-import type { RbacPermission, OrgProfile, SsoConfig, ComplianceConfig, SessionPolicyConfig } from "@shared/schema";
+import type { RbacPermission, OrgProfile, SsoConfig, RetentionConfig, SessionPolicyConfig } from "@shared/schema";
 
 const orgSettingsStatic: {
   organization: OrgProfile;
   permissions: RbacPermission[];
   sso: SsoConfig;
-  compliance: ComplianceConfig;
+  retention: RetentionConfig;
   sessionPolicy: SessionPolicyConfig;
 } = {
   organization: {
     id: "org-ab12cd34ef56",
     name: "AtlasBridge Operations",
     slug: "atlasbridge-ops",
-    planTier: "Enterprise",
+    planTier: "Extended",
     createdAt: new Date(Date.now() - 180 * 86400000).toISOString(),
     owner: "admin@atlasbridge.local",
     domain: "atlasbridge.local",
@@ -197,11 +197,11 @@ const orgSettingsStatic: {
     { id: "perm-005", resource: "Sessions", actions: ["view", "respond", "terminate"], description: "Agent session monitoring and interaction", category: "Operations" },
     { id: "perm-006", resource: "Prompts", actions: ["view", "respond", "escalate"], description: "Decision prompt handling and escalation", category: "Operations" },
     { id: "perm-007", resource: "Traces", actions: ["view", "export"], description: "Decision trace and hash chain access", category: "Observability" },
-    { id: "perm-008", resource: "Audit", actions: ["view", "export", "configure"], description: "Audit log access and retention settings", category: "Compliance" },
+    { id: "perm-008", resource: "Audit", actions: ["view", "export", "configure"], description: "Audit log access and retention settings", category: "Governance" },
     { id: "perm-009", resource: "Integrity", actions: ["verify", "view"], description: "System integrity verification and monitoring", category: "Security" },
     { id: "perm-010", resource: "Policies", actions: ["manage", "view", "override"], description: "Governance policy configuration and overrides", category: "Governance" },
     { id: "perm-011", resource: "Escalations", actions: ["review", "override", "configure"], description: "Escalation routing, review, and threshold configuration", category: "Governance" },
-    { id: "perm-012", resource: "Compliance", actions: ["view", "configure", "export"], description: "Compliance framework configuration and reporting", category: "Compliance" },
+    { id: "perm-012", resource: "Retention", actions: ["view", "configure", "export"], description: "Retention and evidence configuration", category: "Governance" },
     { id: "perm-013", resource: "API Keys", actions: ["manage", "rotate", "revoke", "view"], description: "API key lifecycle management", category: "Security" },
     { id: "perm-014", resource: "Notifications", actions: ["manage", "view", "test"], description: "Alert and notification channel configuration", category: "Operations" },
     { id: "perm-015", resource: "Settings", actions: ["view", "manage"], description: "System-level settings and diagnostics", category: "Administration" },
@@ -219,8 +219,8 @@ const orgSettingsStatic: {
     forceAuth: false,
     sessionDuration: 480,
   },
-  compliance: {
-    frameworks: ["SOC2", "ISO27001", "GDPR"],
+  retention: {
+    auditCategories: ["access_control", "data_integrity", "change_management"],
     auditRetentionDays: 730,
     traceRetentionDays: 365,
     sessionRetentionDays: 180,
@@ -229,8 +229,8 @@ const orgSettingsStatic: {
     encryptionInTransit: true,
     autoRedaction: true,
     dlpEnabled: true,
-    lastAuditDate: new Date(Date.now() - 45 * 86400000).toISOString(),
-    nextAuditDate: new Date(Date.now() + 45 * 86400000).toISOString(),
+    lastReviewDate: new Date(Date.now() - 45 * 86400000).toISOString(),
+    nextReviewDate: new Date(Date.now() + 45 * 86400000).toISOString(),
   },
   sessionPolicy: {
     maxConcurrentSessions: 20,
@@ -645,7 +645,7 @@ export async function registerRoutes(
   });
 
   // -----------------------------------------------------------------------
-  // Repository connections + compliance scanning (dashboard DB)
+  // Repository connections + quality scanning (dashboard DB)
   // -----------------------------------------------------------------------
 
   app.get("/api/repo-connections", async (_req, res) => {
@@ -669,7 +669,7 @@ export async function registerRoutes(
         status: "connected",
         accessToken: body.accessToken,
         connectedBy: body.connectedBy || "admin",
-        complianceLevel: body.complianceLevel || "standard",
+        qualityLevel: body.qualityLevel || "standard",
       });
       res.status(201).json(repoConn);
     } catch (e: any) {
@@ -701,21 +701,21 @@ export async function registerRoutes(
       const repoConn = await storage.getRepoConnection(id);
       if (!repoConn) { res.status(404).json({ error: "Repository not found" }); return; }
 
-      const level = (req.body.complianceLevel || repoConn.complianceLevel || "standard") as string;
-      const result = runComplianceScan(
+      const level = (req.body.qualityLevel || repoConn.qualityLevel || "standard") as string;
+      const result = runQualityScan(
         { provider: repoConn.provider, owner: repoConn.owner, repo: repoConn.repo, branch: repoConn.branch },
         level
       );
 
       await storage.updateRepoConnection(id, {
-        complianceScore: result.overallScore,
-        complianceLevel: level,
+        qualityScore: result.overallScore,
+        qualityLevel: level,
         lastSynced: new Date().toISOString(),
       });
 
-      await storage.createComplianceScan({
+      await storage.createQualityScan({
         repoConnectionId: id,
-        complianceLevel: level,
+        qualityLevel: level,
         overallScore: result.overallScore,
         categories: result.categories,
         suggestions: result.suggestions,
@@ -723,17 +723,17 @@ export async function registerRoutes(
 
       res.json(result);
     } catch (e: any) {
-      res.status(400).json({ error: e.message || "Failed to run compliance scan" });
+      res.status(400).json({ error: e.message || "Failed to run quality scan" });
     }
   });
 
   app.get("/api/repo-connections/:id/scans", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const scans = await storage.getComplianceScans(id);
+      const scans = await storage.getQualityScans(id);
       res.json(scans);
     } catch (e) {
-      res.status(500).json({ error: "Failed to load compliance scans" });
+      res.status(500).json({ error: "Failed to load quality scans" });
     }
   });
 
@@ -781,7 +781,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/evidence/packs", (_req, res) => {
-    res.json(compliancePacks);
+    res.json(policyPacks);
   });
 
   app.get("/api/evidence/integrity", (_req, res) => {

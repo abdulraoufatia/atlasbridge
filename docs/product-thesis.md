@@ -6,7 +6,7 @@
 
 ## Core Identity
 
-AtlasBridge is the deterministic runtime layer enterprises trust to execute AI agents safely.
+AtlasBridge is the deterministic runtime layer for executing AI agents within policy-defined boundaries.
 
 Every governance decision is:
 - **Deterministic** — same inputs + same policy = same outcome, always
@@ -36,7 +36,7 @@ Every governance decision is:
 
 - Not an AI chat wrapper — it governs agents, not conversations
 - Not a hosted orchestration platform — local-first, single-operator
-- Not a compliance checklist generator — deterministic enforcement, not checkbox theater
+- Not a compliance checklist generator — deterministic enforcement, not advisory checklists
 - Not a remote execution engine — no remote management, no policy bypass
 - Not a dashboard-first product — governance primitives first, visualization second
 
@@ -53,16 +53,16 @@ These are the foundational capabilities that define AtlasBridge:
 
 Every feature in the AtlasBridge roadmap must emerge as a consequence of these primitives. Features that don't strengthen determinism, replayability, explainability, or audit integrity are not part of the core product.
 
-## Moat Definition
+## Technical Differentiation
 
-AtlasBridge's competitive moat is deterministic governance infrastructure:
+AtlasBridge's differentiation is deterministic governance infrastructure:
 
-- **No other agent runtime offers deterministic session replay**
-- **No other agent runtime offers hash-verifiable audit trails**
-- **No other agent runtime offers structured policy with formal evaluation semantics**
-- **No other agent runtime offers risk classification with reproducible scoring**
+- **Deterministic session replay** — any session can be re-executed to verify governance behaviour
+- **Hash-verifiable audit trails** — append-only, tamper-evident, independently verifiable
+- **Structured policy with formal evaluation semantics** — first-match-wins, no ambiguity
+- **Risk classification with reproducible scoring** — rule-based, deterministic, explainable
 
-The moat widens with every governance primitive added. Dashboard features, enterprise integrations, and UX improvements are valuable but not moat-creating — they consume moat infrastructure.
+Each governance primitive strengthens the overall infrastructure. Dashboard features and UX improvements build on these primitives.
 
 ## Execution Constraints
 

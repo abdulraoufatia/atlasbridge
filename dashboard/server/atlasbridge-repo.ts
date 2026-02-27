@@ -707,12 +707,12 @@ export class AtlasBridgeRepo {
         humanOverrideRate,
         trend: escalationRate < 20 ? "improving" : escalationRate < 40 ? "stable" : "declining",
       },
-      compliance: {
+      policyAdherence: {
         overallScore: 0,
-        frameworkScores: [],
+        categoryScores: [],
         openFindings: 0,
         resolvedLast30d: 0,
-        nextAuditDays: 0,
+        nextReviewDays: 0,
         policyAdherence: 0,
       },
       operational: {

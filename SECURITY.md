@@ -36,7 +36,7 @@ Please report security issues via one of these channels:
 
 ## Security Design Principles
 
-AtlasBridge is designed as a **security-first** tool. Key principles:
+AtlasBridge is designed around correctness invariants. Key principles:
 
 - **Local-first**: No data leaves your machine unless you configure a channel (e.g., Telegram).
 - **Allowlist by default**: Operations are denied unless explicitly permitted by policy.

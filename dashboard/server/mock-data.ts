@@ -2,7 +2,7 @@ import type {
   OverviewData, Session, SessionDetail, PromptEntry,
   TraceEntry, IntegrityData, AuditEntry, SettingsData,
   ActivityEvent, RuleTriggered, RbacPermission, OrgProfile,
-  SsoConfig, ComplianceConfig, SessionPolicyConfig
+  SsoConfig, RetentionConfig, SessionPolicyConfig
 } from "@shared/schema";
 
 const now = new Date();
@@ -114,16 +114,16 @@ export const overview: OverviewData = {
     humanOverrideRate: 14.3,
     trend: "improving",
   },
-  compliance: {
+  policyAdherence: {
     overallScore: 91,
-    frameworkScores: [
-      { framework: "SOC2", score: 94, maxScore: 100 },
-      { framework: "ISO27001", score: 89, maxScore: 100 },
-      { framework: "GDPR", score: 92, maxScore: 100 },
+    categoryScores: [
+      { category: "Access Control", score: 94, maxScore: 100 },
+      { category: "Data Integrity", score: 89, maxScore: 100 },
+      { category: "Change Management", score: 92, maxScore: 100 },
     ],
     openFindings: 6,
     resolvedLast30d: 14,
-    nextAuditDays: 42,
+    nextReviewDays: 42,
     policyAdherence: 97.3,
   },
   operational: {
@@ -137,10 +137,10 @@ export const overview: OverviewData = {
   insights: [
     { id: "ins-001", category: "safety", type: "positive", title: "AI Trust Score Trending Up", description: "Model trust score has improved 3.2% over the past 7 days, now at 94.2%. Confidence thresholds are well-calibrated.", impact: "medium", actionable: false },
     { id: "ins-002", category: "risk", type: "warning", title: "Escalation Spike Detected", description: "Escalation rate increased to 26.7% in the last 24h, above the 20% threshold. Consider reviewing kubectl and AWS CLI session policies.", impact: "high", actionable: true },
-    { id: "ins-003", category: "compliance", type: "recommendation", title: "ISO 27001 Gap in Access Reviews", description: "Quarterly access review is overdue by 8 days. Complete the review to maintain ISO 27001 certification readiness.", impact: "high", actionable: true },
+    { id: "ins-003", category: "policy", type: "recommendation", title: "Access Review Overdue", description: "Quarterly access review is overdue by 8 days. Complete the review to maintain governance posture.", impact: "high", actionable: true },
     { id: "ins-004", category: "safety", type: "recommendation", title: "Reduce Human Override Rate", description: "Human override rate at 14.3% suggests some automation thresholds could be adjusted. Analyze overrides on low-risk decisions to optimize.", impact: "medium", actionable: true },
     { id: "ins-005", category: "operations", type: "positive", title: "Uptime Exceeds SLA", description: "System uptime at 99.97% exceeds the 99.9% SLA target. Infrastructure reliability is strong.", impact: "low", actionable: false },
-    { id: "ins-006", category: "compliance", type: "warning", title: "6 Open Compliance Findings", description: "There are 6 unresolved compliance findings. Prioritize the 2 critical findings related to data encryption at rest.", impact: "high", actionable: true },
+    { id: "ins-006", category: "policy", type: "warning", title: "6 Open Findings", description: "There are 6 unresolved findings. Prioritise the 2 critical findings related to data encryption at rest.", impact: "high", actionable: true },
   ],
 };
 
@@ -171,7 +171,7 @@ export const audit: AuditEntry[] = Array.from({ length: 50 }, (_, i) => {
     "Configuration drift detected and logged for audit",
     "Access control policy enforced on production resource",
     "Cost threshold exceeded for cloud resource provisioning",
-    "Compliance check passed for data retention policy",
+    "Retention policy check passed for data retention settings",
   ];
   const sessionIds = sessions.map(s => s.id);
   return {
@@ -200,7 +200,7 @@ export const settings: SettingsData = {
     "advanced_analytics": false,
     "policy_hot_reload": true,
     "session_recording": false,
-    "compliance_mode": true,
+    "evidence_mode": true,
   },
 };
 
@@ -210,14 +210,14 @@ export const orgSettingsStatic: {
   organization: OrgProfile;
   permissions: RbacPermission[];
   sso: SsoConfig;
-  compliance: ComplianceConfig;
+  retention: RetentionConfig;
   sessionPolicy: SessionPolicyConfig;
 } = {
   organization: {
     id: "org-ab12cd34ef56",
     name: "AtlasBridge Operations",
     slug: "atlasbridge-ops",
-    planTier: "Enterprise",
+    planTier: "Extended",
     createdAt: d(180),
     owner: "admin@atlasbridge.local",
     domain: "atlasbridge.local",
@@ -232,11 +232,11 @@ export const orgSettingsStatic: {
     { id: "perm-005", resource: "Sessions", actions: ["view", "respond", "terminate"], description: "Agent session monitoring and interaction", category: "Operations" },
     { id: "perm-006", resource: "Prompts", actions: ["view", "respond", "escalate"], description: "Decision prompt handling and escalation", category: "Operations" },
     { id: "perm-007", resource: "Traces", actions: ["view", "export"], description: "Decision trace and hash chain access", category: "Observability" },
-    { id: "perm-008", resource: "Audit", actions: ["view", "export", "configure"], description: "Audit log access and retention settings", category: "Compliance" },
+    { id: "perm-008", resource: "Audit", actions: ["view", "export", "configure"], description: "Audit log access and retention settings", category: "Governance" },
     { id: "perm-009", resource: "Integrity", actions: ["verify", "view"], description: "System integrity verification and monitoring", category: "Security" },
     { id: "perm-010", resource: "Policies", actions: ["manage", "view", "override"], description: "Governance policy configuration and overrides", category: "Governance" },
     { id: "perm-011", resource: "Escalations", actions: ["review", "override", "configure"], description: "Escalation routing, review, and threshold configuration", category: "Governance" },
-    { id: "perm-012", resource: "Compliance", actions: ["view", "configure", "export"], description: "Compliance framework configuration and reporting", category: "Compliance" },
+    { id: "perm-012", resource: "Retention", actions: ["view", "configure", "export"], description: "Retention and evidence configuration", category: "Governance" },
     { id: "perm-013", resource: "API Keys", actions: ["manage", "rotate", "revoke", "view"], description: "API key lifecycle management", category: "Security" },
     { id: "perm-014", resource: "Notifications", actions: ["manage", "view", "test"], description: "Alert and notification channel configuration", category: "Operations" },
     { id: "perm-015", resource: "Settings", actions: ["view", "manage"], description: "System-level settings and diagnostics", category: "Administration" },
@@ -254,8 +254,8 @@ export const orgSettingsStatic: {
     forceAuth: false,
     sessionDuration: 480,
   },
-  compliance: {
-    frameworks: ["SOC2", "ISO27001", "GDPR"],
+  retention: {
+    auditCategories: ["access_control", "data_integrity", "change_management"],
     auditRetentionDays: 730,
     traceRetentionDays: 365,
     sessionRetentionDays: 180,
@@ -264,8 +264,8 @@ export const orgSettingsStatic: {
     encryptionInTransit: true,
     autoRedaction: true,
     dlpEnabled: true,
-    lastAuditDate: d(45),
-    nextAuditDate: d(-45),
+    lastReviewDate: d(45),
+    nextReviewDate: d(-45),
   },
   sessionPolicy: {
     maxConcurrentSessions: 20,

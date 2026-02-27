@@ -4,9 +4,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type {
   RepoConnection,
-  ComplianceScanResult,
-  ComplianceCategoryScore,
-  ComplianceSuggestion,
+  QualityScanResult,
+  QualityCategoryScore,
+  QualitySuggestion,
 } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -53,10 +53,10 @@ const providers = [
   { value: "azure", label: "Azure DevOps", icon: VscAzureDevops },
 ] as const;
 
-const complianceLevels = [
+const qualityLevels = [
   { value: "basic", label: "Basic" },
   { value: "standard", label: "Standard" },
-  { value: "enterprise", label: "Enterprise" },
+  { value: "advanced", label: "Advanced" },
 ];
 
 function getProviderIcon(provider: string) {
@@ -113,7 +113,7 @@ function ConnectRepoDialog({ onSuccess }: { onSuccess: () => void }) {
   const [repo, setRepo] = useState("");
   const [branch, setBranch] = useState("main");
   const [accessToken, setAccessToken] = useState("");
-  const [complianceLevel, setComplianceLevel] = useState("standard");
+  const [qualityLevel, setQualityLevel] = useState("standard");
 
   const connectMutation = useMutation({
     mutationFn: async () => {
@@ -133,7 +133,7 @@ function ConnectRepoDialog({ onSuccess }: { onSuccess: () => void }) {
         url,
         accessToken: accessToken || undefined,
         connectedBy: "admin",
-        complianceLevel,
+        qualityLevel,
       });
     },
     onSuccess: () => {
@@ -222,14 +222,14 @@ function ConnectRepoDialog({ onSuccess }: { onSuccess: () => void }) {
             />
           </div>
           <div className="space-y-2">
-            <Label>Compliance Level</Label>
-            <Select value={complianceLevel} onValueChange={setComplianceLevel}>
-              <SelectTrigger data-testid="select-compliance-level">
+            <Label>Quality Level</Label>
+            <Select value={qualityLevel} onValueChange={setQualityLevel}>
+              <SelectTrigger data-testid="select-quality-level">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {complianceLevels.map((l) => (
-                  <SelectItem key={l.value} value={l.value} data-testid={`option-compliance-${l.value}`}>
+                {qualityLevels.map((l) => (
+                  <SelectItem key={l.value} value={l.value} data-testid={`option-quality-${l.value}`}>
                     {l.label}
                   </SelectItem>
                 ))}
@@ -264,19 +264,19 @@ function RepoDetailView({
   onBack: () => void;
 }) {
   const { toast } = useToast();
-  const [scanLevel, setScanLevel] = useState(repo.complianceLevel || "standard");
-  const [scanResult, setScanResult] = useState<ComplianceScanResult | null>(null);
+  const [scanLevel, setScanLevel] = useState(repo.qualityLevel || "standard");
+  const [scanResult, setScanResult] = useState<QualityScanResult | null>(null);
 
-  const { data: scanHistory, isLoading: historyLoading } = useQuery<ComplianceScanResult[]>({
+  const { data: scanHistory, isLoading: historyLoading } = useQuery<QualityScanResult[]>({
     queryKey: ["/api/repo-connections", repo.id, "scans"],
   });
 
   const scanMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/repo-connections/${repo.id}/scan`, {
-        complianceLevel: scanLevel,
+        qualityLevel: scanLevel,
       });
-      return (await res.json()) as ComplianceScanResult;
+      return (await res.json()) as QualityScanResult;
     },
     onSuccess: (data) => {
       setScanResult(data);
@@ -342,9 +342,9 @@ function RepoDetailView({
         </Card>
         <Card>
           <CardContent className="p-4 space-y-1">
-            <p className="text-xs text-muted-foreground">Compliance Score</p>
-            <p className={`text-2xl font-semibold ${scoreColor(repo.complianceScore ?? 0)}`} data-testid={`text-score-${repo.id}`}>
-              {repo.complianceScore != null ? `${repo.complianceScore}/100` : "N/A"}
+            <p className="text-xs text-muted-foreground">Quality Score</p>
+            <p className={`text-2xl font-semibold ${scoreColor(repo.qualityScore ?? 0)}`} data-testid={`text-score-${repo.id}`}>
+              {repo.qualityScore != null ? `${repo.qualityScore}/100` : "N/A"}
             </p>
           </CardContent>
         </Card>
@@ -361,17 +361,17 @@ function RepoDetailView({
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-          <CardTitle className="text-base">Run Compliance Scan</CardTitle>
+          <CardTitle className="text-base">Run Quality Scan</CardTitle>
         </CardHeader>
         <CardContent className="flex items-end gap-3 flex-wrap">
           <div className="space-y-2">
-            <Label className="text-xs">Compliance Level</Label>
+            <Label className="text-xs">Quality Level</Label>
             <Select value={scanLevel} onValueChange={setScanLevel}>
               <SelectTrigger className="w-[160px]" data-testid="select-scan-level">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {complianceLevels.map((l) => (
+                {qualityLevels.map((l) => (
                   <SelectItem key={l.value} value={l.value}>
                     {l.label}
                   </SelectItem>
@@ -410,7 +410,7 @@ function RepoDetailView({
               Scan Results
             </h3>
             <p className="text-xs text-muted-foreground">
-              Scanned: {formatDate(displayResult.scannedAt)} &middot; Level: {displayResult.complianceLevel}
+              Scanned: {formatDate(displayResult.scannedAt)} &middot; Level: {displayResult.qualityLevel}
             </p>
           </div>
 
@@ -427,7 +427,7 @@ function RepoDetailView({
           </Card>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {displayResult.categories.map((cat: ComplianceCategoryScore) => (
+            {displayResult.categories.map((cat: QualityCategoryScore) => (
               <Card key={cat.name}>
                 <CardHeader className="pb-2 space-y-0">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -467,7 +467,7 @@ function RepoDetailView({
             <div className="space-y-3">
               <h3 className="text-base font-semibold">Suggestions</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {displayResult.suggestions.map((sug: ComplianceSuggestion) => (
+                {displayResult.suggestions.map((sug: QualitySuggestion) => (
                   <Card key={sug.id} data-testid={`suggestion-${sug.id}`}>
                     <CardContent className="p-4 space-y-2">
                       <div className="flex items-start justify-between gap-2">
@@ -597,19 +597,19 @@ export default function RepositoriesPage() {
 
                 <div className="space-y-1">
                   <div className="flex items-center justify-between gap-2 text-xs">
-                    <span className="text-muted-foreground">Compliance</span>
-                    <span className={`font-medium ${scoreColor(repo.complianceScore ?? 0)}`} data-testid={`text-card-score-${repo.id}`}>
-                      {repo.complianceScore != null ? `${repo.complianceScore}%` : "N/A"}
+                    <span className="text-muted-foreground">Quality</span>
+                    <span className={`font-medium ${scoreColor(repo.qualityScore ?? 0)}`} data-testid={`text-card-score-${repo.id}`}>
+                      {repo.qualityScore != null ? `${repo.qualityScore}%` : "N/A"}
                     </span>
                   </div>
-                  {repo.complianceScore != null && (
-                    <Progress value={repo.complianceScore} className="h-1.5" />
+                  {repo.qualityScore != null && (
+                    <Progress value={repo.qualityScore} className="h-1.5" />
                   )}
                 </div>
 
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Badge variant="secondary" className="text-xs">
-                    {repo.complianceLevel}
+                    {repo.qualityLevel}
                   </Badge>
                 </div>
               </CardContent>

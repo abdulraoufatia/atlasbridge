@@ -521,7 +521,7 @@ function UsersTab({ org }: { org: OrgSettingsData }) {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ORG_QUERY_KEY }); toast({ title: "User removed" }); },
   });
 
-  const roleOptions = ["Super Admin", "Org Admin", "Security Officer", "Operator", "Viewer", "Compliance Auditor", "Incident Responder", "API Consumer"];
+  const roleOptions = ["Super Admin", "Org Admin", "Security Officer", "Operator", "Viewer", "Evidence Reviewer", "Incident Responder", "API Consumer"];
   const statusOptions = ["active", "inactive", "suspended", "pending"];
   const mfaOptions = ["disabled", "enabled", "enforced"];
 
@@ -907,23 +907,23 @@ function SecurityTab({ org }: { org: OrgSettingsData }) {
   );
 }
 
-function ComplianceTab({ org }: { org: OrgSettingsData }) {
+function RetentionTab({ org }: { org: OrgSettingsData }) {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-sm font-medium flex items-center gap-2"><FileCheck className="w-4 h-4 text-primary" />Compliance Configuration</CardTitle></CardHeader>
+        <CardHeader className="pb-3"><CardTitle className="text-sm font-medium flex items-center gap-2"><FileCheck className="w-4 h-4 text-primary" />Retention Configuration</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <p className="text-xs font-medium text-muted-foreground mb-2">Active Frameworks</p>
-            <div className="flex flex-wrap gap-2">{org.compliance.frameworks.map(f => <Badge key={f} variant="secondary" className="text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300">{f}</Badge>)}</div>
+            <p className="text-xs font-medium text-muted-foreground mb-2">Audit Categories</p>
+            <div className="flex flex-wrap gap-2">{org.retention.auditCategories.map(f => <Badge key={f} variant="secondary" className="text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300">{f}</Badge>)}</div>
           </div>
           <dl className="space-y-3 text-sm pt-2 border-t">
-            {[["Audit Retention", `${org.compliance.auditRetentionDays} days`], ["Trace Retention", `${org.compliance.traceRetentionDays} days`], ["Session Retention", `${org.compliance.sessionRetentionDays} days`], ["Data Residency", org.compliance.dataResidency], ["Last Audit", fmt(org.compliance.lastAuditDate)], ["Next Audit", fmt(org.compliance.nextAuditDate)]].map(([l, v]) => (
+            {[["Audit Retention", `${org.retention.auditRetentionDays} days`], ["Trace Retention", `${org.retention.traceRetentionDays} days`], ["Session Retention", `${org.retention.sessionRetentionDays} days`], ["Data Residency", org.retention.dataResidency], ["Last Review", fmt(org.retention.lastReviewDate)], ["Next Review", fmt(org.retention.nextReviewDate)]].map(([l, v]) => (
               <div key={String(l)} className="flex items-center justify-between gap-4"><dt className="text-muted-foreground">{String(l)}</dt><dd><code className="text-xs font-mono bg-muted px-2 py-1 rounded">{String(v)}</code></dd></div>
             ))}
           </dl>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t">
-            {([["Encryption at Rest", org.compliance.encryptionAtRest], ["Encryption in Transit", org.compliance.encryptionInTransit], ["Auto-Redaction", org.compliance.autoRedaction], ["DLP Enabled", org.compliance.dlpEnabled]] as [string, boolean][]).map(([l, e]) => (
+            {([["Encryption at Rest", org.retention.encryptionAtRest], ["Encryption in Transit", org.retention.encryptionInTransit], ["Auto-Redaction", org.retention.autoRedaction], ["DLP Enabled", org.retention.dlpEnabled]] as [string, boolean][]).map(([l, e]) => (
               <div key={l} className="flex items-center gap-2 p-2 rounded-md bg-muted/50">
                 {e ? <CheckCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" /> : <XCircle className="w-3.5 h-3.5 text-red-600 dark:text-red-400 shrink-0" />}
                 <span className="text-xs">{l}</span>
@@ -1311,7 +1311,7 @@ export default function SettingsPage() {
             <TabsTrigger value="users" data-testid="tab-users"><UserCog className="w-3.5 h-3.5 mr-1.5" />Users</TabsTrigger>
             <TabsTrigger value="apikeys" data-testid="tab-apikeys"><KeyRound className="w-3.5 h-3.5 mr-1.5" />API Keys</TabsTrigger>
             <TabsTrigger value="security" data-testid="tab-security"><ShieldCheck className="w-3.5 h-3.5 mr-1.5" />Security</TabsTrigger>
-            <TabsTrigger value="compliance" data-testid="tab-compliance"><FileCheck className="w-3.5 h-3.5 mr-1.5" />Compliance</TabsTrigger>
+            <TabsTrigger value="retention" data-testid="tab-retention"><FileCheck className="w-3.5 h-3.5 mr-1.5" />Retention</TabsTrigger>
             <TabsTrigger value="notifications" data-testid="tab-notifications"><Bell className="w-3.5 h-3.5 mr-1.5" />Alerts</TabsTrigger>
             <TabsTrigger value="providers" data-testid="tab-providers"><Key className="w-3.5 h-3.5 mr-1.5" />Providers</TabsTrigger>
             <TabsTrigger value="workspaces" data-testid="tab-workspaces"><FolderCheck className="w-3.5 h-3.5 mr-1.5" />Workspaces</TabsTrigger>
@@ -1325,7 +1325,7 @@ export default function SettingsPage() {
         <TabsContent value="users"><UsersTab org={orgData} /></TabsContent>
         <TabsContent value="apikeys"><ApiKeysTab org={orgData} /></TabsContent>
         <TabsContent value="security"><SecurityTab org={orgData} /></TabsContent>
-        <TabsContent value="compliance"><ComplianceTab org={orgData} /></TabsContent>
+        <TabsContent value="retention"><RetentionTab org={orgData} /></TabsContent>
         <TabsContent value="notifications"><NotificationsTab org={orgData} /></TabsContent>
         <TabsContent value="providers"><ProvidersTab /></TabsContent>
         <TabsContent value="workspaces"><WorkspacesTab /></TabsContent>

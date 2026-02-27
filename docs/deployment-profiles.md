@@ -12,7 +12,7 @@ AtlasBridge ships two built-in deployment profiles. A profile is a configuration
 | Profile | Autonomy default | Escalation | Rate limit | Use case |
 |---------|-----------------|------------|-----------|----------|
 | `core` | `assist` | require_human on no-match | 10/min | Standard development |
-| `high_assurance` | `off` | require_human always | 5/min | CI/CD, regulated workflows |
+| `high_assurance` | `off` | require_human always | 5/min | CI/CD, audited workflows |
 
 ---
 
@@ -41,7 +41,7 @@ Profile YAML files live in `config/profiles/`:
 | File | Description |
 |------|-------------|
 | `config/profiles/core.yaml` | Default profile — full capabilities, sensible defaults |
-| `config/profiles/high_assurance.yaml` | Stricter defaults for regulated environments |
+| `config/profiles/high_assurance.yaml` | Stricter defaults for high-assurance environments |
 
 ---
 

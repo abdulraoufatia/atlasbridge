@@ -88,7 +88,7 @@ function SafetyMetricItem({ icon: IconComp, label, value, cls }: { icon: React.E
   );
 }
 
-type PanelId = "sessions" | "safety" | "compliance" | "risk" | "operations" | "integrity" | null;
+type PanelId = "sessions" | "safety" | "policy" | "risk" | "operations" | "integrity" | null;
 
 function StatCard3D({ title, value, subtitle, icon: Icon, variant, onClick, active, children }: {
   title: string; value: string | number; subtitle?: string;
@@ -187,31 +187,31 @@ function AISafetyPanel({ data }: { data: OverviewData }) {
   );
 }
 
-function CompliancePanel({ data }: { data: OverviewData }) {
-  const c = data.compliance;
+function PolicyPanel({ data }: { data: OverviewData }) {
+  const c = data.policyAdherence;
   const scoreColor = c.overallScore >= 90 ? "hsl(152, 69%, 31%)" : c.overallScore >= 70 ? "hsl(38, 92%, 50%)" : "hsl(0, 84%, 60%)";
   return (
     <Card className="animate-in slide-in-from-top-2 duration-300">
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-medium flex items-center gap-2"><Shield className="w-4 h-4 text-primary" />Compliance Overview</CardTitle>
+        <CardTitle className="text-sm font-medium flex items-center gap-2"><Shield className="w-4 h-4 text-primary" />Policy Adherence</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center gap-5">
           <AnimatedRing value={c.overallScore} max={100} size={80} stroke={6} label={`${c.overallScore}%`} color={scoreColor} />
           <div className="space-y-1">
-            <p className="text-sm font-medium">Overall Compliance</p>
+            <p className="text-sm font-medium">Overall Score</p>
             <p className="text-xs text-muted-foreground">Policy adherence: {c.policyAdherence}%</p>
-            <p className="text-xs text-muted-foreground">Next audit: {c.nextAuditDays} days</p>
+            <p className="text-xs text-muted-foreground">Next review: {c.nextReviewDays} days</p>
           </div>
         </div>
         <div className="space-y-2.5">
-          <p className="text-xs font-medium text-muted-foreground">Framework Scores</p>
-          {c.frameworkScores.map(fw => {
+          <p className="text-xs font-medium text-muted-foreground">Category Scores</p>
+          {c.categoryScores.map(fw => {
             const pct = (fw.score / fw.maxScore) * 100;
             return (
-              <div key={fw.framework} data-testid={`compliance-${fw.framework.toLowerCase()}`}>
+              <div key={fw.category} data-testid={`policy-${fw.category.toLowerCase()}`}>
                 <div className="flex items-center justify-between gap-2 mb-1">
-                  <span className="text-xs font-medium">{fw.framework}</span>
+                  <span className="text-xs font-medium">{fw.category}</span>
                   <span className="text-xs text-muted-foreground">{fw.score}/{fw.maxScore}</span>
                 </div>
                 <div className="h-1.5 rounded-full bg-muted overflow-hidden">
@@ -231,7 +231,7 @@ function CompliancePanel({ data }: { data: OverviewData }) {
             <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{c.resolvedLast30d}</p>
           </div>
         </div>
-        {data.insights.filter(i => i.category === "compliance").map(i => <InsightCard key={i.id} insight={i} />)}
+        {data.insights.filter(i => i.category === "policy").map(i => <InsightCard key={i.id} insight={i} />)}
       </CardContent>
     </Card>
   );
@@ -367,7 +367,7 @@ export default function OverviewPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Overview</h1>
-        <p className="text-sm text-muted-foreground mt-1">System status, AI safety, and compliance</p>
+        <p className="text-sm text-muted-foreground mt-1">System status, AI safety, and policy adherence</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -375,7 +375,7 @@ export default function OverviewPage() {
         <StatCard3D title="AI Safety Score" value={`${data.aiSafety.modelTrustScore}%`} icon={Brain} variant="bg-purple-500/10 text-purple-600 dark:text-purple-400" onClick={() => toggle("safety")} active={activePanel === "safety"}>
           <TrendIndicator trend={data.aiSafety.trend} />
         </StatCard3D>
-        <StatCard3D title="Compliance Score" value={`${data.compliance.overallScore}%`} subtitle={`${data.compliance.openFindings} open findings`} icon={Shield} variant="bg-blue-500/10 text-blue-600 dark:text-blue-400" onClick={() => toggle("compliance")} active={activePanel === "compliance"} />
+        <StatCard3D title="Policy Score" value={`${data.policyAdherence.overallScore}%`} subtitle={`${data.policyAdherence.openFindings} open findings`} icon={Shield} variant="bg-blue-500/10 text-blue-600 dark:text-blue-400" onClick={() => toggle("policy")} active={activePanel === "policy"} />
         <StatCard3D
           title="High-Risk Events"
           value={data.highRiskEvents}
@@ -393,7 +393,7 @@ export default function OverviewPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {activePanel === "sessions" && <ActiveSessionsPanel data={data} />}
           {activePanel === "safety" && <AISafetyPanel data={data} />}
-          {activePanel === "compliance" && <CompliancePanel data={data} />}
+          {activePanel === "policy" && <PolicyPanel data={data} />}
           {activePanel === "risk" && <RiskPanel data={data} />}
           {activePanel === "operations" && <OperationsPanel data={data} />}
           {activePanel === "integrity" && <IntegrityPanel data={data} />}
@@ -406,10 +406,10 @@ export default function OverviewPage() {
             </CardHeader>
             <CardContent className="space-y-2.5">
               {data.insights
-                .filter(i => activePanel === "risk" ? i.category === "risk" : activePanel === "safety" ? i.category === "safety" : activePanel === "compliance" ? i.category === "compliance" : activePanel === "operations" ? i.category === "operations" : true)
+                .filter(i => activePanel === "risk" ? i.category === "risk" : activePanel === "safety" ? i.category === "safety" : activePanel === "policy" ? i.category === "policy" : activePanel === "operations" ? i.category === "operations" : true)
                 .map(i => <InsightCard key={i.id} insight={i} />)
               }
-              {data.insights.filter(i => activePanel === "risk" ? i.category === "risk" : activePanel === "safety" ? i.category === "safety" : activePanel === "compliance" ? i.category === "compliance" : activePanel === "operations" ? i.category === "operations" : true).length === 0 && (
+              {data.insights.filter(i => activePanel === "risk" ? i.category === "risk" : activePanel === "safety" ? i.category === "safety" : activePanel === "policy" ? i.category === "policy" : activePanel === "operations" ? i.category === "operations" : true).length === 0 && (
                 <p className="text-xs text-muted-foreground py-4 text-center">No specific insights for this metric</p>
               )}
             </CardContent>
@@ -466,7 +466,7 @@ export default function OverviewPage() {
                 <Shield className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                 <span className="text-xs">Policy Adherence</span>
               </div>
-              <span className="text-sm font-semibold">{data.compliance.policyAdherence}%</span>
+              <span className="text-sm font-semibold">{data.policyAdherence.policyAdherence}%</span>
             </div>
             <div className="flex items-center justify-between p-2.5 rounded-md bg-muted/50">
               <div className="flex items-center gap-2">
@@ -493,7 +493,7 @@ export default function OverviewPage() {
               <div className="flex items-center justify-between p-2.5 rounded-md bg-primary/5 border border-primary/10 cursor-pointer hover:bg-primary/10 transition-colors" data-testid="link-governance-evidence">
                 <div className="flex items-center gap-2">
                   <FileCheck className="w-3.5 h-3.5 text-primary" />
-                  <span className="text-xs font-medium">Governance Evidence</span>
+                  <span className="text-xs font-medium">Decision Evidence</span>
                 </div>
                 <ChevronRight className="w-3 h-3 text-muted-foreground" />
               </div>

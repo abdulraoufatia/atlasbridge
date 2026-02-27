@@ -46,10 +46,10 @@ interface IntegrityReport {
   traceHashSummary: string;
 }
 
-interface CompliancePack {
+interface PolicyPack {
   id: string;
   name: string;
-  framework: string;
+  category: string;
   description: string;
   disclaimer: string;
   policies: { name: string; action: string; description: string }[];
@@ -88,7 +88,7 @@ function GovernanceScoreWidget({ score }: { score: GovernanceScore }) {
     <Card data-testid="governance-score-widget">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-primary" />Governance Score
+          <TrendingUp className="w-4 h-4 text-primary" />Decision Score
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -307,14 +307,14 @@ function BundlesList() {
   );
 }
 
-function CompliancePacksPanel() {
-  const { data: packs, isLoading } = useQuery<CompliancePack[]>({ queryKey: ["/api/evidence/packs"] });
+function PolicyPacksPanel() {
+  const { data: packs, isLoading } = useQuery<PolicyPack[]>({ queryKey: ["/api/evidence/packs"] });
   const [expanded, setExpanded] = useState<string | null>(null);
 
   if (isLoading) return <Skeleton className="h-40 w-full" />;
 
   return (
-    <Card data-testid="compliance-packs">
+    <Card data-testid="policy-packs">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
           <Lock className="w-4 h-4 text-primary" />Policy Pack Templates
@@ -323,7 +323,7 @@ function CompliancePacksPanel() {
       <CardContent className="space-y-2.5">
         <p className="text-xs text-muted-foreground">
           Pre-configured policy bundles that support governance evidence collection.
-          These are policy presets, not compliance certifications.
+          These are policy presets, not external certifications.
         </p>
         {packs && packs.map(pack => (
           <div key={pack.id} className="border rounded-md overflow-hidden" data-testid={`pack-${pack.id}`}>
@@ -333,7 +333,7 @@ function CompliancePacksPanel() {
               data-testid={`button-pack-${pack.id}`}
             >
               <div className="flex items-center gap-2.5 min-w-0">
-                <Badge variant="secondary" className="text-[9px] shrink-0">{pack.framework}</Badge>
+                <Badge variant="secondary" className="text-[9px] shrink-0">{pack.category}</Badge>
                 <span className="text-xs font-medium truncate">{pack.name}</span>
               </div>
               <Activity className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${expanded === pack.id ? "rotate-90" : ""}`} />
@@ -374,7 +374,7 @@ export default function EvidencePage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">Governance Evidence</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Decision Evidence</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Export verifiable governance evidence from local decision data
         </p>
@@ -383,10 +383,10 @@ export default function EvidencePage() {
       <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-3 flex items-start gap-2.5" data-testid="evidence-disclaimer">
         <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
         <div>
-          <p className="text-xs font-medium text-blue-700 dark:text-blue-300">Governance Evidence Disclaimer</p>
+          <p className="text-xs font-medium text-blue-700 dark:text-blue-300">Decision Evidence Disclaimer</p>
           <p className="text-[11px] text-blue-600/80 dark:text-blue-400/80 mt-0.5">
-            AtlasBridge produces verifiable governance evidence; it does not certify compliance.
-            Users are responsible for their own compliance programs. Evidence exports are deterministic
+            AtlasBridge produces verifiable decision evidence; it does not certify compliance
+            with any external framework. Evidence exports are deterministic
             and reproducible from local decision logs, traces, and integrity verification data.
           </p>
         </div>
@@ -462,7 +462,7 @@ export default function EvidencePage() {
         </TabsContent>
 
         <TabsContent value="packs" className="mt-4">
-          <CompliancePacksPanel />
+          <PolicyPacksPanel />
         </TabsContent>
       </Tabs>
     </div>
