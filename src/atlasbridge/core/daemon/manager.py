@@ -673,18 +673,178 @@ class DaemonManager:
                 self._session_manager.mark_ended(session_id)
             logger.info("chat_session_ended", session_id=session_id[:8])
 
+    async def _run_agent_session(self) -> None:
+        """
+        Run an Expert Agent session: users interact with a governance-specialised
+        LLM agent through the channel, with SoR persistence and policy gating.
+        """
+        chat_cfg = self._config.get("chat", {})
+        provider_name = chat_cfg.get("provider_name", "")
+        api_key = chat_cfg.get("api_key", "")
+
+        if not provider_name or not api_key:
+            logger.error("agent_session_missing_provider")
+            return
+
+        if self._channel is None:
+            logger.error("agent_session_no_channel")
+            return
+
+        import atlasbridge.providers  # noqa: F401
+        from atlasbridge.providers.base import ProviderRegistry
+
+        try:
+            provider_cls = ProviderRegistry.get(provider_name)
+        except KeyError as exc:
+            logger.error("agent_provider_not_found", error=str(exc))
+            return
+
+        model = chat_cfg.get("model", "")
+        provider = provider_cls(api_key=api_key, model=model)  # type: ignore[call-arg]
+
+        # Create or reuse session (pre-created by --background path)
+        from atlasbridge.core.session.models import Session
+
+        pre_session_id = self._config.get("session_id", "")
+        session_id = pre_session_id if pre_session_id else str(uuid.uuid4())
+        trace_id = str(uuid.uuid4())
+        session = Session(
+            session_id=session_id,
+            tool=f"agent:{provider_name}",
+            command=["agent"],
+        )
+        if self._session_manager is not None:
+            self._session_manager.register(session)
+
+        # Persist session (skip save if pre-created, just update status)
+        if self._db is not None:
+            if pre_session_id:
+                self._db.update_session(session_id, status="running")
+            else:
+                self._db.save_session(
+                    session_id,
+                    f"agent:{provider_name}",
+                    ["agent"],
+                    label="Expert Agent",
+                )
+                self._db.update_session(session_id, status="running")
+
+        # Set up agent tools
+        from atlasbridge.core.agent.tools import get_agent_registry, set_agent_context
+        from atlasbridge.tools.executor import ToolExecutor
+
+        set_agent_context(self._db, self._config)
+        tool_registry = get_agent_registry()
+        tool_executor = ToolExecutor(tool_registry)
+
+        # Build system prompt
+        from atlasbridge.core.agent.models import AgentProfile
+        from atlasbridge.core.agent.prompt import build_system_prompt
+
+        profile = AgentProfile(
+            name="atlasbridge_expert",
+            version="1.0.0",
+            description="AtlasBridge Expert Agent — governance operations specialist",
+            capabilities=[t.name for t in tool_registry.list_all()],
+            risk_tier="moderate",
+            max_autonomy="assist",
+        )
+        system_prompt = build_system_prompt(profile, self._config)
+
+        # Create SoR writer
+        from atlasbridge.core.agent.sor import SystemOfRecordWriter
+
+        assert self._db is not None, "Database must be initialised for agent mode"
+        sor = SystemOfRecordWriter(db=self._db, session_id=session_id, trace_id=trace_id)
+
+        # Create ExpertAgentEngine
+        from atlasbridge.core.agent.engine import ExpertAgentEngine
+
+        engine = ExpertAgentEngine(
+            provider=provider,
+            channel=self._channel,
+            session_id=session_id,
+            session_manager=self._session_manager,  # type: ignore[arg-type]
+            sor=sor,
+            db=self._db,
+            tool_registry=tool_registry,
+            tool_executor=tool_executor,
+            policy=self._policy,
+            system_prompt=system_prompt,
+            max_history=chat_cfg.get("max_history", 50),
+            profile=profile,
+        )
+
+        logger.info(
+            "agent_session_started",
+            session_id=session_id[:8],
+            trace_id=trace_id[:8],
+            provider=provider_name,
+            model=model or "(default)",
+        )
+
+        if not self._dry_run:
+            await self._channel.notify(
+                f"Expert Agent session started (trace: {trace_id[:8]}). Send a message to begin.",
+                session_id=session_id,
+            )
+
+        # Consume channel messages
+        try:
+            async for reply in self._channel.receive_replies():
+                text = reply.value
+                if not text or not text.strip():
+                    continue
+
+                # Handle approval/denial commands
+                lower = text.strip().lower()
+                if lower == "approve" and engine.state.value == "gate":
+                    plan_id = engine._state_machine.active_plan_id
+                    if plan_id:
+                        await engine.handle_approval(plan_id, approved=True)
+                        continue
+                elif lower == "deny" and engine.state.value == "gate":
+                    plan_id = engine._state_machine.active_plan_id
+                    if plan_id:
+                        await engine.handle_approval(plan_id, approved=False)
+                        continue
+
+                try:
+                    await engine.handle_message(text)
+                except Exception as exc:  # noqa: BLE001
+                    logger.error(
+                        "agent_message_error",
+                        session_id=session_id[:8],
+                        error=str(exc),
+                    )
+                    try:
+                        await self._channel.notify(f"Error: {exc}", session_id=session_id)
+                    except Exception:  # noqa: BLE001
+                        pass
+        finally:
+            await provider.close()
+            if self._session_manager is not None:
+                self._session_manager.mark_ended(session_id)
+            if self._db is not None:
+                self._db.update_session(session_id, status="completed")
+            logger.info("agent_session_ended", session_id=session_id[:8])
+
     # ------------------------------------------------------------------
     # Main loop
     # ------------------------------------------------------------------
 
     async def _run_loop(self) -> None:
-        """Run the reply consumer, TTL sweeper, and adapter/chat session until shutdown."""
+        """Run the reply consumer, TTL sweeper, and adapter/chat/agent session until shutdown."""
         tasks: list[asyncio.Task[Any]] = []
         router = self._intent_router or self._router
 
-        is_chat_mode = self._config.get("mode") == "chat"
+        mode = self._config.get("mode", "")
+        is_chat_mode = mode == "chat"
+        is_agent_mode = mode == "agent"
 
-        if is_chat_mode:
+        if is_agent_mode:
+            tasks.append(asyncio.create_task(self._run_agent_session(), name="agent_session"))
+        elif is_chat_mode:
             # Chat mode: ChatEngine consumes replies directly
             tasks.append(asyncio.create_task(self._run_chat_session(), name="chat_session"))
         else:

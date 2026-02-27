@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
-import type { SettingsData, OrgSettingsData, User, Group, Role, ApiKey, SecurityPolicy, Notification as NotifType, IpAllowlistEntry } from "@shared/schema";
+import type { SettingsData, OrgSettingsData, User, Group, Role, ApiKey, SecurityPolicy, Notification as NotifType, IpAllowlistEntry, AgentProfile } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ import {
   UserCog, ChevronDown, Search, ShieldCheck, ShieldAlert, Clock,
   CheckCircle, XCircle, AlertTriangle, Server, Eye, Fingerprint,
   Plus, Trash2, Edit, UserPlus, RotateCcw,
-  Key, FolderCheck, AlertCircle, ShieldOff
+  Key, FolderCheck, AlertCircle, ShieldOff, Sparkles
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -1231,6 +1231,57 @@ function WorkspacesTab() {
 }
 
 
+function AgentsTab() {
+  const { data: agents, isLoading } = useQuery<AgentProfile[]>({
+    queryKey: ["/api/agents"],
+  });
+
+  if (isLoading) return <Skeleton className="h-40 w-full" />;
+
+  return (
+    <div className="space-y-4">
+      {(!agents || agents.length === 0) ? (
+        <Card>
+          <CardContent className="p-6 text-center text-sm text-muted-foreground">
+            No agent profiles registered.
+          </CardContent>
+        </Card>
+      ) : (
+        agents.map(agent => (
+          <Card key={agent.name} data-testid={`agent-profile-${agent.name}`}>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Sparkles className="w-4 h-4" />
+                  {agent.name}
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-[10px]">v{agent.version}</Badge>
+                  <Badge variant="outline" className="text-[10px]">{agent.risk_tier}</Badge>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">{agent.description}</p>
+              <div>
+                <span className="text-xs font-medium text-muted-foreground">Capabilities</span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {agent.capabilities.map(cap => (
+                    <Badge key={cap} variant="secondary" className="text-[10px]">{cap}</Badge>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                <span>Max autonomy: <span className="font-medium text-foreground">{agent.max_autonomy}</span></span>
+              </div>
+            </CardContent>
+          </Card>
+        ))
+      )}
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { data: settings, isLoading: settingsLoading } = useQuery<SettingsData>({ queryKey: ["/api/settings"] });
   const { data: orgData, isLoading: orgLoading } = useQuery<OrgSettingsData>({ queryKey: ORG_QUERY_KEY });
@@ -1264,6 +1315,7 @@ export default function SettingsPage() {
             <TabsTrigger value="notifications" data-testid="tab-notifications"><Bell className="w-3.5 h-3.5 mr-1.5" />Alerts</TabsTrigger>
             <TabsTrigger value="providers" data-testid="tab-providers"><Key className="w-3.5 h-3.5 mr-1.5" />Providers</TabsTrigger>
             <TabsTrigger value="workspaces" data-testid="tab-workspaces"><FolderCheck className="w-3.5 h-3.5 mr-1.5" />Workspaces</TabsTrigger>
+            <TabsTrigger value="agents" data-testid="tab-agents"><Sparkles className="w-3.5 h-3.5 mr-1.5" />Agents</TabsTrigger>
           </TabsList>
         </div>
         <TabsContent value="general"><GeneralTab data={settings} /></TabsContent>
@@ -1277,6 +1329,7 @@ export default function SettingsPage() {
         <TabsContent value="notifications"><NotificationsTab org={orgData} /></TabsContent>
         <TabsContent value="providers"><ProvidersTab /></TabsContent>
         <TabsContent value="workspaces"><WorkspacesTab /></TabsContent>
+        <TabsContent value="agents"><AgentsTab /></TabsContent>
       </Tabs>
     </div>
   );

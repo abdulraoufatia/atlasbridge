@@ -92,6 +92,7 @@ def ui() -> None:
 # ---------------------------------------------------------------------------
 
 from atlasbridge.cli._adapter import adapter_group  # noqa: E402
+from atlasbridge.cli._agent import agent_group  # noqa: E402
 from atlasbridge.cli._audit_cmd import audit_group  # noqa: E402
 from atlasbridge.cli._autopilot import autopilot_group  # noqa: E402
 from atlasbridge.cli._channel import channel_group  # noqa: E402
@@ -147,6 +148,7 @@ cli.add_command(risk_group)
 cli.add_command(chat_cmd)
 cli.add_command(workspace_group)
 cli.add_command(providers_group)
+cli.add_command(agent_group)
 
 
 # ---------------------------------------------------------------------------

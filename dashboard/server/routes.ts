@@ -1308,6 +1308,269 @@ export async function registerRoutes(
   );
 
   // ---------------------------------------------------------------------------
+  // Expert Agent endpoints
+  // ---------------------------------------------------------------------------
+
+  const VALID_AGENT_PROVIDERS = new Set(["anthropic", "openai", "google"]);
+
+  app.post(
+    "/api/agent/start",
+    requireCsrf,
+    operatorRateLimiter,
+    async (req, res) => {
+      const { runAtlasBridge } = await import("./routes/operator");
+      const body = req.body as Record<string, unknown>;
+      const provider = typeof body.provider === "string" ? body.provider.toLowerCase() : "";
+      const model = typeof body.model === "string" ? body.model : "";
+
+      if (provider && !VALID_AGENT_PROVIDERS.has(provider)) {
+        res.status(400).json({ error: `Invalid provider. Choose from: ${Array.from(VALID_AGENT_PROVIDERS).join(", ")}` });
+        return;
+      }
+
+      // Prevent duplicate agent starts from rapid double-clicks.
+      if ((globalThis as any).__lastAgentStart &&
+          Date.now() - (globalThis as any).__lastAgentStart < 3000) {
+        res.status(429).json({ error: "Agent start already in progress. Please wait." });
+        return;
+      }
+      (globalThis as any).__lastAgentStart = Date.now();
+
+      const args = ["agent", "start", "--background", "--json"];
+      if (provider) args.push("--provider", provider);
+      if (model) args.push("--model", model);
+
+      try {
+        const { stdout } = await runAtlasBridge(args);
+        const parsed = JSON.parse(stdout.trim() || "{}");
+        insertOperatorAuditLog({
+          method: "POST",
+          path: "/api/agent/start",
+          action: `agent-start:${provider || "default"}`,
+          body: { provider: provider || "default", model: model || "default" },
+          result: "ok",
+        });
+        res.json({ ok: true, ...parsed });
+      } catch (err: any) {
+        // CLI writes JSON errors to stdout, not stderr
+        let detail = "";
+        const out = (err.stdout as string | undefined)?.trim();
+        if (out) {
+          try {
+            const parsed = JSON.parse(out);
+            detail = parsed.error || out;
+          } catch {
+            detail = out;
+          }
+        }
+        if (!detail) detail = (err.stderr as string | undefined)?.trim() || err.message;
+        insertOperatorAuditLog({
+          method: "POST",
+          path: "/api/agent/start",
+          action: `agent-start:${provider || "default"}`,
+          body: { provider, model },
+          result: "error",
+          error: detail,
+        });
+        res.status(503).json({ error: detail });
+      }
+    },
+  );
+
+  app.get("/api/agent/sessions/:id/turns", (_req, res) => {
+    const turns = repo.listAgentTurns(_req.params.id);
+    res.json(turns);
+  });
+
+  app.get("/api/agent/sessions/:id/state", (_req, res) => {
+    const state = repo.getAgentState(_req.params.id);
+    if (!state) {
+      res.status(404).json({ error: "Session not found" });
+      return;
+    }
+    res.json(state);
+  });
+
+  app.get("/api/agent/sessions/:id/plans", (_req, res) => {
+    const plans = repo.listAgentPlans(_req.params.id);
+    res.json(plans);
+  });
+
+  app.get("/api/agent/sessions/:id/decisions", (_req, res) => {
+    const decisions = repo.listAgentDecisions(_req.params.id);
+    res.json(decisions);
+  });
+
+  app.get("/api/agent/sessions/:id/tool-runs", (_req, res) => {
+    const runs = repo.listAgentToolRuns(_req.params.id);
+    res.json(runs);
+  });
+
+  app.get("/api/agent/sessions/:id/outcomes", (_req, res) => {
+    const outcomes = repo.listAgentOutcomes(_req.params.id);
+    res.json(outcomes);
+  });
+
+  app.post(
+    "/api/agent/sessions/:id/message",
+    requireCsrf,
+    operatorRateLimiter,
+    async (req, res) => {
+      const { runAtlasBridge } = await import("./routes/operator");
+      const sessionId = String(req.params.id);
+      const body = req.body || {};
+      const text = typeof body.text === "string" ? body.text : (typeof body.content === "string" ? body.content : "");
+      if (!text) {
+        res.status(400).json({ error: "text is required" });
+        return;
+      }
+      try {
+        const { stdout } = await runAtlasBridge([
+          "agent", "message", sessionId, text, "--json",
+        ]);
+        const parsed = JSON.parse(stdout.trim() || "{}");
+        insertOperatorAuditLog({
+          method: "POST",
+          path: `/api/agent/sessions/${sessionId}/message`,
+          action: `agent-message:${sessionId}`,
+          body: { text: text.substring(0, 100) },
+          result: "ok",
+        });
+        res.json(parsed);
+      } catch (err: any) {
+        const detail = (err.stderr as string | undefined)?.trim() || err.message;
+        res.status(503).json({ error: "Failed to send message", detail });
+      }
+    },
+  );
+
+  app.post(
+    "/api/agent/sessions/:id/approve",
+    requireCsrf,
+    operatorRateLimiter,
+    async (req, res) => {
+      const { runAtlasBridge } = await import("./routes/operator");
+      const sessionId = String(req.params.id);
+      const { plan_id } = req.body || {};
+      if (!plan_id) {
+        res.status(400).json({ error: "plan_id is required" });
+        return;
+      }
+      try {
+        const { stdout } = await runAtlasBridge([
+          "agent", "approve", sessionId, String(plan_id), "--json",
+        ]);
+        const parsed = JSON.parse(stdout.trim() || "{}");
+        insertOperatorAuditLog({
+          method: "POST",
+          path: `/api/agent/sessions/${sessionId}/approve`,
+          action: `agent-approve:${sessionId}:${plan_id}`,
+          body: { plan_id },
+          result: "ok",
+        });
+        res.json(parsed);
+      } catch (err: any) {
+        const detail = (err.stderr as string | undefined)?.trim() || err.message;
+        res.status(503).json({ error: "Failed to approve plan", detail });
+      }
+    },
+  );
+
+  app.post(
+    "/api/agent/sessions/:id/deny",
+    requireCsrf,
+    operatorRateLimiter,
+    async (req, res) => {
+      const { runAtlasBridge } = await import("./routes/operator");
+      const sessionId = String(req.params.id);
+      const { plan_id } = req.body || {};
+      if (!plan_id) {
+        res.status(400).json({ error: "plan_id is required" });
+        return;
+      }
+      try {
+        const { stdout } = await runAtlasBridge([
+          "agent", "deny", sessionId, String(plan_id), "--json",
+        ]);
+        const parsed = JSON.parse(stdout.trim() || "{}");
+        insertOperatorAuditLog({
+          method: "POST",
+          path: `/api/agent/sessions/${sessionId}/deny`,
+          action: `agent-deny:${sessionId}:${plan_id}`,
+          body: { plan_id },
+          result: "ok",
+        });
+        res.json(parsed);
+      } catch (err: any) {
+        const detail = (err.stderr as string | undefined)?.trim() || err.message;
+        res.status(503).json({ error: "Failed to deny plan", detail });
+      }
+    },
+  );
+
+  // SSE stream for real-time agent updates
+  app.get("/api/agent/sessions/:id/stream", (_req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    let lastTurnCount = 0;
+    let lastPlanCount = 0;
+    let lastToolRunCount = 0;
+
+    const interval = setInterval(() => {
+      try {
+        const turns = repo.listAgentTurns(_req.params.id);
+        const plans = repo.listAgentPlans(_req.params.id);
+        const toolRuns = repo.listAgentToolRuns(_req.params.id);
+        const state = repo.getAgentState(_req.params.id);
+
+        if (turns.length !== lastTurnCount) {
+          lastTurnCount = turns.length;
+          res.write(`event: turn_update\ndata: ${JSON.stringify(turns[turns.length - 1])}\n\n`);
+        }
+        if (plans.length !== lastPlanCount) {
+          lastPlanCount = plans.length;
+          res.write(`event: plan_update\ndata: ${JSON.stringify(plans[0])}\n\n`);
+        }
+        if (toolRuns.length !== lastToolRunCount) {
+          lastToolRunCount = toolRuns.length;
+          res.write(`event: tool_run\ndata: ${JSON.stringify(toolRuns[toolRuns.length - 1])}\n\n`);
+        }
+        if (state) {
+          res.write(`event: state_change\ndata: ${JSON.stringify(state)}\n\n`);
+        }
+      } catch {
+        // Ignore errors during polling
+      }
+    }, 500);
+
+    _req.on("close", () => {
+      clearInterval(interval);
+    });
+  });
+
+  // Agent profiles (static for v1)
+  app.get("/api/agents", (_req, res) => {
+    res.json([
+      {
+        name: "atlasbridge_expert",
+        version: "1.0.0",
+        description: "AtlasBridge Expert Agent — governance operations specialist",
+        capabilities: [
+          "ab_list_sessions", "ab_get_session", "ab_list_prompts",
+          "ab_get_audit_events", "ab_get_traces", "ab_check_integrity",
+          "ab_get_config", "ab_get_policy", "ab_explain_decision", "ab_get_stats",
+          "ab_validate_policy", "ab_test_policy", "ab_set_mode", "ab_kill_switch",
+        ],
+        risk_tier: "moderate",
+        max_autonomy: "assist",
+      },
+    ]);
+  });
+
+  // ---------------------------------------------------------------------------
   // Operator write actions (kill switch, autonomy mode, audit log)
   // ---------------------------------------------------------------------------
   registerOperatorRoutes(app);

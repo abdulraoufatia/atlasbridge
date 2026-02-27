@@ -256,10 +256,13 @@ omit = [
     "*/atlasbridge/channels/multi.py",
     "*/atlasbridge/adapters/claude_code.py",
     "*/atlasbridge/__main__.py",
-    # Tier 3: LLM providers, tools, chat engine — require network/API runtime
+    # Tier 3: LLM providers, tools, chat/agent engines — require network/API runtime
     "*/atlasbridge/providers/*",
     "*/atlasbridge/tools/*",
     "*/atlasbridge/core/chat/*",
+    "*/atlasbridge/core/agent/engine.py",
+    "*/atlasbridge/core/agent/tools.py",
+    "*/atlasbridge/core/agent/prompt.py",
 ]
 
 [tool.coverage.report]

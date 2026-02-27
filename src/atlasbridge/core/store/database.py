@@ -445,6 +445,214 @@ class Database:
 
         return len(rows)
 
+    # ------------------------------------------------------------------
+    # Agent SoR tables
+    # ------------------------------------------------------------------
+
+    def save_agent_turn(
+        self,
+        turn_id: str,
+        session_id: str,
+        trace_id: str,
+        turn_number: int,
+        role: str,
+        content: str = "",
+        state: str = "intake",
+        metadata: str = "{}",
+    ) -> None:
+        self._db.execute(
+            """
+            INSERT INTO agent_turns
+                (id, session_id, trace_id, turn_number, role, content, state, metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (turn_id, session_id, trace_id, turn_number, role, content, state, metadata),
+        )
+        self._db.commit()
+
+    def update_agent_turn(self, turn_id: str, **kwargs: Any) -> None:
+        allowed = {"content", "state", "metadata"}
+        bad = set(kwargs) - allowed
+        if bad:
+            raise ValueError(f"update_agent_turn: disallowed column(s): {sorted(bad)}")
+        if not kwargs:
+            return
+        columns = ", ".join(f"{k} = ?" for k in kwargs)
+        values = list(kwargs.values()) + [turn_id]
+        self._db.execute(f"UPDATE agent_turns SET {columns} WHERE id = ?", values)  # noqa: S608
+        self._db.commit()
+
+    def get_agent_turn(self, turn_id: str) -> sqlite3.Row | None:
+        return self._db.execute("SELECT * FROM agent_turns WHERE id = ?", (turn_id,)).fetchone()
+
+    def list_agent_turns(self, session_id: str, limit: int = 200) -> list[sqlite3.Row]:
+        return self._db.execute(
+            "SELECT * FROM agent_turns WHERE session_id = ? ORDER BY turn_number ASC LIMIT ?",
+            (session_id, limit),
+        ).fetchall()
+
+    def save_agent_plan(
+        self,
+        plan_id: str,
+        session_id: str,
+        trace_id: str,
+        turn_id: str,
+        description: str = "",
+        steps: str = "[]",
+        risk_level: str = "low",
+    ) -> None:
+        self._db.execute(
+            """
+            INSERT INTO agent_plans
+                (id, session_id, trace_id, turn_id, description, steps, risk_level)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (plan_id, session_id, trace_id, turn_id, description, steps, risk_level),
+        )
+        self._db.commit()
+
+    def update_agent_plan(self, plan_id: str, **kwargs: Any) -> None:
+        allowed = {"status", "resolved_at", "resolved_by"}
+        bad = set(kwargs) - allowed
+        if bad:
+            raise ValueError(f"update_agent_plan: disallowed column(s): {sorted(bad)}")
+        if not kwargs:
+            return
+        columns = ", ".join(f"{k} = ?" for k in kwargs)
+        values = list(kwargs.values()) + [plan_id]
+        self._db.execute(f"UPDATE agent_plans SET {columns} WHERE id = ?", values)  # noqa: S608
+        self._db.commit()
+
+    def get_agent_plan(self, plan_id: str) -> sqlite3.Row | None:
+        return self._db.execute("SELECT * FROM agent_plans WHERE id = ?", (plan_id,)).fetchone()
+
+    def list_agent_plans(self, session_id: str, limit: int = 100) -> list[sqlite3.Row]:
+        return self._db.execute(
+            "SELECT * FROM agent_plans WHERE session_id = ? ORDER BY created_at DESC LIMIT ?",
+            (session_id, limit),
+        ).fetchall()
+
+    def save_agent_decision(
+        self,
+        decision_id: str,
+        session_id: str,
+        trace_id: str,
+        turn_id: str,
+        decision_type: str,
+        action: str,
+        plan_id: str | None = None,
+        rule_matched: str | None = None,
+        confidence: str = "medium",
+        explanation: str = "",
+        risk_score: int = 0,
+    ) -> None:
+        self._db.execute(
+            """
+            INSERT INTO agent_decisions
+              (id, session_id, trace_id, plan_id, turn_id, decision_type, action,
+               rule_matched, confidence, explanation, risk_score)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                decision_id,
+                session_id,
+                trace_id,
+                plan_id,
+                turn_id,
+                decision_type,
+                action,
+                rule_matched,
+                confidence,
+                explanation,
+                risk_score,
+            ),
+        )
+        self._db.commit()
+
+    def list_agent_decisions(self, session_id: str, limit: int = 200) -> list[sqlite3.Row]:
+        return self._db.execute(
+            "SELECT * FROM agent_decisions WHERE session_id = ? ORDER BY created_at DESC LIMIT ?",
+            (session_id, limit),
+        ).fetchall()
+
+    def save_agent_tool_run(
+        self,
+        tool_run_id: str,
+        session_id: str,
+        trace_id: str,
+        turn_id: str,
+        tool_name: str,
+        arguments: str = "{}",
+        result: str = "",
+        is_error: int = 0,
+        duration_ms: float | None = None,
+        plan_id: str | None = None,
+    ) -> None:
+        self._db.execute(
+            """
+            INSERT INTO agent_tool_runs
+              (id, session_id, trace_id, plan_id, turn_id, tool_name,
+               arguments, result, is_error, duration_ms)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                tool_run_id,
+                session_id,
+                trace_id,
+                plan_id,
+                turn_id,
+                tool_name,
+                arguments,
+                result,
+                is_error,
+                duration_ms,
+            ),
+        )
+        self._db.commit()
+
+    def list_agent_tool_runs(self, session_id: str, limit: int = 200) -> list[sqlite3.Row]:
+        return self._db.execute(
+            "SELECT * FROM agent_tool_runs WHERE session_id = ? ORDER BY created_at ASC LIMIT ?",
+            (session_id, limit),
+        ).fetchall()
+
+    def save_agent_outcome(
+        self,
+        outcome_id: str,
+        session_id: str,
+        trace_id: str,
+        turn_id: str,
+        status: str,
+        summary: str = "",
+        tool_runs_count: int = 0,
+        total_duration_ms: float | None = None,
+    ) -> None:
+        self._db.execute(
+            """
+            INSERT INTO agent_outcomes
+              (id, session_id, trace_id, turn_id, status, summary,
+               tool_runs_count, total_duration_ms)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                outcome_id,
+                session_id,
+                trace_id,
+                turn_id,
+                status,
+                summary,
+                tool_runs_count,
+                total_duration_ms,
+            ),
+        )
+        self._db.commit()
+
+    def list_agent_outcomes(self, session_id: str, limit: int = 100) -> list[sqlite3.Row]:
+        return self._db.execute(
+            "SELECT * FROM agent_outcomes WHERE session_id = ? ORDER BY created_at DESC LIMIT ?",
+            (session_id, limit),
+        ).fetchall()
+
     def archive_oldest_audit_events(
         self,
         archive_path: Path,

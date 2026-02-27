@@ -17,6 +17,8 @@ Version history:
   2 → 3: Workspace trust (workspace_trust table for runtime consent model)
   3 → 4: Provider configs + processed_messages (provider key metadata, channel dedup)
   4 → 5: sessions.command column (missing from DBs created before this column was added)
+  5 → 6: Agent SoR tables (agent_turns, agent_plans, agent_decisions,
+         agent_tool_runs, agent_outcomes)
 """
 
 from __future__ import annotations
@@ -30,7 +32,7 @@ import structlog
 logger = structlog.get_logger()
 
 # Bump this when adding a new migration.
-LATEST_SCHEMA_VERSION = 5
+LATEST_SCHEMA_VERSION = 6
 
 
 # ---------------------------------------------------------------------------
@@ -225,12 +227,112 @@ def _migrate_4_to_5(conn: sqlite3.Connection) -> None:
     _add_column_if_missing(conn, "sessions", "command", "TEXT NOT NULL DEFAULT ''")
 
 
+def _migrate_5_to_6(conn: sqlite3.Connection) -> None:
+    """Version 5 → 6: add Agent System-of-Record tables for the Expert Agent."""
+    # -- agent_turns --------------------------------------------------------
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS agent_turns (
+            id          TEXT PRIMARY KEY,
+            session_id  TEXT NOT NULL REFERENCES sessions(id),
+            trace_id    TEXT NOT NULL,
+            turn_number INTEGER NOT NULL,
+            role        TEXT NOT NULL,
+            content     TEXT NOT NULL DEFAULT '',
+            state       TEXT NOT NULL DEFAULT 'intake',
+            created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+            metadata    TEXT NOT NULL DEFAULT '{}'
+        )
+    """)
+
+    # -- agent_plans --------------------------------------------------------
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS agent_plans (
+            id          TEXT PRIMARY KEY,
+            session_id  TEXT NOT NULL REFERENCES sessions(id),
+            trace_id    TEXT NOT NULL,
+            turn_id     TEXT NOT NULL REFERENCES agent_turns(id),
+            status      TEXT NOT NULL DEFAULT 'proposed',
+            description TEXT NOT NULL DEFAULT '',
+            steps       TEXT NOT NULL DEFAULT '[]',
+            risk_level  TEXT NOT NULL DEFAULT 'low',
+            created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+            resolved_at TEXT,
+            resolved_by TEXT
+        )
+    """)
+
+    # -- agent_decisions ----------------------------------------------------
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS agent_decisions (
+            id            TEXT PRIMARY KEY,
+            session_id    TEXT NOT NULL REFERENCES sessions(id),
+            trace_id      TEXT NOT NULL,
+            plan_id       TEXT REFERENCES agent_plans(id),
+            turn_id       TEXT NOT NULL REFERENCES agent_turns(id),
+            decision_type TEXT NOT NULL,
+            action        TEXT NOT NULL,
+            rule_matched  TEXT,
+            confidence    TEXT NOT NULL DEFAULT 'medium',
+            explanation   TEXT NOT NULL DEFAULT '',
+            risk_score    INTEGER NOT NULL DEFAULT 0,
+            created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+
+    # -- agent_tool_runs ----------------------------------------------------
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS agent_tool_runs (
+            id          TEXT PRIMARY KEY,
+            session_id  TEXT NOT NULL REFERENCES sessions(id),
+            trace_id    TEXT NOT NULL,
+            plan_id     TEXT REFERENCES agent_plans(id),
+            turn_id     TEXT NOT NULL REFERENCES agent_turns(id),
+            tool_name   TEXT NOT NULL,
+            arguments   TEXT NOT NULL DEFAULT '{}',
+            result      TEXT NOT NULL DEFAULT '',
+            is_error    INTEGER NOT NULL DEFAULT 0,
+            duration_ms REAL,
+            created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+
+    # -- agent_outcomes -----------------------------------------------------
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS agent_outcomes (
+            id                TEXT PRIMARY KEY,
+            session_id        TEXT NOT NULL REFERENCES sessions(id),
+            trace_id          TEXT NOT NULL,
+            turn_id           TEXT NOT NULL REFERENCES agent_turns(id),
+            status            TEXT NOT NULL,
+            summary           TEXT NOT NULL DEFAULT '',
+            tool_runs_count   INTEGER NOT NULL DEFAULT 0,
+            total_duration_ms REAL,
+            created_at        TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+
+    # -- indexes ------------------------------------------------------------
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_turns_session ON agent_turns(session_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_turns_trace ON agent_turns(trace_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_plans_session ON agent_plans(session_id)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_agent_decisions_session ON agent_decisions(session_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_agent_tool_runs_session ON agent_tool_runs(session_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_agent_outcomes_session ON agent_outcomes(session_id)"
+    )
+
+
 _MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     0: _migrate_0_to_1,
     1: _migrate_1_to_2,
     2: _migrate_2_to_3,
     3: _migrate_3_to_4,
     4: _migrate_4_to_5,
+    5: _migrate_5_to_6,
 }
 
 

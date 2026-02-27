@@ -435,3 +435,94 @@ export interface ComplianceScanResult {
   suggestions: ComplianceSuggestion[];
   scannedAt: string;
 }
+
+// ---------------------------------------------------------------------------
+// Expert Agent types
+// ---------------------------------------------------------------------------
+
+export interface AgentTurn {
+  id: string;
+  session_id: string;
+  trace_id: string;
+  turn_number: number;
+  role: "user" | "assistant" | "tool";
+  content: string;
+  state: string;
+  created_at: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface AgentPlan {
+  id: string;
+  session_id: string;
+  trace_id: string;
+  turn_id: string;
+  status: "proposed" | "approved" | "denied" | "executing" | "completed" | "failed";
+  description: string;
+  steps: { tool: string; arguments_preview: string }[];
+  risk_level: "low" | "medium" | "high";
+  created_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+}
+
+export interface AgentDecision {
+  id: string;
+  session_id: string;
+  trace_id: string;
+  plan_id: string | null;
+  turn_id: string;
+  decision_type: string;
+  action: "allow" | "deny" | "escalate";
+  rule_matched: string | null;
+  confidence: string;
+  explanation: string;
+  risk_score: number;
+  created_at: string;
+}
+
+export interface AgentToolRun {
+  id: string;
+  session_id: string;
+  trace_id: string;
+  plan_id: string | null;
+  turn_id: string;
+  tool_name: string;
+  arguments: Record<string, unknown>;
+  result: string;
+  is_error: boolean;
+  duration_ms: number | null;
+  created_at: string;
+}
+
+export interface AgentOutcome {
+  id: string;
+  session_id: string;
+  trace_id: string;
+  turn_id: string;
+  status: "success" | "partial" | "failed" | "denied";
+  summary: string;
+  tool_runs_count: number;
+  total_duration_ms: number | null;
+  created_at: string;
+}
+
+export interface AgentState {
+  session_id: string;
+  session_status: string;
+  agent_state: string;
+  total_turns: number;
+  latest_turn_id: string | null;
+  latest_plan_id: string | null;
+  latest_plan_status: string | null;
+  trace_id: string | null;
+}
+
+export interface AgentProfile {
+  name: string;
+  version: string;
+  description: string;
+  capabilities: string[];
+  risk_tier: string;
+  max_autonomy: string;
+}

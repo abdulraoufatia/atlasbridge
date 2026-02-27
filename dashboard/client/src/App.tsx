@@ -17,6 +17,7 @@ import RepositoriesPage from "@/pages/repositories";
 import TerminalPage from "@/pages/terminal";
 import EvidencePage from "@/pages/evidence";
 import ChatPage from "@/pages/chat";
+import AgentPage from "@/pages/agent";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -35,6 +36,7 @@ function Router() {
         <Route path="/terminal" component={TerminalPage} />
         <Route path="/evidence" component={EvidencePage} />
         <Route path="/chat" component={ChatPage} />
+        <Route path="/agent" component={AgentPage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

@@ -32,6 +32,12 @@ import type {
   RiskLevel,
   PromptDecision,
   PromptType,
+  AgentTurn,
+  AgentPlan,
+  AgentDecision,
+  AgentToolRun,
+  AgentOutcome,
+  AgentState,
 } from "@shared/schema";
 
 // ---------------------------------------------------------------------------
@@ -740,6 +746,190 @@ export class AtlasBridgeRepo {
         policy_hot_reload: true,
       },
     };
+  }
+
+  // -----------------------------------------------------------------------
+  // Expert Agent SoR
+  // -----------------------------------------------------------------------
+
+  listAgentTurns(sessionId: string, limit = 200): AgentTurn[] {
+    const db = getAtlasBridgeDb();
+    if (!db) return [];
+    try {
+      const rows = db.prepare(
+        "SELECT * FROM agent_turns WHERE session_id = ? ORDER BY turn_number ASC LIMIT ?"
+      ).all(sessionId, limit) as any[];
+      return rows.map((r) => ({
+        id: r.id,
+        session_id: r.session_id,
+        trace_id: r.trace_id,
+        turn_number: r.turn_number,
+        role: r.role,
+        content: r.content || "",
+        state: r.state,
+        created_at: r.created_at,
+        metadata: r.metadata ? JSON.parse(r.metadata) : {},
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  listAgentPlans(sessionId: string, limit = 100): AgentPlan[] {
+    const db = getAtlasBridgeDb();
+    if (!db) return [];
+    try {
+      const rows = db.prepare(
+        "SELECT * FROM agent_plans WHERE session_id = ? ORDER BY created_at DESC LIMIT ?"
+      ).all(sessionId, limit) as any[];
+      return rows.map((r) => ({
+        id: r.id,
+        session_id: r.session_id,
+        trace_id: r.trace_id,
+        turn_id: r.turn_id,
+        status: r.status,
+        description: r.description || "",
+        steps: r.steps ? JSON.parse(r.steps) : [],
+        risk_level: r.risk_level,
+        created_at: r.created_at,
+        resolved_at: r.resolved_at,
+        resolved_by: r.resolved_by,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  getAgentPlan(planId: string): AgentPlan | null {
+    const db = getAtlasBridgeDb();
+    if (!db) return null;
+    try {
+      const r = db.prepare("SELECT * FROM agent_plans WHERE id = ?").get(planId) as any;
+      if (!r) return null;
+      return {
+        id: r.id,
+        session_id: r.session_id,
+        trace_id: r.trace_id,
+        turn_id: r.turn_id,
+        status: r.status,
+        description: r.description || "",
+        steps: r.steps ? JSON.parse(r.steps) : [],
+        risk_level: r.risk_level,
+        created_at: r.created_at,
+        resolved_at: r.resolved_at,
+        resolved_by: r.resolved_by,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  listAgentDecisions(sessionId: string, limit = 200): AgentDecision[] {
+    const db = getAtlasBridgeDb();
+    if (!db) return [];
+    try {
+      const rows = db.prepare(
+        "SELECT * FROM agent_decisions WHERE session_id = ? ORDER BY created_at DESC LIMIT ?"
+      ).all(sessionId, limit) as any[];
+      return rows.map((r) => ({
+        id: r.id,
+        session_id: r.session_id,
+        trace_id: r.trace_id,
+        plan_id: r.plan_id,
+        turn_id: r.turn_id,
+        decision_type: r.decision_type,
+        action: r.action,
+        rule_matched: r.rule_matched,
+        confidence: r.confidence,
+        explanation: r.explanation || "",
+        risk_score: r.risk_score,
+        created_at: r.created_at,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  listAgentToolRuns(sessionId: string, limit = 200): AgentToolRun[] {
+    const db = getAtlasBridgeDb();
+    if (!db) return [];
+    try {
+      const rows = db.prepare(
+        "SELECT * FROM agent_tool_runs WHERE session_id = ? ORDER BY created_at ASC LIMIT ?"
+      ).all(sessionId, limit) as any[];
+      return rows.map((r) => ({
+        id: r.id,
+        session_id: r.session_id,
+        trace_id: r.trace_id,
+        plan_id: r.plan_id,
+        turn_id: r.turn_id,
+        tool_name: r.tool_name,
+        arguments: r.arguments ? JSON.parse(r.arguments) : {},
+        result: r.result || "",
+        is_error: Boolean(r.is_error),
+        duration_ms: r.duration_ms,
+        created_at: r.created_at,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  listAgentOutcomes(sessionId: string, limit = 100): AgentOutcome[] {
+    const db = getAtlasBridgeDb();
+    if (!db) return [];
+    try {
+      const rows = db.prepare(
+        "SELECT * FROM agent_outcomes WHERE session_id = ? ORDER BY created_at DESC LIMIT ?"
+      ).all(sessionId, limit) as any[];
+      return rows.map((r) => ({
+        id: r.id,
+        session_id: r.session_id,
+        trace_id: r.trace_id,
+        turn_id: r.turn_id,
+        status: r.status,
+        summary: r.summary || "",
+        tool_runs_count: r.tool_runs_count,
+        total_duration_ms: r.total_duration_ms,
+        created_at: r.created_at,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  getAgentState(sessionId: string): AgentState | null {
+    const db = getAtlasBridgeDb();
+    if (!db) return null;
+    try {
+      const session = db.prepare("SELECT * FROM sessions WHERE id = ?").get(sessionId) as any;
+      if (!session) return null;
+
+      const turns = this.listAgentTurns(sessionId);
+      const plans = this.listAgentPlans(sessionId, 1);
+      const latestTurn = turns.length > 0 ? turns[turns.length - 1] : null;
+      const latestPlan = plans.length > 0 ? plans[0] : null;
+
+      let agentState = "ready";
+      if (latestPlan && latestPlan.status === "proposed") {
+        agentState = "gate";
+      } else if (latestTurn && ["intake", "plan", "execute"].includes(latestTurn.state)) {
+        agentState = latestTurn.state;
+      }
+
+      return {
+        session_id: sessionId,
+        session_status: session.status,
+        agent_state: agentState,
+        total_turns: turns.length,
+        latest_turn_id: latestTurn?.id ?? null,
+        latest_plan_id: latestPlan?.id ?? null,
+        latest_plan_status: latestPlan?.status ?? null,
+        trace_id: latestTurn?.trace_id ?? null,
+      };
+    } catch {
+      return null;
+    }
   }
 }
 

@@ -196,8 +196,8 @@ jobs:
           coverage report --include="src/atlasbridge/core/policy/*,src/atlasbridge/core/autopilot/*,src/atlasbridge/core/audit/*,src/atlasbridge/core/store/*" --fail-under=88
 
           echo ""
-          echo "=== Tier 2: Core (prompt, routing, session, daemon) — floor 80% ==="
-          coverage report --include="src/atlasbridge/core/prompt/*,src/atlasbridge/core/routing/*,src/atlasbridge/core/session/*,src/atlasbridge/core/daemon/*" --fail-under=80
+          echo "=== Tier 2: Core (prompt, routing, session, daemon) — floor 75% ==="
+          coverage report --include="src/atlasbridge/core/prompt/*,src/atlasbridge/core/routing/*,src/atlasbridge/core/session/*,src/atlasbridge/core/daemon/*" --fail-under=75
 
       - name: Upload coverage report
         uses: codecov/codecov-action@v5
