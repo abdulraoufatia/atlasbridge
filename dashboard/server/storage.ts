@@ -2,6 +2,7 @@ import { db } from "./db";
 import { eq } from "drizzle-orm";
 import {
   users, groups, roles, apiKeys, securityPolicies, notifications, ipAllowlist, repoConnections, qualityScans, rbacPermissions,
+  localScans, authProviders, containerScans, infraScans,
   type InsertUser, type User,
   type InsertGroup, type Group,
   type InsertRole, type Role,
@@ -12,6 +13,10 @@ import {
   type InsertRepoConnection, type RepoConnection,
   type InsertQualityScan, type QualityScan,
   type InsertRbacPermission, type RbacPermissionRow,
+  type InsertLocalScan, type LocalScan,
+  type InsertAuthProvider, type AuthProvider,
+  type InsertContainerScan, type ContainerScan,
+  type InsertInfraScan, type InfraScan,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -63,6 +68,22 @@ export interface IStorage {
   createRbacPermission(data: InsertRbacPermission): Promise<RbacPermissionRow>;
   updateRbacPermission(id: number, data: Partial<InsertRbacPermission>): Promise<RbacPermissionRow | undefined>;
   deleteRbacPermission(id: number): Promise<boolean>;
+
+  getLocalScans(repoId: number): Promise<LocalScan[]>;
+  getLocalScan(id: number): Promise<LocalScan | undefined>;
+  createLocalScan(data: InsertLocalScan): Promise<LocalScan>;
+
+  getAuthProviders(): Promise<AuthProvider[]>;
+  getAuthProvider(id: number): Promise<AuthProvider | undefined>;
+  createAuthProvider(data: InsertAuthProvider): Promise<AuthProvider>;
+  updateAuthProvider(id: number, data: Partial<InsertAuthProvider>): Promise<AuthProvider | undefined>;
+  deleteAuthProvider(id: number): Promise<boolean>;
+
+  getContainerScans(): Promise<ContainerScan[]>;
+  createContainerScan(data: InsertContainerScan): Promise<ContainerScan>;
+
+  getInfraScans(repoId: number): Promise<InfraScan[]>;
+  createInfraScan(data: InsertInfraScan): Promise<InfraScan>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -114,6 +135,22 @@ export class DatabaseStorage implements IStorage {
   async createRbacPermission(data: InsertRbacPermission) { const [p] = await db.insert(rbacPermissions).values(data).returning(); return p; }
   async updateRbacPermission(id: number, data: Partial<InsertRbacPermission>) { const [p] = await db.update(rbacPermissions).set(data).where(eq(rbacPermissions.id, id)).returning(); return p; }
   async deleteRbacPermission(id: number) { const result = await db.delete(rbacPermissions).where(eq(rbacPermissions.id, id)).returning(); return result.length > 0; }
+
+  async getLocalScans(repoId: number) { return db.select().from(localScans).where(eq(localScans.repoConnectionId, repoId)); }
+  async getLocalScan(id: number) { const [s] = await db.select().from(localScans).where(eq(localScans.id, id)); return s; }
+  async createLocalScan(data: InsertLocalScan) { const [s] = await db.insert(localScans).values(data).returning(); return s; }
+
+  async getAuthProviders() { return db.select().from(authProviders); }
+  async getAuthProvider(id: number) { const [p] = await db.select().from(authProviders).where(eq(authProviders.id, id)); return p; }
+  async createAuthProvider(data: InsertAuthProvider) { const [p] = await db.insert(authProviders).values(data).returning(); return p; }
+  async deleteAuthProvider(id: number) { const result = await db.delete(authProviders).where(eq(authProviders.id, id)).returning(); return result.length > 0; }
+  async updateAuthProvider(id: number, data: Partial<InsertAuthProvider>) { const [p] = await db.update(authProviders).set(data).where(eq(authProviders.id, id)).returning(); return p; }
+
+  async getContainerScans() { return db.select().from(containerScans); }
+  async createContainerScan(data: InsertContainerScan) { const [s] = await db.insert(containerScans).values(data).returning(); return s; }
+
+  async getInfraScans(repoId: number) { return db.select().from(infraScans).where(eq(infraScans.repoConnectionId, repoId)); }
+  async createInfraScan(data: InsertInfraScan) { const [s] = await db.insert(infraScans).values(data).returning(); return s; }
 }
 
 export const storage = new DatabaseStorage();

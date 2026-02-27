@@ -31,6 +31,8 @@ export interface ProviderClient {
   checkFiles(ctx: RepoContext, paths: string[]): Promise<Record<string, boolean>>;
   checkBranchProtection(ctx: RepoContext): Promise<BranchProtection>;
   getMetadata(ctx: RepoContext): Promise<RepoMetadata>;
+  listTree?(ctx: RepoContext): Promise<string[]>;
+  getFileContent?(ctx: RepoContext, filePath: string): Promise<string | null>;
 }
 
 export async function apiFetch(url: string, token?: string | null): Promise<Response> {

@@ -196,6 +196,24 @@ function ExportPanel({ sessionFilter }: { sessionFilter?: string }) {
     setExporting(null);
   };
 
+  const handleExportZIP = async () => {
+    setExporting("zip");
+    try {
+      const url = sessionFilter ? `/api/evidence/export/zip?sessionId=${sessionFilter}` : "/api/evidence/export/zip";
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `atlasbridge-evidence-${Date.now()}.zip`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      toast({ title: "ZIP exported", description: "Evidence bundle ZIP downloaded" });
+    } catch {
+      toast({ title: "Export failed", variant: "destructive" });
+    }
+    setExporting(null);
+  };
+
   const handleExportBundle = async () => {
     setExporting("bundle");
     try {
@@ -228,7 +246,7 @@ function ExportPanel({ sessionFilter }: { sessionFilter?: string }) {
           Generate verifiable governance evidence from local decision logs, traces, and integrity data.
           All exports are sanitized — secrets and tokens are automatically redacted.
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
           <Button variant="outline" className="h-auto py-3 flex flex-col gap-1.5" onClick={handleExportJSON} disabled={!!exporting} data-testid="button-export-json">
             <FileJson className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             <span className="text-xs font-medium">JSON Export</span>
@@ -246,6 +264,12 @@ function ExportPanel({ sessionFilter }: { sessionFilter?: string }) {
             <span className="text-xs font-medium">Full Bundle</span>
             <span className="text-[10px] text-muted-foreground">Hash-verified package</span>
             {exporting === "bundle" && <RefreshCw className="w-3 h-3 animate-spin" />}
+          </Button>
+          <Button variant="outline" className="h-auto py-3 flex flex-col gap-1.5" onClick={handleExportZIP} disabled={!!exporting} data-testid="button-export-zip">
+            <Download className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+            <span className="text-xs font-medium">ZIP Bundle</span>
+            <span className="text-[10px] text-muted-foreground">All files in one archive</span>
+            {exporting === "zip" && <RefreshCw className="w-3 h-3 animate-spin" />}
           </Button>
         </div>
       </CardContent>

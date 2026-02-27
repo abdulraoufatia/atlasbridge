@@ -36,6 +36,10 @@ export function getConfigPath(): string {
   return path.join(getAtlasBridgeDir(), "config.toml");
 }
 
+export function getArtifactsDir(): string {
+  return path.join(getAtlasBridgeDir(), "scan-artifacts");
+}
+
 export function ensureDir(dirPath: string): void {
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });

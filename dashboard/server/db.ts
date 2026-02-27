@@ -123,6 +123,37 @@ dashboardSqlite.exec(`
     categories TEXT NOT NULL,
     suggestions TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS local_scans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    repo_connection_id INTEGER NOT NULL,
+    profile TEXT NOT NULL,
+    commit_sha TEXT NOT NULL,
+    result TEXT NOT NULL,
+    artifact_path TEXT,
+    scanned_at TEXT NOT NULL DEFAULT (datetime('now')),
+    duration_ms INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE TABLE IF NOT EXISTS auth_providers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    name TEXT NOT NULL,
+    config TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS container_scans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    image TEXT NOT NULL,
+    tag TEXT NOT NULL,
+    result TEXT NOT NULL,
+    scanned_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS infra_scans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    repo_connection_id INTEGER NOT NULL,
+    result TEXT NOT NULL,
+    scanned_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
   CREATE TABLE IF NOT EXISTS operator_audit_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp TEXT NOT NULL DEFAULT (datetime('now')),
@@ -134,6 +165,9 @@ dashboardSqlite.exec(`
     error TEXT
   );
 `);
+
+// Migrations — add columns to existing tables (idempotent)
+try { dashboardSqlite.exec(`ALTER TABLE repo_connections ADD COLUMN auth_provider_id INTEGER`); } catch { /* column already exists */ }
 
 export const db = drizzle(dashboardSqlite, { schema });
 

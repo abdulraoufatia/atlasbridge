@@ -1112,6 +1112,158 @@ function ProviderCard({ provider, config }: { provider: SupportedProvider; confi
   );
 }
 
+// ---------------------------------------------------------------------------
+// Authentication tab — GitHub App / OIDC provider management
+// ---------------------------------------------------------------------------
+
+interface AuthProviderEntry {
+  id: number;
+  type: "github-app" | "oidc";
+  provider: string;
+  name: string;
+  createdAt: string;
+}
+
+const AUTH_PROVIDERS_QUERY_KEY = ["/api/auth-providers"];
+
+function AuthenticationTab() {
+  const { toast } = useToast();
+  const { data: authProviders, isLoading } = useQuery<AuthProviderEntry[]>({ queryKey: AUTH_PROVIDERS_QUERY_KEY, refetchInterval: 15_000 });
+  const [showAdd, setShowAdd] = useState(false);
+  const [addType, setAddType] = useState<"github-app" | "oidc">("github-app");
+  const [addName, setAddName] = useState("");
+  const [addProvider, setAddProvider] = useState("github");
+  const [addConfig, setAddConfig] = useState("{}");
+
+  const createMutation = useMutation({
+    mutationFn: (data: { type: string; provider: string; name: string; config: string }) => apiRequest("POST", "/api/auth-providers", data),
+    onSuccess: () => { toast({ title: "Auth provider created" }); queryClient.invalidateQueries({ queryKey: AUTH_PROVIDERS_QUERY_KEY }); setShowAdd(false); setAddName(""); setAddConfig("{}"); },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/auth-providers/${id}`),
+    onSuccess: () => { toast({ title: "Auth provider deleted" }); queryClient.invalidateQueries({ queryKey: AUTH_PROVIDERS_QUERY_KEY }); },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const testMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("POST", `/api/auth-providers/${id}/test`);
+      return res.json();
+    },
+    onSuccess: (data: any) => toast({ title: "Test result", description: data.success ? "Connection successful" : `Failed: ${data.error || "Unknown error"}` }),
+    onError: (e: Error) => toast({ title: "Test failed", description: e.message, variant: "destructive" }),
+  });
+
+  const providers = authProviders ?? [];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button size="sm" variant="outline" onClick={() => setShowAdd(!showAdd)} data-testid="add-auth-provider"><Plus className="w-4 h-4 mr-1.5" />Add Provider</Button>
+      </div>
+
+      {showAdd && (
+        <Card>
+          <CardHeader className="pb-3"><CardTitle className="text-sm font-medium">Add Authentication Provider</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Type</Label>
+                <Select value={addType} onValueChange={(v) => setAddType(v as "github-app" | "oidc")}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="github-app">GitHub App</SelectItem>
+                    <SelectItem value="oidc">OIDC</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Provider</Label>
+                <Input value={addProvider} onChange={(e) => setAddProvider(e.target.value)} placeholder="github" />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Name</Label>
+              <Input value={addName} onChange={(e) => setAddName(e.target.value)} placeholder="My GitHub App" />
+            </div>
+            <div>
+              <Label className="text-xs">Config (JSON)</Label>
+              <textarea
+                className="w-full h-24 text-xs font-mono border rounded-md p-2 bg-background"
+                value={addConfig}
+                onChange={(e) => setAddConfig(e.target.value)}
+                placeholder={addType === "github-app" ? '{"appId": "...", "privateKeyPath": "...", "installationId": "..."}' : '{"issuerUrl": "...", "clientId": "...", "redirectUri": "...", "scopes": ["openid"]}'}
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" size="sm" onClick={() => setShowAdd(false)}>Cancel</Button>
+              <Button size="sm" onClick={() => createMutation.mutate({ type: addType, provider: addProvider, name: addName, config: addConfig })} disabled={!addName || !addConfig}>Create</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {isLoading ? (
+        <div className="space-y-3">{[1, 2].map(i => <Skeleton key={i} className="h-20 w-full" />)}</div>
+      ) : providers.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="p-8 text-center">
+            <Fingerprint className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">No authentication providers configured. Add a GitHub App or OIDC provider to enable authenticated scanning of private repositories.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {providers.map(p => (
+            <Card key={p.id}>
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${p.type === "github-app" ? "bg-gray-100 dark:bg-gray-800" : "bg-blue-50 dark:bg-blue-900/30"}`}>
+                    {p.type === "github-app" ? <Lock className="w-4 h-4" /> : <Globe className="w-4 h-4" />}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">{p.name}</p>
+                    <p className="text-xs text-muted-foreground">{p.type === "github-app" ? "GitHub App" : "OIDC"} &middot; {p.provider} &middot; {ago(p.createdAt)}</p>
+                  </div>
+                </div>
+                <div className="flex gap-1.5">
+                  <Button size="sm" variant="outline" onClick={() => testMutation.mutate(p.id)}>Test</Button>
+                  {p.type === "oidc" && (
+                    <Button size="sm" variant="outline" asChild>
+                      <a href={`/api/auth/oidc/${p.id}/authorize`}>Authorize</a>
+                    </Button>
+                  )}
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild><Button size="sm" variant="ghost"><Trash2 className="w-4 h-4 text-destructive" /></Button></AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete auth provider?</AlertDialogTitle>
+                        <AlertDialogDescription>This will remove "{p.name}" and any linked repo connections will fall back to PAT authentication.</AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => deleteMutation.mutate(p.id)}>Delete</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <Card className="border-dashed">
+        <CardContent className="p-4">
+          <p className="text-xs text-muted-foreground"><strong>GitHub App:</strong> Provide appId, privateKeyPath, and installationId. The private key file stays on disk and is never uploaded. <strong>OIDC:</strong> Provide issuerUrl, clientId, clientSecretPath, redirectUri, and scopes. Use the Authorize button to complete the browser flow.</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function ProvidersTab() {
   const { data: providers, isLoading } = useQuery<ProviderConfig[]>({ queryKey: PROVIDERS_QUERY_KEY, refetchInterval: 15_000 });
   const configMap = Object.fromEntries((providers ?? []).map(p => [p.provider, p])) as Record<string, ProviderConfig>;
@@ -1313,6 +1465,7 @@ export default function SettingsPage() {
             <TabsTrigger value="security" data-testid="tab-security"><ShieldCheck className="w-3.5 h-3.5 mr-1.5" />Security</TabsTrigger>
             <TabsTrigger value="retention" data-testid="tab-retention"><FileCheck className="w-3.5 h-3.5 mr-1.5" />Retention</TabsTrigger>
             <TabsTrigger value="notifications" data-testid="tab-notifications"><Bell className="w-3.5 h-3.5 mr-1.5" />Alerts</TabsTrigger>
+            <TabsTrigger value="authentication" data-testid="tab-authentication"><Fingerprint className="w-3.5 h-3.5 mr-1.5" />Authentication</TabsTrigger>
             <TabsTrigger value="providers" data-testid="tab-providers"><Key className="w-3.5 h-3.5 mr-1.5" />Providers</TabsTrigger>
             <TabsTrigger value="workspaces" data-testid="tab-workspaces"><FolderCheck className="w-3.5 h-3.5 mr-1.5" />Workspaces</TabsTrigger>
             <TabsTrigger value="agents" data-testid="tab-agents"><Sparkles className="w-3.5 h-3.5 mr-1.5" />Agents</TabsTrigger>
@@ -1327,6 +1480,7 @@ export default function SettingsPage() {
         <TabsContent value="security"><SecurityTab org={orgData} /></TabsContent>
         <TabsContent value="retention"><RetentionTab org={orgData} /></TabsContent>
         <TabsContent value="notifications"><NotificationsTab org={orgData} /></TabsContent>
+        <TabsContent value="authentication"><AuthenticationTab /></TabsContent>
         <TabsContent value="providers"><ProvidersTab /></TabsContent>
         <TabsContent value="workspaces"><WorkspacesTab /></TabsContent>
         <TabsContent value="agents"><AgentsTab /></TabsContent>

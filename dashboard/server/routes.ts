@@ -9,6 +9,16 @@ import { repo } from "./atlasbridge-repo";
 import { storage } from "./storage";
 import { seedDatabase } from "./seed";
 import { runQualityScan } from "./scanner";
+import { runLocalScan } from "./scanner/profiles";
+import { cloneRepo } from "./scanner/local";
+import { testGitHubAppConfig, getGitHubAppToken } from "./auth/github-app";
+import { testOIDCConfig, initiateOIDCFlow, handleCallback as handleOIDCCallback, encryptToken, refreshAccessToken } from "./auth/oidc";
+import type { ScanProfile } from "@shared/schema";
+import { runRemoteScan } from "./scanner/remote";
+import { scanContainerImage } from "./scanner/container";
+import { scanInfraAsCode } from "./scanner/infra";
+import { streamZipResponse, streamZipFromDisk } from "./zip-builder";
+import { GitHubClient } from "./scanner/github";
 import {
   generateEvidenceJSON, generateEvidenceCSV, generateFullBundle,
   computeGovernanceScore, policyPacks, listGeneratedBundles, addGeneratedBundle,
@@ -19,6 +29,29 @@ import { operatorRateLimiter } from "./middleware/rate-limit";
 import { insertOperatorAuditLog } from "./db";
 import { getConfigPath } from "./config";
 import { parse as parseTOML, stringify as stringifyTOML } from "smol-toml";
+
+// ---------------------------------------------------------------------------
+// Auth token resolution — resolve access token from auth provider or inline PAT
+// ---------------------------------------------------------------------------
+
+async function resolveAccessToken(repo: { accessToken?: string | null; authProviderId?: number | null }): Promise<string | null> {
+  if (repo.accessToken) return repo.accessToken;
+  if (!repo.authProviderId) return null;
+
+  const provider = await storage.getAuthProvider(repo.authProviderId);
+  if (!provider) return null;
+
+  const config = typeof provider.config === "string" ? JSON.parse(provider.config) : provider.config;
+
+  if (provider.type === "github-app") {
+    return getGitHubAppToken(config);
+  }
+  if (provider.type === "oidc" && config.storedRefreshToken) {
+    const tokenSet = await refreshAccessToken(config.storedRefreshToken, config);
+    return tokenSet.accessToken;
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // TOML config helpers — read/write atlasbridge config.toml directly
@@ -739,6 +772,400 @@ export async function registerRoutes(
   });
 
   // -----------------------------------------------------------------------
+  // Local scan endpoints
+  // -----------------------------------------------------------------------
+
+  app.post("/api/repo-connections/:id/local-scan", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const repoConn = await storage.getRepoConnection(id);
+      if (!repoConn) { res.status(404).json({ error: "Repository not found" }); return; }
+
+      const profile = (req.body.profile || "quick") as ScanProfile;
+      if (!["quick", "safety", "deep"].includes(profile)) {
+        res.status(400).json({ error: "Invalid profile. Must be: quick, safety, or deep" });
+        return;
+      }
+
+      let repoPath = req.body.localPath as string | undefined;
+      let tempDir: string | null = null;
+
+      if (repoPath) {
+        // Validate local path
+        const fs = await import("fs");
+        if (!fs.existsSync(repoPath)) {
+          res.status(400).json({ error: `Local path does not exist: ${repoPath}` });
+          return;
+        }
+        if (!fs.existsSync(path.join(repoPath, ".git"))) {
+          res.status(400).json({ error: "Path is not a git repository (no .git directory)" });
+          return;
+        }
+      } else {
+        // Clone repo to temp dir — resolve access token from auth provider if configured
+        const os = await import("os");
+        tempDir = path.join(os.tmpdir(), `atlasbridge-scan-${Date.now()}`);
+        try {
+          const token = await resolveAccessToken(repoConn);
+          cloneRepo(repoConn.url, repoConn.branch, tempDir, token);
+          repoPath = tempDir;
+        } catch (cloneErr: any) {
+          res.status(400).json({ error: `Failed to clone repository: ${cloneErr.message}` });
+          return;
+        }
+      }
+
+      try {
+        const result = await runLocalScan(repoPath!, profile, id);
+
+        // Store in DB
+        await storage.createLocalScan({
+          repoConnectionId: id,
+          profile,
+          commitSha: result.commitSha,
+          result: result as any,
+          artifactPath: result.artifactPath,
+          durationMs: result.duration,
+        });
+
+        // Update last synced
+        await storage.updateRepoConnection(id, {
+          lastSynced: new Date().toISOString(),
+        });
+
+        res.json(result);
+      } finally {
+        // Cleanup temp dir
+        if (tempDir) {
+          try {
+            const fs = await import("fs");
+            fs.rmSync(tempDir, { recursive: true, force: true });
+          } catch {
+            // ignore cleanup errors
+          }
+        }
+      }
+    } catch (e: any) {
+      res.status(400).json({ error: e.message || "Failed to run local scan" });
+    }
+  });
+
+  app.get("/api/repo-connections/:id/local-scans", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const scans = await storage.getLocalScans(id);
+      // Return the parsed result for each scan
+      const results = scans.map((s) => ({
+        id: s.id,
+        profile: s.profile,
+        commitSha: s.commitSha,
+        scannedAt: s.scannedAt,
+        durationMs: s.durationMs,
+        result: typeof s.result === "string" ? JSON.parse(s.result) : s.result,
+      }));
+      res.json(results);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to load local scans" });
+    }
+  });
+
+  // Scan artifact ZIP — must be registered BEFORE the :filename catch-all
+  app.get("/api/repo-connections/:id/local-scans/:scanId/artifacts/bundle.zip", async (req, res) => {
+    try {
+      const scanId = parseInt(req.params.scanId);
+      const scan = await storage.getLocalScan(scanId);
+      if (!scan || !scan.artifactPath) {
+        res.status(404).json({ error: "Scan or artifacts not found" });
+        return;
+      }
+
+      const artifactFiles = ["repo_scan.json", "repo_scan_summary.md", "manifest.json"];
+      const files = artifactFiles
+        .map((name) => ({ diskPath: path.join(scan.artifactPath!, name), archiveName: name }))
+        .filter((f) => fs.existsSync(f.diskPath));
+
+      if (files.length === 0) {
+        res.status(404).json({ error: "No artifact files found" });
+        return;
+      }
+
+      streamZipFromDisk(res, `scan-${scanId}-artifacts.zip`, files);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to generate artifact ZIP" });
+    }
+  });
+
+  app.get("/api/repo-connections/:id/local-scans/:scanId/artifacts/:filename", async (req, res) => {
+    try {
+      const scanId = parseInt(req.params.scanId);
+      const filename = req.params.filename;
+
+      // Validate filename to prevent path traversal
+      if (!/^[a-zA-Z0-9_.\-]+$/.test(filename)) {
+        res.status(400).json({ error: "Invalid filename" });
+        return;
+      }
+
+      const scan = await storage.getLocalScan(scanId);
+      if (!scan || !scan.artifactPath) {
+        res.status(404).json({ error: "Scan or artifacts not found" });
+        return;
+      }
+
+      const filePath = path.join(scan.artifactPath, filename);
+      const fsModule = await import("fs");
+      if (!fsModule.existsSync(filePath)) {
+        res.status(404).json({ error: "Artifact file not found" });
+        return;
+      }
+
+      // Determine content type
+      const ext = path.extname(filename);
+      const contentType = ext === ".json" ? "application/json" : ext === ".md" ? "text/markdown" : "application/octet-stream";
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.send(fsModule.readFileSync(filePath));
+    } catch (e) {
+      res.status(500).json({ error: "Failed to serve artifact" });
+    }
+  });
+
+  // -----------------------------------------------------------------------
+  // Remote repository scanning
+  // -----------------------------------------------------------------------
+
+  app.post("/api/repo-connections/:id/remote-scan", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const repoConn = await storage.getRepoConnection(id);
+      if (!repoConn) { res.status(404).json({ error: "Repo connection not found" }); return; }
+
+      const token = await resolveAccessToken(repoConn);
+      if (!token) { res.status(400).json({ error: "No access token available. Configure an auth provider or add a PAT." }); return; }
+
+      const client = new GitHubClient();
+      if (!client.listTree || !client.getFileContent) {
+        res.status(400).json({ error: "Provider does not support remote scanning" });
+        return;
+      }
+
+      const ctx = {
+        provider: repoConn.provider,
+        owner: repoConn.owner,
+        repo: repoConn.repo,
+        branch: repoConn.branch,
+        accessToken: token,
+      };
+      const result = await runRemoteScan(client, ctx);
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Remote scan failed" });
+    }
+  });
+
+  // -----------------------------------------------------------------------
+  // Container image scanning (Trivy)
+  // -----------------------------------------------------------------------
+
+  app.post("/api/container-scan", async (req, res) => {
+    try {
+      const { image, tag } = req.body as { image?: string; tag?: string };
+      if (!image) { res.status(400).json({ error: "image is required" }); return; }
+      const result = await scanContainerImage(image, tag || "latest");
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Container scan failed" });
+    }
+  });
+
+  // -----------------------------------------------------------------------
+  // Infrastructure-as-Code scanning
+  // -----------------------------------------------------------------------
+
+  app.post("/api/repo-connections/:id/infra-scan", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const repoConn = await storage.getRepoConnection(id);
+      if (!repoConn) { res.status(404).json({ error: "Repo connection not found" }); return; }
+
+      let repoPath = req.body.localPath as string | undefined;
+      let tempDir: string | null = null;
+
+      if (repoPath) {
+        if (!fs.existsSync(repoPath) || !fs.existsSync(path.join(repoPath, ".git"))) {
+          res.status(400).json({ error: "Invalid local path" });
+          return;
+        }
+      } else {
+        const os = await import("os");
+        tempDir = path.join(os.tmpdir(), `atlasbridge-infra-${Date.now()}`);
+        try {
+          const token = await resolveAccessToken(repoConn);
+          cloneRepo(repoConn.url, repoConn.branch, tempDir, token);
+          repoPath = tempDir;
+        } catch (cloneErr: any) {
+          res.status(400).json({ error: `Failed to clone repository: ${cloneErr.message}` });
+          return;
+        }
+      }
+
+      const result = scanInfraAsCode(repoPath!);
+
+      // Clean up temp clone
+      if (tempDir) {
+        try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
+      }
+
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Infra scan failed" });
+    }
+  });
+
+  // -----------------------------------------------------------------------
+  // Auth provider endpoints
+  // -----------------------------------------------------------------------
+
+  app.get("/api/auth-providers", async (_req, res) => {
+    try {
+      const providers = await storage.getAuthProviders();
+      // Strip sensitive config details from response
+      const safe = providers.map((p) => ({
+        id: p.id,
+        type: p.type,
+        provider: p.provider,
+        name: p.name,
+        createdAt: p.createdAt,
+      }));
+      res.json(safe);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to load auth providers" });
+    }
+  });
+
+  app.post("/api/auth-providers", async (req, res) => {
+    try {
+      const { type, provider, name, config } = req.body;
+      if (!type || !provider || !name || !config) {
+        res.status(400).json({ error: "Missing required fields: type, provider, name, config" });
+        return;
+      }
+      if (!["github-app", "oidc"].includes(type)) {
+        res.status(400).json({ error: "Invalid type. Must be: github-app or oidc" });
+        return;
+      }
+
+      const authProvider = await storage.createAuthProvider({
+        type,
+        provider,
+        name,
+        config,
+      });
+
+      res.json({
+        id: authProvider.id,
+        type: authProvider.type,
+        provider: authProvider.provider,
+        name: authProvider.name,
+        createdAt: authProvider.createdAt,
+      });
+    } catch (e: any) {
+      res.status(400).json({ error: e.message || "Failed to create auth provider" });
+    }
+  });
+
+  app.delete("/api/auth-providers/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteAuthProvider(id);
+      if (!deleted) { res.status(404).json({ error: "Auth provider not found" }); return; }
+      res.status(204).end();
+    } catch (e) {
+      res.status(500).json({ error: "Failed to delete auth provider" });
+    }
+  });
+
+  app.post("/api/auth-providers/:id/test", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const authProvider = await storage.getAuthProvider(id);
+      if (!authProvider) { res.status(404).json({ error: "Auth provider not found" }); return; }
+
+      const config = typeof authProvider.config === "string"
+        ? JSON.parse(authProvider.config)
+        : authProvider.config;
+
+      if (authProvider.type === "github-app") {
+        const result = await testGitHubAppConfig(config);
+        res.json(result);
+      } else if (authProvider.type === "oidc") {
+        const result = await testOIDCConfig(config);
+        res.json(result);
+      } else {
+        res.status(400).json({ error: "Unknown auth provider type" });
+      }
+    } catch (e: any) {
+      res.status(400).json({ error: e.message || "Test failed" });
+    }
+  });
+
+  // -----------------------------------------------------------------------
+  // OIDC browser redirect flow
+  // -----------------------------------------------------------------------
+
+  app.get("/api/auth/oidc/:providerId/authorize", async (req, res) => {
+    try {
+      const providerId = parseInt(req.params.providerId);
+      const provider = await storage.getAuthProvider(providerId);
+      if (!provider || provider.type !== "oidc") {
+        res.status(404).json({ error: "OIDC provider not found" });
+        return;
+      }
+
+      const config = typeof provider.config === "string" ? JSON.parse(provider.config) : provider.config;
+      const state = Buffer.from(JSON.stringify({ providerId })).toString("base64url");
+      const authorizeUrl = await initiateOIDCFlow(config, state);
+      res.redirect(authorizeUrl);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Failed to initiate OIDC flow" });
+    }
+  });
+
+  app.get("/api/auth/oidc/callback", async (req, res) => {
+    try {
+      const code = req.query.code as string;
+      const state = req.query.state as string;
+      if (!code || !state) {
+        res.status(400).send("Missing code or state parameter");
+        return;
+      }
+
+      const { providerId } = JSON.parse(Buffer.from(state, "base64url").toString());
+      const provider = await storage.getAuthProvider(providerId);
+      if (!provider || provider.type !== "oidc") {
+        res.status(404).send("OIDC provider not found");
+        return;
+      }
+
+      const config = typeof provider.config === "string" ? JSON.parse(provider.config) : provider.config;
+      const tokenSet = await handleOIDCCallback(code, config);
+
+      // Encrypt and store refresh token in provider config
+      const updatedConfig = {
+        ...config,
+        storedRefreshToken: tokenSet.refreshToken ? encryptToken(tokenSet.refreshToken) : undefined,
+        lastTokenAt: new Date().toISOString(),
+      };
+      await storage.updateAuthProvider(providerId, { config: JSON.stringify(updatedConfig) });
+
+      // Redirect back to settings page
+      res.redirect("/settings?tab=authentication&oidc=success");
+    } catch (e: any) {
+      res.redirect(`/settings?tab=authentication&oidc=error&message=${encodeURIComponent(e.message || "Callback failed")}`);
+    }
+  });
+
+  // -----------------------------------------------------------------------
   // Evidence engine endpoints
   // -----------------------------------------------------------------------
 
@@ -788,6 +1215,36 @@ export async function registerRoutes(
   app.get("/api/evidence/integrity", (_req, res) => {
     const bundle = generateEvidenceJSON();
     res.json(bundle.integrityReport);
+  });
+
+  app.get("/api/evidence/export/zip", (req, res) => {
+    try {
+      const sessionId = req.query.sessionId as string | undefined;
+      const bundle = generateFullBundle(sessionId || undefined);
+      const ts = new Date().toISOString().replace(/[:.]/g, "-");
+
+      const entries: { name: string; content: string }[] = [
+        { name: "evidence.json", content: JSON.stringify(bundle.evidence, null, 2) },
+        { name: "decisions.csv", content: generateEvidenceCSV(sessionId || undefined) },
+        { name: "integrity_report.json", content: JSON.stringify(bundle.integrityReport, null, 2) },
+        { name: "manifest.json", content: JSON.stringify(bundle.manifest, null, 2) },
+        { name: "README.txt", content: [
+          "AtlasBridge Evidence Bundle",
+          `Generated: ${new Date().toISOString()}`,
+          sessionId ? `Session: ${sessionId}` : "All sessions",
+          "",
+          "Files:",
+          "  evidence.json          — Full evidence payload (decisions, escalations, score)",
+          "  decisions.csv          — Decisions in CSV format for spreadsheet import",
+          "  integrity_report.json  — Audit log integrity verification",
+          "  manifest.json          — File manifest with SHA-256 hashes",
+        ].join("\n") },
+      ];
+
+      streamZipResponse(res, `atlasbridge-evidence-${ts}.zip`, entries);
+    } catch (e: any) {
+      if (!res.headersSent) res.status(500).json({ error: e.message || "Failed to generate ZIP" });
+    }
   });
 
   // ---------------------------------------------------------------------------

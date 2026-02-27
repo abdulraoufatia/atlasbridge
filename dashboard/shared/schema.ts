@@ -308,6 +308,7 @@ export const repoConnections = sqliteTable("repo_connections", {
   lastSynced: text("last_synced"),
   qualityLevel: text("quality_level").notNull().default("standard"),
   qualityScore: integer("quality_score"),
+  authProviderId: integer("auth_provider_id"),
 });
 
 export const insertRepoConnectionSchema = createInsertSchema(repoConnections).omit({ id: true, connectedAt: true });
@@ -327,6 +328,38 @@ export const qualityScans = sqliteTable("quality_scans", {
 export const insertQualityScanSchema = createInsertSchema(qualityScans).omit({ id: true, scanDate: true });
 export type InsertQualityScan = z.infer<typeof insertQualityScanSchema>;
 export type QualityScan = typeof qualityScans.$inferSelect;
+
+// --- Local scan tables ---
+
+export const localScans = sqliteTable("local_scans", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  repoConnectionId: integer("repo_connection_id").notNull(),
+  profile: text("profile").notNull(),
+  commitSha: text("commit_sha").notNull(),
+  result: text("result", { mode: "json" }).notNull(),
+  artifactPath: text("artifact_path"),
+  scannedAt: text("scanned_at").notNull().default(sql`(datetime('now'))`),
+  durationMs: integer("duration_ms").notNull().default(0),
+});
+
+export const insertLocalScanSchema = createInsertSchema(localScans).omit({ id: true, scannedAt: true });
+export type InsertLocalScan = z.infer<typeof insertLocalScanSchema>;
+export type LocalScan = typeof localScans.$inferSelect;
+
+// --- Auth provider tables ---
+
+export const authProviders = sqliteTable("auth_providers", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  type: text("type").notNull(),         // "github-app" | "oidc"
+  provider: text("provider").notNull(), // "github" | "gitlab" | "azure"
+  name: text("name").notNull(),
+  config: text("config", { mode: "json" }).notNull(),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+});
+
+export const insertAuthProviderSchema = createInsertSchema(authProviders).omit({ id: true, createdAt: true });
+export type InsertAuthProvider = z.infer<typeof insertAuthProviderSchema>;
+export type AuthProvider = typeof authProviders.$inferSelect;
 
 export type UserStatus = "active" | "inactive" | "suspended" | "pending";
 export type MfaStatus = "enabled" | "disabled" | "enforced";
@@ -526,3 +559,201 @@ export interface AgentProfile {
   risk_tier: string;
   max_autonomy: string;
 }
+
+// ---------------------------------------------------------------------------
+// Local scan types
+// ---------------------------------------------------------------------------
+
+export type ScanProfile = "quick" | "safety" | "deep";
+
+export interface LanguageBreakdown {
+  name: string;
+  percentage: number;
+  files: number;
+}
+
+export interface RepoInventory {
+  languages: LanguageBreakdown[];
+  buildSystems: string[];
+  ciPlatforms: string[];
+  projectType: string;
+  frameworks: string[];
+  totalFiles: number;
+  totalLines: number;
+  repoSize: string;
+}
+
+export interface SensitivePathEntry {
+  path: string;
+  reason: string;
+  risk: "high" | "medium" | "low";
+}
+
+export interface ToolSurface {
+  tool: string;
+  configPath: string;
+  risk: string;
+}
+
+export interface PolicyCoverageResult {
+  score: number;
+  gaps: string[];
+  coveredRules: number;
+  totalRules: number;
+}
+
+export interface CISafetyCheck {
+  name: string;
+  present: boolean;
+  detail: string;
+}
+
+export interface SafetyBoundary {
+  sensitivePaths: SensitivePathEntry[];
+  toolSurfaces: ToolSurface[];
+  policyCoverage: PolicyCoverageResult | null;
+  ciSafetyChecks: CISafetyCheck[];
+}
+
+export interface SecretFinding {
+  file: string;
+  line: number;
+  type: string;
+  fingerprint: string;
+}
+
+export interface DependencyRisk {
+  name: string;
+  version: string;
+  risk: string;
+  detail: string;
+}
+
+export interface LicenseEntry {
+  name: string;
+  license: string;
+  risk: "compatible" | "review" | "incompatible";
+}
+
+export interface VulnerabilityFinding {
+  cveId: string;
+  packageName: string;
+  packageVersion: string;
+  ecosystem: string;
+  severity: "critical" | "high" | "medium" | "low" | "unknown";
+  cvssScore: number | null;
+  summary: string;
+  advisoryUrl: string | null;
+  fixVersion: string | null;
+  source: "osv" | "github-advisory";
+}
+
+export interface SecuritySignal {
+  secretFindings: SecretFinding[];
+  dependencyRisks: DependencyRisk[];
+  licenseInventory: LicenseEntry[];
+  totalSecretsFound: number;
+  vulnerabilities?: VulnerabilityFinding[];
+  totalVulnerabilities?: number;
+  criticalVulnerabilities?: number;
+}
+
+export interface LocalScanResult {
+  id: string;
+  profile: ScanProfile;
+  inventory: RepoInventory;
+  safetyBoundaries: SafetyBoundary | null;
+  securitySignals: SecuritySignal | null;
+  commitSha: string;
+  scannerVersion: string;
+  scannedAt: string;
+  duration: number;
+  artifactPath: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Container scan types
+// ---------------------------------------------------------------------------
+
+export interface ContainerVulnerability {
+  id: string;
+  packageName: string;
+  installedVersion: string;
+  fixedVersion: string | null;
+  severity: "critical" | "high" | "medium" | "low" | "unknown";
+  title: string;
+}
+
+export interface ContainerScanResult {
+  available: boolean;
+  image: string;
+  tag: string;
+  os: string | null;
+  vulnerabilities: ContainerVulnerability[];
+  totalVulnerabilities: number;
+  criticalCount: number;
+  highCount: number;
+  scannedAt: string;
+  error?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Infrastructure-as-Code scan types
+// ---------------------------------------------------------------------------
+
+export interface InfraFinding {
+  file: string;
+  line: number;
+  resource: string;
+  check: string;
+  severity: "critical" | "high" | "medium" | "low";
+  detail: string;
+  remediation: string;
+}
+
+export interface InfraScanResult {
+  findings: InfraFinding[];
+  filesScanned: number;
+  totalFindings: number;
+  criticalCount: number;
+  highCount: number;
+  scannedAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Remote scan types
+// ---------------------------------------------------------------------------
+
+export interface RemoteScanResult {
+  inventory: RepoInventory;
+  sensitivePaths: SensitivePathEntry[];
+  scannedAt: string;
+  duration: number;
+}
+
+// ---------------------------------------------------------------------------
+// Container / Infra scan tables
+// ---------------------------------------------------------------------------
+
+export const containerScans = sqliteTable("container_scans", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  image: text("image").notNull(),
+  tag: text("tag").notNull(),
+  result: text("result", { mode: "json" }).notNull(),
+  scannedAt: text("scanned_at").notNull().default(sql`(datetime('now'))`),
+});
+
+export const insertContainerScanSchema = createInsertSchema(containerScans).omit({ id: true, scannedAt: true });
+export type InsertContainerScan = z.infer<typeof insertContainerScanSchema>;
+export type ContainerScan = typeof containerScans.$inferSelect;
+
+export const infraScans = sqliteTable("infra_scans", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  repoConnectionId: integer("repo_connection_id").notNull(),
+  result: text("result", { mode: "json" }).notNull(),
+  scannedAt: text("scanned_at").notNull().default(sql`(datetime('now'))`),
+});
+
+export const insertInfraScanSchema = createInsertSchema(infraScans).omit({ id: true, scannedAt: true });
+export type InsertInfraScan = z.infer<typeof insertInfraScanSchema>;
+export type InfraScan = typeof infraScans.$inferSelect;
