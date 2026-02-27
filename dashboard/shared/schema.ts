@@ -22,12 +22,12 @@ export interface AISafetyMetrics {
   trend: "improving" | "stable" | "declining";
 }
 
-export interface ComplianceMetrics {
+export interface PolicyAdherenceMetrics {
   overallScore: number;
-  frameworkScores: { framework: string; score: number; maxScore: number }[];
+  categoryScores: { category: string; score: number; maxScore: number }[];
   openFindings: number;
   resolvedLast30d: number;
-  nextAuditDays: number;
+  nextReviewDays: number;
   policyAdherence: number;
 }
 
@@ -42,7 +42,7 @@ export interface OperationalMetrics {
 
 export interface MetricInsight {
   id: string;
-  category: "safety" | "compliance" | "operations" | "risk";
+  category: "safety" | "policy" | "operations" | "risk";
   type: "recommendation" | "warning" | "positive";
   title: string;
   description: string;
@@ -61,7 +61,7 @@ export interface OverviewData {
   topRulesTriggered: RuleTriggered[];
   riskBreakdown: { low: number; medium: number; high: number; critical: number };
   aiSafety: AISafetyMetrics;
-  compliance: ComplianceMetrics;
+  policyAdherence: PolicyAdherenceMetrics;
   operational: OperationalMetrics;
   insights: MetricInsight[];
 }
@@ -306,33 +306,33 @@ export const repoConnections = sqliteTable("repo_connections", {
   connectedBy: text("connected_by").notNull(),
   connectedAt: text("connected_at").notNull().default(sql`(datetime('now'))`),
   lastSynced: text("last_synced"),
-  complianceLevel: text("compliance_level").notNull().default("standard"),
-  complianceScore: integer("compliance_score"),
+  qualityLevel: text("quality_level").notNull().default("standard"),
+  qualityScore: integer("quality_score"),
 });
 
 export const insertRepoConnectionSchema = createInsertSchema(repoConnections).omit({ id: true, connectedAt: true });
 export type InsertRepoConnection = z.infer<typeof insertRepoConnectionSchema>;
 export type RepoConnection = typeof repoConnections.$inferSelect;
 
-export const complianceScans = sqliteTable("compliance_scans", {
+export const qualityScans = sqliteTable("quality_scans", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   repoConnectionId: integer("repo_connection_id").notNull(),
   scanDate: text("scan_date").notNull().default(sql`(datetime('now'))`),
-  complianceLevel: text("compliance_level").notNull(),
+  qualityLevel: text("quality_level").notNull(),
   overallScore: integer("overall_score").notNull(),
   categories: text("categories", { mode: "json" }).notNull(),
   suggestions: text("suggestions", { mode: "json" }).notNull(),
 });
 
-export const insertComplianceScanSchema = createInsertSchema(complianceScans).omit({ id: true, scanDate: true });
-export type InsertComplianceScan = z.infer<typeof insertComplianceScanSchema>;
-export type ComplianceScan = typeof complianceScans.$inferSelect;
+export const insertQualityScanSchema = createInsertSchema(qualityScans).omit({ id: true, scanDate: true });
+export type InsertQualityScan = z.infer<typeof insertQualityScanSchema>;
+export type QualityScan = typeof qualityScans.$inferSelect;
 
 export type UserStatus = "active" | "inactive" | "suspended" | "pending";
 export type MfaStatus = "enabled" | "disabled" | "enforced";
 export type ApiKeyStatus = "active" | "revoked" | "expired";
 export type SsoProvider = "saml" | "oidc" | "ldap" | "none";
-export type ComplianceFramework = "SOC2" | "ISO27001" | "HIPAA" | "GDPR" | "PCI-DSS" | "FedRAMP";
+export type AuditCategory = "access_control" | "data_integrity" | "change_management" | "incident_response" | "risk_assessment" | "monitoring";
 export type NotificationChannel = "slack" | "email" | "webhook" | "pagerduty" | "opsgenie";
 
 export interface OrgProfile {
@@ -369,8 +369,8 @@ export interface SsoConfig {
   sessionDuration: number;
 }
 
-export interface ComplianceConfig {
-  frameworks: ComplianceFramework[];
+export interface RetentionConfig {
+  auditCategories: AuditCategory[];
   auditRetentionDays: number;
   traceRetentionDays: number;
   sessionRetentionDays: number;
@@ -379,8 +379,8 @@ export interface ComplianceConfig {
   encryptionInTransit: boolean;
   autoRedaction: boolean;
   dlpEnabled: boolean;
-  lastAuditDate: string;
-  nextAuditDate: string;
+  lastReviewDate: string;
+  nextReviewDate: string;
 }
 
 export interface SessionPolicyConfig {
@@ -405,13 +405,13 @@ export interface OrgSettingsData {
   apiKeys: ApiKey[];
   sso: SsoConfig;
   securityPolicies: SecurityPolicy[];
-  compliance: ComplianceConfig;
+  retention: RetentionConfig;
   notifications: Notification[];
   sessionPolicy: SessionPolicyConfig;
   ipAllowlist: IpAllowlistEntry[];
 }
 
-export interface ComplianceSuggestion {
+export interface QualitySuggestion {
   id: string;
   category: string;
   title: string;
@@ -421,18 +421,18 @@ export interface ComplianceSuggestion {
   details?: string;
 }
 
-export interface ComplianceCategoryScore {
+export interface QualityCategoryScore {
   name: string;
   score: number;
   maxScore: number;
   checks: { name: string; passed: boolean; detail: string }[];
 }
 
-export interface ComplianceScanResult {
+export interface QualityScanResult {
   overallScore: number;
-  complianceLevel: string;
-  categories: ComplianceCategoryScore[];
-  suggestions: ComplianceSuggestion[];
+  qualityLevel: string;
+  categories: QualityCategoryScore[];
+  suggestions: QualitySuggestion[];
   scannedAt: string;
 }
 

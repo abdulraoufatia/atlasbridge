@@ -1,6 +1,6 @@
 # Ethics & Safety Guarantees
 
-AtlasBridge enforces safety guarantees through deterministic, testable invariants.
+AtlasBridge enforces safety properties through deterministic, testable invariants.
 These are not aspirational principles — they are properties verified by CI on every commit.
 
 ## Guarantee 1: Network Isolation (Cloud Module)

@@ -6,7 +6,7 @@ Deterministic governance infrastructure roadmap. All features emerge from the co
 
 ## Months 0-3: Deterministic Core (GA Foundation)
 
-**Objective:** Ship the six GA primitives that constitute the governance moat.
+**Objective:** Ship the six GA primitives that constitute the governance infrastructure.
 
 | Feature | Priority | Complexity | Risk |
 |---------|----------|-----------|------|
@@ -19,7 +19,7 @@ Deterministic governance infrastructure roadmap. All features emerge from the co
 
 **Exit criteria:** All six GA primitives functional, tested, contract-frozen.
 
-**Strategic value:** Establishes the deterministic moat. After this phase, AtlasBridge is the only agent runtime with replayable governance and verifiable audit trails.
+**Strategic value:** Establishes the deterministic governance infrastructure — replayable governance and verifiable audit trails.
 
 ---
 
@@ -37,7 +37,7 @@ Deterministic governance infrastructure roadmap. All features emerge from the co
 
 **Exit criteria:** v1.0 GA tagged and released. Governance is quantified and explainable.
 
-**Strategic value:** Governance score and coverage analysis differentiate from "prompt-and-pray" agent frameworks. Incident mode + sandboxing complete the safety story.
+**Strategic value:** Governance score and coverage analysis provide quantified, explainable decision quality. Incident mode and sandboxing complete the runtime safety model.
 
 ---
 
@@ -56,13 +56,13 @@ Deterministic governance infrastructure roadmap. All features emerge from the co
 
 **Exit criteria:** Governance operates at scale with drift monitoring and pattern detection.
 
-**Strategic value:** Self-improving governance. Drift detection and pattern analysis close the feedback loop — governance gets better automatically.
+**Strategic value:** Drift detection and pattern analysis close the feedback loop — governance quality improves over time.
 
 ---
 
-## Months 9-12: Enterprise Expansion
+## Months 9-12: Extended Capabilities
 
-**Objective:** Enterprise-grade access control, authentication, and multi-workspace governance.
+**Objective:** Access control, authentication, and multi-workspace governance.
 
 | Feature | Priority | Complexity | Risk |
 |---------|----------|-----------|------|
@@ -70,32 +70,32 @@ Deterministic governance infrastructure roadmap. All features emerge from the co
 | SSO / OIDC (#275) | P1 | High | Medium — integration complexity |
 | Multi-Workspace Isolation (#276) | P1 | Very High | High — isolation boundaries |
 | Audit Export Packs (#277) | P1 | Medium | Low — read-only export |
-| Enterprise Dashboard foundation (#255-#264) | P1 | High | Medium — UX design |
+| Dashboard foundation (#255-#264) | P1 | High | Medium — UX design |
 
-**Exit criteria:** Enterprise organizations can deploy AtlasBridge with access control, SSO, and workspace isolation.
+**Exit criteria:** Operators can deploy AtlasBridge with access control, SSO, and workspace isolation.
 
-**Strategic value:** Enterprise adoption enablement. Every enterprise feature builds on the deterministic core — GBAC uses the policy engine, audit export preserves hash verification, workspaces maintain governance isolation.
+**Strategic value:** Each extended feature builds on the deterministic core — GBAC uses the policy engine, audit export preserves hash verification, workspaces maintain governance isolation.
 
 ---
 
 ## Strategic Impact Ranking
 
-Ranked by contribution to the deterministic governance moat:
+Ranked by contribution to the deterministic governance infrastructure:
 
-| Rank | Feature | Moat Score | Strategic Rationale |
+| Rank | Feature | Impact Score | Strategic Rationale |
 |------|---------|------------|-------------------|
 | 1 | Deterministic Replay Engine | 19/20 | Only agent runtime with replayable governance |
 | 2 | Risk Classification Engine | 19/20 | Reproducible, explainable risk — not probabilistic |
 | 3 | Session Trace Timeline | 18/20 | Governance narrative — visible and comparable |
 | 4 | Policy Engine Stabilization | 17/20 | Foundation everything else builds on |
 | 5 | Policy Explain Mode | 16/20 | Third pillar of trust (after determinism + audit) |
-| 6 | Audit Hash Chain Hardening | 15/20 | Enterprise trust foundation |
+| 6 | Audit Hash Chain Hardening | 15/20 | Audit integrity foundation |
 | 7 | Governance Drift Detection | 15/20 | Self-monitoring governance |
 | 8 | GA Scope Boundary | 15/20 | Scope discipline prevents dilution |
-| 9 | RBAC + GBAC | 13/20 | GBAC differentiates; RBAC is table stakes |
+| 9 | RBAC + GBAC | 13/20 | GBAC differentiates; RBAC is foundational |
 | 10 | Audit Export Packs | 13/20 | Portable hash verification is unique |
-| 11 | Multi-Workspace Isolation | 11/20 | Scaling requirement, not moat creator |
-| 12 | SSO / OIDC | 10/20 | Enterprise requirement, integration concern |
+| 11 | Multi-Workspace Isolation | 11/20 | Scaling requirement, not core differentiator |
+| 12 | SSO / OIDC | 10/20 | Access control requirement, integration concern |
 
 ---
 
@@ -140,19 +140,19 @@ These constraints hold across all 12 months:
 | Month 3 | All 6 GA primitives pass contract tests |
 | Month 6 | v1.0 GA released, governance score operational |
 | Month 9 | Drift detection active, pattern analysis generating suggestions |
-| Month 12 | Enterprise features deployed, RBAC + SSO functional |
+| Month 12 | Extended features deployed, RBAC + SSO functional |
 
-**North star:** AtlasBridge is the deterministic governance runtime that enterprises trust to execute AI agents safely. Every feature strengthens that position.
+Every feature strengthens the deterministic governance infrastructure.
 
 ---
 
 ## Deterministic Governance Expansion (Infrastructure Moat)
 
-Advanced capabilities that strengthen the deterministic governance moat. All features are consequences of the core primitives — none introduce probabilistic governance, ML-based scoring, or external service dependencies.
+Advanced capabilities that strengthen the deterministic governance infrastructure. All features are consequences of the core primitives — none introduce probabilistic governance, ML-based scoring, or external service dependencies.
 
 ### Pre-GA Must Build
 
-| Issue | Feature | Moat Score | Phase |
+| Issue | Feature | Impact Score | Phase |
 |-------|---------|-----------|-------|
 | #290 | Structured Planning Gate | 24/25 | E |
 | #268 | Deterministic Replay Engine | 19/25 | E |
@@ -162,7 +162,7 @@ Advanced capabilities that strengthen the deterministic governance moat. All fea
 
 ### Post-GA Differentiators
 
-| Issue | Feature | Moat Score | Phase |
+| Issue | Feature | Impact Score | Phase |
 |-------|---------|-----------|-------|
 | #280 | Counterfactual Engine | 25/25 | G |
 | #291 | Time Travel Debugger | 25/25 | G |
@@ -174,39 +174,39 @@ Advanced capabilities that strengthen the deterministic governance moat. All fea
 | #282 | Agent Behavior Contracts | 21/25 | G |
 | #285 | Autonomy Confidence Metric | 18/25 | G |
 
-### Enterprise Expansion
+### Extended Capabilities
 
-| Issue | Feature | Moat Score | Phase |
+| Issue | Feature | Impact Score | Phase |
 |-------|---------|-----------|-------|
 | #292 | Governance-as-Code Marketplace | 18/25 | H |
 
 ### Prioritization Matrix
 
-| Rank | Feature | Moat | Complexity | GA Alignment | Impact Tier |
+| Rank | Feature | Impact | Complexity | GA Alignment | Impact Tier |
 |------|---------|------|-----------|-------------|-------------|
 | 1 | Counterfactual Engine (#280) | 25/25 | Very High | Post-GA Core | Strategic |
 | 2 | Time Travel Debugger (#291) | 25/25 | Very High | Post-GA Core | Strategic |
 | 3 | Multi-Agent Orchestration (#283) | 25/25 | Very High | Post-GA Core | Strategic |
 | 4 | Structured Planning Gate (#290) | 24/25 | High | Pre-GA Core | Strategic |
 | 5 | Incident Forensics (#288) | 24/25 | High | Post-GA Core | Strategic |
-| 6 | Behavior Contracts (#282) | 21/25 | Medium | Post-GA Core | Enterprise |
+| 6 | Behavior Contracts (#282) | 21/25 | Medium | Post-GA Core | Extended |
 | 7 | Governance Diff Engine (#281) | 20/25 | Medium | Post-GA Core | Differentiator |
-| 8 | Red-Team Simulation (#287) | 20/25 | Medium | Post-GA Core | Enterprise |
+| 8 | Red-Team Simulation (#287) | 20/25 | Medium | Post-GA Core | Extended |
 | 9 | Escalation Graph (#284) | 19/25 | Medium | Post-GA Core | Differentiator |
 | 10 | Sensitivity Mapping (#289) | 18/25 | Low | Pre-GA Core | Differentiator |
 | 11 | Autonomy Confidence (#285) | 18/25 | Low | Post-GA Core | Differentiator |
-| 12 | Marketplace (#292) | 18/25 | Very High | Enterprise | Long-Term |
+| 12 | Marketplace (#292) | 18/25 | Very High | Extended | Long-Term |
 | 13 | Policy Coverage Testing (#286) | 17/25 | Medium | Pre-GA Core | Differentiator |
 
 ### Build Sequence
 
 **Immediate (Pre-GA):**
-1. Structured Planning Gate (#290) — intent-level governance, highest pre-GA moat
+1. Structured Planning Gate (#290) — intent-level governance, highest pre-GA impact
 2. Repository Sensitivity Mapping (#289) — context-aware risk, low complexity
 3. Policy Coverage Testing (#286) — policy quality assurance, enables diff engine
 
 **Next (Post-GA, Months 6-9):**
-4. Counterfactual Engine (#280) — apex moat capability, depends on replay engine
+4. Counterfactual Engine (#280) — apex governance capability, depends on replay engine
 5. Incident Forensics (#288) — replay-verified investigation
 6. Governance Diff Engine (#281) — infrastructure-grade policy management
 7. Behavior Contracts (#282) — enterprise execution constraints

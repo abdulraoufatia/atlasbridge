@@ -21,7 +21,7 @@ import {
   generateFullBundle,
   listGeneratedBundles,
   addGeneratedBundle,
-  compliancePacks,
+  policyPacks,
 } from "../evidence-engine";
 
 const mockSessions = [
@@ -292,23 +292,23 @@ describe("generateFullBundle", () => {
 });
 
 // ---------------------------------------------------------------------------
-// compliancePacks
+// policyPacks
 // ---------------------------------------------------------------------------
 
-describe("compliancePacks", () => {
+describe("policyPacks", () => {
   it("has four packs", () => {
-    expect(compliancePacks).toHaveLength(4);
+    expect(policyPacks).toHaveLength(4);
   });
 
   it("every pack has a disclaimer", () => {
-    for (const pack of compliancePacks) {
+    for (const pack of policyPacks) {
       expect(pack.disclaimer).toBeTruthy();
       expect(pack.disclaimer.length).toBeGreaterThan(0);
     }
   });
 
   it("no pack claims to certify compliance", () => {
-    for (const pack of compliancePacks) {
+    for (const pack of policyPacks) {
       const lower = (pack.disclaimer + pack.description).toLowerCase();
       expect(lower).not.toContain("certifies");
       expect(lower).not.toContain("is compliant");
@@ -316,14 +316,14 @@ describe("compliancePacks", () => {
   });
 
   it("every pack has at least one policy", () => {
-    for (const pack of compliancePacks) {
+    for (const pack of policyPacks) {
       expect(pack.policies.length).toBeGreaterThan(0);
     }
   });
 
   it("pack action values are valid", () => {
     const validActions = ["enforce", "require_human", "advisory"];
-    for (const pack of compliancePacks) {
+    for (const pack of policyPacks) {
       for (const policy of pack.policies) {
         expect(validActions).toContain(policy.action);
       }

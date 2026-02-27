@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 import {
-  users, groups, roles, apiKeys, securityPolicies, notifications, ipAllowlist, repoConnections, complianceScans, rbacPermissions,
+  users, groups, roles, apiKeys, securityPolicies, notifications, ipAllowlist, repoConnections, qualityScans, rbacPermissions,
   type InsertUser, type User,
   type InsertGroup, type Group,
   type InsertRole, type Role,
@@ -10,7 +10,7 @@ import {
   type InsertNotification, type Notification,
   type InsertIpAllowlist, type IpAllowlistEntry,
   type InsertRepoConnection, type RepoConnection,
-  type InsertComplianceScan, type ComplianceScan,
+  type InsertQualityScan, type QualityScan,
   type InsertRbacPermission, type RbacPermissionRow,
 } from "@shared/schema";
 
@@ -56,8 +56,8 @@ export interface IStorage {
   updateRepoConnection(id: number, data: Partial<InsertRepoConnection>): Promise<RepoConnection | undefined>;
   deleteRepoConnection(id: number): Promise<boolean>;
 
-  getComplianceScans(repoId: number): Promise<ComplianceScan[]>;
-  createComplianceScan(data: InsertComplianceScan): Promise<ComplianceScan>;
+  getQualityScans(repoId: number): Promise<QualityScan[]>;
+  createQualityScan(data: InsertQualityScan): Promise<QualityScan>;
 
   getRbacPermissions(): Promise<RbacPermissionRow[]>;
   createRbacPermission(data: InsertRbacPermission): Promise<RbacPermissionRow>;
@@ -107,8 +107,8 @@ export class DatabaseStorage implements IStorage {
   async updateRepoConnection(id: number, data: Partial<InsertRepoConnection>) { const [r] = await db.update(repoConnections).set(data).where(eq(repoConnections.id, id)).returning(); return r; }
   async deleteRepoConnection(id: number) { const result = await db.delete(repoConnections).where(eq(repoConnections.id, id)).returning(); return result.length > 0; }
 
-  async getComplianceScans(repoId: number) { return db.select().from(complianceScans).where(eq(complianceScans.repoConnectionId, repoId)); }
-  async createComplianceScan(data: InsertComplianceScan) { const [s] = await db.insert(complianceScans).values(data).returning(); return s; }
+  async getQualityScans(repoId: number) { return db.select().from(qualityScans).where(eq(qualityScans.repoConnectionId, repoId)); }
+  async createQualityScan(data: InsertQualityScan) { const [s] = await db.insert(qualityScans).values(data).returning(); return s; }
 
   async getRbacPermissions() { return db.select().from(rbacPermissions); }
   async createRbacPermission(data: InsertRbacPermission) { const [p] = await db.insert(rbacPermissions).values(data).returning(); return p; }

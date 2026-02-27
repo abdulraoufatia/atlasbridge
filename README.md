@@ -366,7 +366,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history, or [GitHub Releas
 AtlasBridge ships two editions, both open source (MIT license):
 
 - **Core** — policy engine, PTY supervisor, prompt detection, channel relay, audit log, local dashboard (sessions + settings). Fully functional. The default.
-- **Enterprise** — everything in Core plus decision trace browsing, integrity verification, session export, capability views, and extended settings.
+- **Extended** — everything in Core plus decision trace browsing, integrity verification, session export, capability views, and extended settings.
 
 | Feature | Available |
 |---------|-----------|
@@ -378,8 +378,8 @@ AtlasBridge ships two editions, both open source (MIT license):
 | Decision trace browsing | Yes |
 | Integrity verification | Yes |
 | Session export (JSON/HTML) | Yes |
-| Governance Evidence export | Yes |
-| Governance score + bundle manifest | Yes |
+| Decision evidence export | Yes |
+| Decision score + bundle manifest | Yes |
 
 **Key principles:**
 
@@ -391,7 +391,7 @@ AtlasBridge ships two editions, both open source (MIT license):
 atlasbridge dashboard start
 ```
 
-The dashboard includes a **Governance Evidence** page for exporting verifiable audit artefacts (decisions, escalations, integrity report, policy snapshot) as JSON, CSV, or a hash-verified bundle. See [docs/governance-evidence.md](docs/governance-evidence.md) for details.
+The dashboard includes a **Decision Evidence** page for exporting verifiable audit artefacts (decisions, escalations, integrity report, policy snapshot) as JSON, CSV, or a hash-verified bundle. See [docs/governance-evidence.md](docs/governance-evidence.md) for details.
 
 ---
 
@@ -406,7 +406,7 @@ AtlasBridge follows [Semantic Versioning](https://semver.org/). All 8 contract s
 - Deterministic policy evaluation before every injection
 - Append-only, hash-chained audit log
 
-> **Future roadmap** includes multi-tenant management, authentication, and extended dashboard features — but v1.0 is strictly local-first.
+> **Future roadmap** includes additional dashboard features and extended capabilities — but v1.0 is strictly local-first.
 
 ## Status
 
@@ -419,7 +419,7 @@ See [CHANGELOG.md](CHANGELOG.md) for full version history.
 | v0.5 | Released | Interactive terminal UI, setup wizard, doctor |
 | v0.6 | Released | Policy DSL v0, autopilot engine, kill switch |
 | v0.7.x | Released | Per-rule rate limits, hot-reload, adapter auto-registration |
-| v0.8.x | Released | Zero-touch setup, Policy DSL v1, enterprise scaffolding |
+| v0.8.x | Released | Zero-touch setup, Policy DSL v1, extended edition scaffolding |
 | v0.9.0 | Released | Contract freeze — 8 frozen surfaces, 155 safety tests |
 | v0.9.1–v0.9.3 | Released | Local dashboard MVP, hardening, remote-ready UX |
 | v0.9.4 | Released | Platform automation — CI hardening, release pipeline |
@@ -430,14 +430,14 @@ See [CHANGELOG.md](CHANGELOG.md) for full version history.
 | v0.9.9 | Released | Chat mode UX — per-plan escalation, folder trust detection, no more "arrow keys" messages |
 | v0.10.0 | Released | Full conversational agent mode — streaming state, plan detection, secret redaction |
 | v1.6.2 | Released | Formal edition contract — router separation, CapabilitySpec enrichment, 41 new enforcement tests |
-| v1.6.3 | Released | Governance Evidence page — real sessions, 36 vitest tests, unified dashboard (one audience), governance-evidence.md |
+| v1.6.3 | Released | Decision Evidence page — real sessions, 36 vitest tests, unified dashboard (one audience), governance-evidence.md |
 | v1.6.4 | Released | Operator write actions — kill switch, autonomy mode, CSRF, rate limiting, audit log, 15 vitest tests |
 | v1.7.0 | Released | Dashboard session lifecycle — pause/resume/stop from browser, chat prompt relay, channels optional, custom adapter fallback |
 | v1.6.7 | Released | Dashboard Settings consolidation — Channels tab (Telegram/Slack setup), Providers + Workspaces moved into Settings, `channel remove` CLI |
 | v1.6.6 | Released | Dashboard-first sessions — workspace trust, provider key management, session start/stop, phone-first gate messages, 232 new tests |
 | v1.6.5 | Released | P0 hardening sprint — 24 audit attack tests, dashboard payload limits + content-type, deployment profiles, threat model v1.6.x, audit export spec, role separation |
 | v1.6.1 | Released | Security fix — terminal sandbox, loopback-only WebSocket guard |
-| v1.6.0 | Released | Dashboard edition split — Core/Enterprise editions, badge system, capability-gated routes |
+| v1.6.0 | Released | Dashboard edition split — Core/Extended editions, badge system, capability-gated routes |
 | v1.5.0 | Released | Q1 Foundations — remove tui/, simplify CLI, doctor LLM check, keyring-first, audit export, environment tagging |
 | v1.4.1 | Released | Flatten assets directory, remove unused placeholders |
 | v1.4.0 | Released | Direct LLM chat mode — talk to Claude/GPT-4o/Gemini via Telegram with policy-governed tool use |
@@ -471,11 +471,11 @@ Key starting points:
 | [architecture.md](docs/architecture.md) | System design, data flow, invariants |
 | [troubleshooting.md](docs/troubleshooting.md) | Common issues and solutions |
 | [ethics-and-safety-guarantees.md](docs/ethics-and-safety-guarantees.md) | Safety invariants and CI enforcement |
-| [enterprise-architecture.md](docs/enterprise-architecture.md) | Enterprise edition architecture overview |
-| [enterprise-dashboard-product-spec.md](docs/enterprise-dashboard-product-spec.md) | Enterprise dashboard product spec (design only) |
-| [enterprise-dashboard-ui-map.md](docs/enterprise-dashboard-ui-map.md) | Enterprise dashboard UI wireframes (design only) |
-| [enterprise-data-model.md](docs/enterprise-data-model.md) | Enterprise data model (design only) |
-| [enterprise-dashboard-threat-model.md](docs/enterprise-dashboard-threat-model.md) | Enterprise dashboard threat model (design only) |
+| [enterprise-architecture.md](docs/enterprise-architecture.md) | Extended edition architecture overview |
+| [enterprise-dashboard-product-spec.md](docs/enterprise-dashboard-product-spec.md) | Extended dashboard product spec (design only) |
+| [enterprise-dashboard-ui-map.md](docs/enterprise-dashboard-ui-map.md) | Extended dashboard UI wireframes (design only) |
+| [enterprise-data-model.md](docs/enterprise-data-model.md) | Extended data model (design only) |
+| [enterprise-dashboard-threat-model.md](docs/enterprise-dashboard-threat-model.md) | Extended dashboard threat model (design only) |
 
 ---
 
@@ -496,7 +496,7 @@ src/atlasbridge/
   os/systemd/   — Linux systemd user service integration
   adapters/     — CLI tool adapters (Claude Code, OpenAI CLI, Gemini CLI)
   channels/     — notification channels (Telegram, Slack, MultiChannel)
-  enterprise/   — enterprise edition features (Phase A: local risk, RBAC, trace v2)
+  enterprise/   — extended edition features (local risk, RBAC, trace v2)
   cli/          — Click CLI entry point and subcommands
 tests/
   unit/         — pure unit tests (no I/O)
@@ -521,7 +521,7 @@ config/
 
 ## Core invariants
 
-AtlasBridge guarantees the following regardless of channel, adapter, or concurrency:
+AtlasBridge enforces the following invariants regardless of channel, adapter, or concurrency:
 
 1. **No duplicate injection** — nonce idempotency via atomic SQL guard
 2. **No expired injection** — TTL enforced in the database WHERE clause

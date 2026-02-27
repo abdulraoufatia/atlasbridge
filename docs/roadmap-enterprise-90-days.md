@@ -47,7 +47,7 @@ Every layer depends only on the layer above it. No circular dependencies. Each l
 **Status:** In Progress (scaffolding complete)
 **Infrastructure cost:** None — everything runs locally
 
-Phase A adds enterprise governance capabilities to the existing local runtime. No network calls, no cloud dependencies, no new infrastructure. All features are gated behind feature flags resolved from the edition.
+Phase A adds extended governance capabilities to the existing local runtime. No network calls, no cloud dependencies, no new infrastructure. All features are gated behind feature flags resolved from the edition.
 
 ### Milestones
 

@@ -24,7 +24,7 @@ SaaS implementation requires an explicit program gate. Before any code that enab
 
 3. **Data residency policy** — A policy defining where tenant data is stored, how long it is retained, and how deletion requests are handled.
 
-4. **SOC2 readiness assessment** — A gap analysis against SOC2 Type II trust service criteria (security, availability, processing integrity, confidentiality, privacy).
+4. **Audit readiness assessment** — A gap analysis against trust service criteria (security, availability, processing integrity, confidentiality, privacy).
 
 5. **Safety tests updated** — All existing safety tests must continue to pass. New safety tests must verify that the "cloud observes, local executes" invariant is maintained.
 
@@ -40,7 +40,7 @@ SaaS implementation requires an explicit program gate. Before any code that enab
 ## Alternatives Considered
 
 1. **No gate** — Allow SaaS code incrementally. Rejected: risk of scope creep and unreviewed cloud attack surface.
-2. **Full SOC2 before any SaaS** — Too slow; observe-only SaaS has minimal data handling. A readiness assessment (not full certification) is sufficient for Phase G.
+2. **Full audit certification before any cloud features** — Too slow; observe-only mode has minimal data handling. A readiness assessment (not full certification) is sufficient for Phase G.
 
 ## Consequences
 

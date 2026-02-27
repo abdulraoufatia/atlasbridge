@@ -263,7 +263,7 @@ export function generateEvidenceManifest(bundle: EvidenceBundle, csv: string): E
       { filename: "integrity_report.json", sha256: sha256(integrityJson), sizeBytes: Buffer.byteLength(integrityJson) },
       { filename: "README.txt", sha256: sha256(readmeText), sizeBytes: Buffer.byteLength(readmeText) },
     ],
-    disclaimer: "AtlasBridge produces verifiable governance evidence; it does not certify compliance. Users are responsible for their compliance programs.",
+    disclaimer: "AtlasBridge produces verifiable decision evidence; it does not certify compliance with any external framework.",
   };
 }
 
@@ -285,10 +285,10 @@ To verify the integrity of this bundle, compute SHA-256 hashes for each file
 and compare them against the hashes listed in manifest.json.
 
 IMPORTANT DISCLAIMER:
-AtlasBridge produces verifiable governance evidence; it does not certify compliance.
-This evidence may support audit and compliance narratives, but it does not constitute
-certification or attestation of compliance with any framework (SOC2, ISO 27001,
-HIPAA, GDPR, or otherwise). Users are responsible for their own compliance programs.
+AtlasBridge produces verifiable decision evidence; it does not certify compliance
+with any external framework. This evidence may support audit narratives, but it
+does not constitute certification or attestation. Users are responsible for their
+own programmes.
 
 All secrets and sensitive tokens have been redacted from this export.
 `;
@@ -313,22 +313,22 @@ export function generateFullBundle(sessionId?: string): {
   };
 }
 
-export interface CompliancePack {
+export interface PolicyPack {
   id: string;
   name: string;
-  framework: string;
+  category: string;
   description: string;
   disclaimer: string;
   policies: { name: string; action: string; description: string }[];
 }
 
-export const compliancePacks: CompliancePack[] = [
+export const policyPacks: PolicyPack[] = [
   {
-    id: "soc2-evidence-mode",
-    name: "SOC 2 Evidence Mode",
-    framework: "SOC2",
-    disclaimer: "This policy pack supports governance evidence collection aligned with SOC 2 principles. It does NOT certify SOC 2 compliance.",
-    description: "Enforce governance behaviors that support SOC 2 audit narratives: require human approval for high-risk operations, strict session recording, and comprehensive audit logging.",
+    id: "high-assurance-mode",
+    name: "High-Assurance Mode",
+    category: "Assurance",
+    disclaimer: "This policy pack enforces strict governance behaviours. It does not certify compliance with any external framework.",
+    description: "Require human approval for high-risk operations, strict session recording, and comprehensive audit logging.",
     policies: [
       { name: "require_human_high_risk", action: "require_human", description: "Require human approval for all high-risk and critical operations" },
       { name: "session_recording", action: "enforce", description: "Record all agent sessions for audit trail" },
@@ -338,11 +338,11 @@ export const compliancePacks: CompliancePack[] = [
     ],
   },
   {
-    id: "iso27001-evidence-mode",
-    name: "ISO 27001 Evidence Mode",
-    framework: "ISO27001",
-    disclaimer: "This policy pack supports governance evidence aligned with ISO 27001 controls. It does NOT certify ISO 27001 compliance.",
-    description: "Enforce governance behaviors supporting ISO 27001 information security management: strict access controls, risk-based escalation, and integrity verification.",
+    id: "strict-access-control",
+    name: "Strict Access Control",
+    category: "Access",
+    disclaimer: "This policy pack enforces strict access controls and integrity verification. It does not certify compliance with any external framework.",
+    description: "Strict access controls, risk-based escalation, and integrity verification for security-sensitive environments.",
     policies: [
       { name: "risk_based_escalation", action: "require_human", description: "Escalate decisions above medium risk threshold" },
       { name: "integrity_verification", action: "enforce", description: "Run integrity checks on all components hourly" },
@@ -353,13 +353,13 @@ export const compliancePacks: CompliancePack[] = [
     ],
   },
   {
-    id: "hipaa-advisory-mode",
-    name: "HIPAA Advisory Mode",
-    framework: "HIPAA",
-    disclaimer: "This policy pack provides advisory governance behaviors aligned with HIPAA principles. It does NOT certify HIPAA compliance or constitute a BAA.",
-    description: "Advisory governance behaviors for environments handling protected health information: strict data handling, enhanced redaction, and minimum necessary access.",
+    id: "data-protection-mode",
+    name: "Data Protection Mode",
+    category: "Data",
+    disclaimer: "This policy pack provides data protection governance behaviours. It does not certify compliance with any external framework.",
+    description: "Strict data handling, enhanced redaction, and minimum necessary access for sensitive data environments.",
     policies: [
-      { name: "phi_redaction_enhanced", action: "enforce", description: "Enhanced redaction rules for PHI-adjacent data patterns" },
+      { name: "sensitive_data_redaction", action: "enforce", description: "Enhanced redaction rules for sensitive data patterns" },
       { name: "minimum_necessary_access", action: "require_human", description: "Require human approval for broad data access operations" },
       { name: "audit_trail_complete", action: "enforce", description: "Complete audit trail for all data access and modifications" },
       { name: "session_timeout_strict", action: "enforce", description: "Strict 15-minute inactivity timeout" },
@@ -367,11 +367,11 @@ export const compliancePacks: CompliancePack[] = [
     ],
   },
   {
-    id: "gdpr-logging-restrictions",
-    name: "GDPR Logging Restrictions",
-    framework: "GDPR",
-    disclaimer: "This policy pack provides logging restrictions aligned with GDPR data protection principles. It does NOT certify GDPR compliance.",
-    description: "Restrict logging and data handling to align with GDPR data minimization and purpose limitation: redact PII, limit retention, and enforce data subject rights support.",
+    id: "minimal-logging-mode",
+    name: "Minimal Logging Mode",
+    category: "Retention",
+    disclaimer: "This policy pack restricts logging to the minimum necessary for governance. It does not certify compliance with any external framework.",
+    description: "Restrict logging and data handling to the minimum necessary: redact PII, limit retention, and enforce data minimisation principles.",
     policies: [
       { name: "pii_redaction", action: "enforce", description: "Redact personally identifiable information from all logs" },
       { name: "data_minimization", action: "enforce", description: "Log only minimum necessary data for governance purposes" },
