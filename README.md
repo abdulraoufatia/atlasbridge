@@ -432,6 +432,7 @@ See [CHANGELOG.md](CHANGELOG.md) for full version history.
 | v1.6.2 | Released | Formal edition contract — router separation, CapabilitySpec enrichment, 41 new enforcement tests |
 | v1.6.3 | Released | Decision Evidence page — real sessions, 36 vitest tests, unified dashboard (one audience), governance-evidence.md |
 | v1.6.4 | Released | Operator write actions — kill switch, autonomy mode, CSRF, rate limiting, audit log, 15 vitest tests |
+| v1.7.2 | Released | Real repository scanning — live API-based scanning across GitHub, GitLab, Bitbucket, Azure DevOps with actionable remediation |
 | v1.7.1 | Released | Public messaging cleanup — neutralise compliance frameworks, rename Enterprise to Extended, remove marketing language |
 | v1.7.0 | Released | Dashboard session lifecycle — pause/resume/stop from browser, chat prompt relay, channels optional, custom adapter fallback |
 | v1.6.7 | Released | Dashboard Settings consolidation — Channels tab (Telegram/Slack setup), Providers + Workspaces moved into Settings, `channel remove` CLI |

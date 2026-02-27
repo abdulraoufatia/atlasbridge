@@ -11,6 +11,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.2] — 2026-02-27
+
+### Added
+- **Real repository scanning** — replace mock scanner with live API-based scanning across GitHub, GitLab, Bitbucket, and Azure DevOps using tree/listing APIs (#375)
+- **Scanner module** — provider-agnostic interface with per-provider clients, deterministic check evaluation across 5 categories (Security, CI/CD, Documentation, Dependencies, Code Quality)
+- **Expandable suggestion cards** — click suggestions to see step-by-step remediation instructions
+- **25 new scanner tests** — evaluator unit tests + mocked provider integration tests (128 vitest total)
+
+### Fixed
+- **Dashboard DDL column mismatch** — `db.ts` CREATE TABLE now uses `quality_level`/`quality_scans` to match Drizzle schema
+
+### Removed
+- Session-start Telegram/Slack `notify()` calls — no more notification noise on every session start
+- Mock `compliance-engine.ts` — fully replaced by real scanner
+
+---
+
 ## [1.7.1] — 2026-02-27
 
 ### Changed
