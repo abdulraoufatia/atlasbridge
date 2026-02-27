@@ -42,6 +42,8 @@ import {
   XCircle,
   Clock,
   Plus,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { SiGithub, SiGitlab, SiBitbucket } from "react-icons/si";
 import { VscAzureDevops } from "react-icons/vsc";
@@ -256,6 +258,60 @@ function ConnectRepoDialog({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
+function SuggestionsPanel({ suggestions }: { suggestions: QualitySuggestion[] }) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  return (
+    <div className="space-y-3">
+      <h3 className="text-base font-semibold">Suggestions</h3>
+      <div className="grid grid-cols-1 gap-3">
+        {suggestions.map((sug: QualitySuggestion) => {
+          const isExpanded = expandedId === sug.id;
+          return (
+            <Card
+              key={sug.id}
+              data-testid={`suggestion-${sug.id}`}
+              className={sug.details ? "cursor-pointer" : ""}
+              onClick={() => {
+                if (sug.details) setExpandedId(isExpanded ? null : sug.id);
+              }}
+            >
+              <CardContent className="p-4 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {sug.details && (
+                      isExpanded
+                        ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                        : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                    )}
+                    {sug.status === "pass" ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                    ) : (
+                      <XCircle className="w-4 h-4 text-red-500 shrink-0" />
+                    )}
+                    <span className="text-sm font-medium">{sug.title}</span>
+                    <span className="text-xs text-muted-foreground italic">{sug.category}</span>
+                  </div>
+                  <Badge variant="secondary" className={`text-xs shrink-0 ${impactBadgeVariant(sug.impact)}`}>
+                    {sug.impact}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">{sug.description}</p>
+                {isExpanded && sug.details && (
+                  <div className="mt-3 pt-3 border-t">
+                    <p className="text-xs font-medium mb-2">How to fix</p>
+                    <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-sans leading-relaxed">{sug.details}</pre>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function RepoDetailView({
   repo,
   onBack,
@@ -464,32 +520,7 @@ function RepoDetailView({
           </div>
 
           {displayResult.suggestions.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-base font-semibold">Suggestions</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {displayResult.suggestions.map((sug: QualitySuggestion) => (
-                  <Card key={sug.id} data-testid={`suggestion-${sug.id}`}>
-                    <CardContent className="p-4 space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {sug.status === "pass" ? (
-                            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                          ) : (
-                            <XCircle className="w-4 h-4 text-red-500 shrink-0" />
-                          )}
-                          <span className="text-sm font-medium">{sug.title}</span>
-                        </div>
-                        <Badge variant="secondary" className={`text-xs shrink-0 ${impactBadgeVariant(sug.impact)}`}>
-                          {sug.impact}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{sug.description}</p>
-                      <p className="text-xs text-muted-foreground italic">{sug.category}</p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
+            <SuggestionsPanel suggestions={displayResult.suggestions} />
           )}
         </div>
       )}

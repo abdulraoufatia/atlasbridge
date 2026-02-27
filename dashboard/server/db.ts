@@ -111,14 +111,14 @@ dashboardSqlite.exec(`
     connected_by TEXT NOT NULL,
     connected_at TEXT NOT NULL DEFAULT (datetime('now')),
     last_synced TEXT,
-    compliance_level TEXT NOT NULL DEFAULT 'standard',
-    compliance_score INTEGER
+    quality_level TEXT NOT NULL DEFAULT 'standard',
+    quality_score INTEGER
   );
-  CREATE TABLE IF NOT EXISTS compliance_scans (
+  CREATE TABLE IF NOT EXISTS quality_scans (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     repo_connection_id INTEGER NOT NULL,
     scan_date TEXT NOT NULL DEFAULT (datetime('now')),
-    compliance_level TEXT NOT NULL,
+    quality_level TEXT NOT NULL,
     overall_score INTEGER NOT NULL,
     categories TEXT NOT NULL,
     suggestions TEXT NOT NULL

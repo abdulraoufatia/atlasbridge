@@ -8,7 +8,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { repo } from "./atlasbridge-repo";
 import { storage } from "./storage";
 import { seedDatabase } from "./seed";
-import { runQualityScan } from "./compliance-engine";
+import { runQualityScan } from "./scanner";
 import {
   generateEvidenceJSON, generateEvidenceCSV, generateFullBundle,
   computeGovernanceScore, policyPacks, listGeneratedBundles, addGeneratedBundle,
@@ -702,9 +702,10 @@ export async function registerRoutes(
       if (!repoConn) { res.status(404).json({ error: "Repository not found" }); return; }
 
       const level = (req.body.qualityLevel || repoConn.qualityLevel || "standard") as string;
-      const result = runQualityScan(
+      const result = await runQualityScan(
         { provider: repoConn.provider, owner: repoConn.owner, repo: repoConn.repo, branch: repoConn.branch },
-        level
+        level,
+        repoConn.accessToken,
       );
 
       await storage.updateRepoConnection(id, {

@@ -386,13 +386,6 @@ class DaemonManager:
             label = self._config.get("session_label", "") or ""
             self._db.save_session(session_id, tool, list(command), cwd=cwd, label=label)
 
-        # Session lifecycle: notify channel of session start
-        if self._channel is not None and not self._dry_run:
-            await self._channel.notify(
-                f"Session started: {tool} ({session_id[:8]})",
-                session_id=session_id,
-            )
-
         await adapter.start_session(session_id=session_id, command=list(command))
 
         # Mark the session as running once the child PID is known
@@ -640,12 +633,6 @@ class DaemonManager:
             tools=chat_cfg.get("tools_enabled", True),
         )
 
-        if not self._dry_run:
-            await self._channel.notify(
-                f"Chat session started ({provider_name}). Send a message to begin.",
-                session_id=session_id,
-            )
-
         # Consume channel messages and forward to ChatEngine
         try:
             async for reply in self._channel.receive_replies():
@@ -782,12 +769,6 @@ class DaemonManager:
             provider=provider_name,
             model=model or "(default)",
         )
-
-        if not self._dry_run:
-            await self._channel.notify(
-                f"Expert Agent session started (trace: {trace_id[:8]}). Send a message to begin.",
-                session_id=session_id,
-            )
 
         # Consume channel messages
         try:
