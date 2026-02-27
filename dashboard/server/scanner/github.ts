@@ -87,4 +87,23 @@ export class GitHubClient implements ProviderClient {
       hasIssues: data.has_issues ?? true,
     };
   }
+
+  async listTree(ctx: RepoContext): Promise<string[]> {
+    const url = `${BASE}/repos/${ctx.owner}/${ctx.repo}/git/trees/${ctx.branch}?recursive=1`;
+    const res = await apiFetch(url, ctx.accessToken);
+    if (!res.ok) return [];
+
+    const data = (await res.json()) as { tree?: { path: string; type: string }[] };
+    return (data.tree ?? []).filter((e) => e.type === "blob").map((e) => e.path);
+  }
+
+  async getFileContent(ctx: RepoContext, filePath: string): Promise<string | null> {
+    const url = `${BASE}/repos/${ctx.owner}/${ctx.repo}/contents/${encodeURIComponent(filePath)}?ref=${ctx.branch}`;
+    const res = await apiFetch(url, ctx.accessToken);
+    if (!res.ok) return null;
+
+    const data = (await res.json()) as { content?: string; encoding?: string };
+    if (!data.content || data.encoding !== "base64") return null;
+    return Buffer.from(data.content, "base64").toString("utf-8");
+  }
 }
