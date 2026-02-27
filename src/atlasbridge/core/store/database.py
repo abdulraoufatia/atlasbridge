@@ -462,7 +462,8 @@ class Database:
     ) -> None:
         self._db.execute(
             """
-            INSERT INTO agent_turns (id, session_id, trace_id, turn_number, role, content, state, metadata)
+            INSERT INTO agent_turns
+                (id, session_id, trace_id, turn_number, role, content, state, metadata)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (turn_id, session_id, trace_id, turn_number, role, content, state, metadata),
@@ -502,7 +503,8 @@ class Database:
     ) -> None:
         self._db.execute(
             """
-            INSERT INTO agent_plans (id, session_id, trace_id, turn_id, description, steps, risk_level)
+            INSERT INTO agent_plans
+                (id, session_id, trace_id, turn_id, description, steps, risk_level)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (plan_id, session_id, trace_id, turn_id, description, steps, risk_level),
@@ -552,8 +554,17 @@ class Database:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                decision_id, session_id, trace_id, plan_id, turn_id,
-                decision_type, action, rule_matched, confidence, explanation, risk_score,
+                decision_id,
+                session_id,
+                trace_id,
+                plan_id,
+                turn_id,
+                decision_type,
+                action,
+                rule_matched,
+                confidence,
+                explanation,
+                risk_score,
             ),
         )
         self._db.commit()
@@ -585,8 +596,16 @@ class Database:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                tool_run_id, session_id, trace_id, plan_id, turn_id,
-                tool_name, arguments, result, is_error, duration_ms,
+                tool_run_id,
+                session_id,
+                trace_id,
+                plan_id,
+                turn_id,
+                tool_name,
+                arguments,
+                result,
+                is_error,
+                duration_ms,
             ),
         )
         self._db.commit()
@@ -615,7 +634,16 @@ class Database:
                tool_runs_count, total_duration_ms)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (outcome_id, session_id, trace_id, turn_id, status, summary, tool_runs_count, total_duration_ms),
+            (
+                outcome_id,
+                session_id,
+                trace_id,
+                turn_id,
+                status,
+                summary,
+                tool_runs_count,
+                total_duration_ms,
+            ),
         )
         self._db.commit()
 

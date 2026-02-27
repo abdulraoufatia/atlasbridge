@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from atlasbridge.core.agent.state import AgentState, AgentStateMachine, VALID_AGENT_TRANSITIONS
+from atlasbridge.core.agent.state import VALID_AGENT_TRANSITIONS, AgentState, AgentStateMachine
 
 
 class TestAgentStateEnum:
@@ -12,8 +12,16 @@ class TestAgentStateEnum:
 
     def test_all_states_exist(self) -> None:
         expected = {
-            "init", "ready", "intake", "plan", "gate",
-            "execute", "synthesise", "respond", "stopping", "stopped",
+            "init",
+            "ready",
+            "intake",
+            "plan",
+            "gate",
+            "execute",
+            "synthesise",
+            "respond",
+            "stopping",
+            "stopped",
         }
         assert {s.value for s in AgentState} == expected
 
@@ -145,7 +153,10 @@ class TestAgentStateMachine:
 
     def test_on_transition_callback(self) -> None:
         calls: list[tuple[AgentState, AgentState, str]] = []
-        sm = AgentStateMachine(session_id="s1", on_transition=lambda f, t, r: calls.append((f, t, r)))
+        sm = AgentStateMachine(
+            session_id="s1",
+            on_transition=lambda f, t, r: calls.append((f, t, r)),
+        )
         sm.transition(AgentState.READY)
         assert len(calls) == 1
         assert calls[0][0] == AgentState.INIT

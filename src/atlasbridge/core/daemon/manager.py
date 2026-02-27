@@ -721,7 +721,12 @@ class DaemonManager:
             if pre_session_id:
                 self._db.update_session(session_id, status="running")
             else:
-                self._db.save_session(session_id, f"agent:{provider_name}", ["agent"], label="Expert Agent")
+                self._db.save_session(
+                    session_id,
+                    f"agent:{provider_name}",
+                    ["agent"],
+                    label="Expert Agent",
+                )
                 self._db.update_session(session_id, status="running")
 
         # Set up agent tools
@@ -749,6 +754,7 @@ class DaemonManager:
         # Create SoR writer
         from atlasbridge.core.agent.sor import SystemOfRecordWriter
 
+        assert self._db is not None, "Database must be initialised for agent mode"
         sor = SystemOfRecordWriter(db=self._db, session_id=session_id, trace_id=trace_id)
 
         # Create ExpertAgentEngine
@@ -760,7 +766,7 @@ class DaemonManager:
             session_id=session_id,
             session_manager=self._session_manager,  # type: ignore[arg-type]
             sor=sor,
-            db=self._db,  # type: ignore[arg-type]
+            db=self._db,
             tool_registry=tool_registry,
             tool_executor=tool_executor,
             policy=self._policy,

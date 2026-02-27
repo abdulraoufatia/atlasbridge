@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from atlasbridge.core.store.database import Database
 from atlasbridge.core.agent.sor import SystemOfRecordWriter
+from atlasbridge.core.store.database import Database
 
 
 @pytest.fixture()
@@ -80,7 +80,10 @@ class TestPlanRecording:
         sor = _make_sor(db, sid)
         turn_id = sor.record_turn(role="user", content="need a plan", state="intake")
         plan_id = sor.record_plan(
-            turn_id=turn_id, description="test plan", steps=[], risk_level="medium",
+            turn_id=turn_id,
+            description="test plan",
+            steps=[],
+            risk_level="medium",
         )
         sor.resolve_plan(plan_id, status="approved", resolved_by="human")
         plan = db.get_agent_plan(plan_id)
@@ -105,9 +108,13 @@ class TestDecisionRecording:
         sor = _make_sor(db, sid)
         turn_id = sor.record_turn(role="user", content="decide", state="intake")
         dec_id = sor.record_decision(
-            turn_id=turn_id, decision_type="tool_call", action="allow",
-            rule_matched="rule-1", confidence="high",
-            explanation="Policy allows this", risk_score=0.1,
+            turn_id=turn_id,
+            decision_type="tool_call",
+            action="allow",
+            rule_matched="rule-1",
+            confidence="high",
+            explanation="Policy allows this",
+            risk_score=0.1,
         )
         assert dec_id
         decisions = db.list_agent_decisions(sid)
@@ -121,9 +128,12 @@ class TestToolRunRecording:
         sor = _make_sor(db, sid)
         turn_id = sor.record_turn(role="user", content="run tool", state="intake")
         run_id = sor.record_tool_run(
-            turn_id=turn_id, tool_name="ab_list_sessions",
-            arguments={"limit": 10}, result='{"count":5}',
-            is_error=False, duration_ms=42,
+            turn_id=turn_id,
+            tool_name="ab_list_sessions",
+            arguments={"limit": 10},
+            result='{"count":5}',
+            is_error=False,
+            duration_ms=42,
         )
         assert run_id
         runs = db.list_agent_tool_runs(sid)
@@ -138,9 +148,11 @@ class TestOutcomeRecording:
         sor = _make_sor(db, sid)
         turn_id = sor.record_turn(role="user", content="do work", state="intake")
         out_id = sor.record_outcome(
-            turn_id=turn_id, status="success",
+            turn_id=turn_id,
+            status="success",
             summary="Completed 3 tool runs",
-            tool_runs_count=3, total_duration_ms=500,
+            tool_runs_count=3,
+            total_duration_ms=500,
         )
         assert out_id
         outcomes = db.list_agent_outcomes(sid)

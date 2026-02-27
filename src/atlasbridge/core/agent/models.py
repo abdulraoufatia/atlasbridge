@@ -13,7 +13,6 @@ import sqlite3
 from dataclasses import dataclass, field
 from typing import Any
 
-
 # ---------------------------------------------------------------------------
 # Agent Profile (not persisted — defined in code)
 # ---------------------------------------------------------------------------

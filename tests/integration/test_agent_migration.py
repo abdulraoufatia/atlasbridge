@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sqlite3
 from pathlib import Path
 
 import pytest
@@ -45,7 +44,17 @@ class TestFreshInstall:
         assert conn is not None
         cursor = conn.execute("PRAGMA table_info(agent_turns)")
         cols = {row[1] for row in cursor.fetchall()}
-        expected = {"id", "session_id", "trace_id", "turn_number", "role", "content", "state", "created_at", "metadata"}
+        expected = {
+            "id",
+            "session_id",
+            "trace_id",
+            "turn_number",
+            "role",
+            "content",
+            "state",
+            "created_at",
+            "metadata",
+        }
         assert expected.issubset(cols), f"Missing columns: {expected - cols}"
 
     def test_agent_plans_schema(self, db: Database) -> None:
@@ -53,7 +62,19 @@ class TestFreshInstall:
         assert conn is not None
         cursor = conn.execute("PRAGMA table_info(agent_plans)")
         cols = {row[1] for row in cursor.fetchall()}
-        expected = {"id", "session_id", "trace_id", "turn_id", "status", "description", "steps", "risk_level", "created_at", "resolved_at", "resolved_by"}
+        expected = {
+            "id",
+            "session_id",
+            "trace_id",
+            "turn_id",
+            "status",
+            "description",
+            "steps",
+            "risk_level",
+            "created_at",
+            "resolved_at",
+            "resolved_by",
+        }
         assert expected.issubset(cols), f"Missing columns: {expected - cols}"
 
     def test_agent_decisions_schema(self, db: Database) -> None:
@@ -61,7 +82,20 @@ class TestFreshInstall:
         assert conn is not None
         cursor = conn.execute("PRAGMA table_info(agent_decisions)")
         cols = {row[1] for row in cursor.fetchall()}
-        expected = {"id", "session_id", "trace_id", "plan_id", "turn_id", "decision_type", "action", "rule_matched", "confidence", "explanation", "risk_score", "created_at"}
+        expected = {
+            "id",
+            "session_id",
+            "trace_id",
+            "plan_id",
+            "turn_id",
+            "decision_type",
+            "action",
+            "rule_matched",
+            "confidence",
+            "explanation",
+            "risk_score",
+            "created_at",
+        }
         assert expected.issubset(cols)
 
     def test_agent_tool_runs_schema(self, db: Database) -> None:
@@ -69,7 +103,19 @@ class TestFreshInstall:
         assert conn is not None
         cursor = conn.execute("PRAGMA table_info(agent_tool_runs)")
         cols = {row[1] for row in cursor.fetchall()}
-        expected = {"id", "session_id", "trace_id", "plan_id", "turn_id", "tool_name", "arguments", "result", "is_error", "duration_ms", "created_at"}
+        expected = {
+            "id",
+            "session_id",
+            "trace_id",
+            "plan_id",
+            "turn_id",
+            "tool_name",
+            "arguments",
+            "result",
+            "is_error",
+            "duration_ms",
+            "created_at",
+        }
         assert expected.issubset(cols)
 
     def test_agent_outcomes_schema(self, db: Database) -> None:
@@ -77,7 +123,17 @@ class TestFreshInstall:
         assert conn is not None
         cursor = conn.execute("PRAGMA table_info(agent_outcomes)")
         cols = {row[1] for row in cursor.fetchall()}
-        expected = {"id", "session_id", "trace_id", "turn_id", "status", "summary", "tool_runs_count", "total_duration_ms", "created_at"}
+        expected = {
+            "id",
+            "session_id",
+            "trace_id",
+            "turn_id",
+            "status",
+            "summary",
+            "tool_runs_count",
+            "total_duration_ms",
+            "created_at",
+        }
         assert expected.issubset(cols)
 
 
@@ -87,7 +143,9 @@ class TestIndexes:
     def test_session_id_indexes(self, db: Database) -> None:
         conn = db._conn
         assert conn is not None
-        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_agent_%'")
+        cursor = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_agent_%'"
+        )
         indexes = {row[0] for row in cursor.fetchall()}
         for table in AGENT_TABLES:
             idx_name = f"idx_{table}_session"

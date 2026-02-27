@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-
 from atlasbridge.core.agent.tools import get_agent_registry
 
 
@@ -36,9 +34,16 @@ class TestAgentToolDefinitions:
 
     def test_safe_tools_exist(self) -> None:
         safe_names = {
-            "ab_list_sessions", "ab_get_session", "ab_list_prompts",
-            "ab_get_audit_events", "ab_get_traces", "ab_check_integrity",
-            "ab_get_config", "ab_get_policy", "ab_explain_decision", "ab_get_stats",
+            "ab_list_sessions",
+            "ab_get_session",
+            "ab_list_prompts",
+            "ab_get_audit_events",
+            "ab_get_traces",
+            "ab_check_integrity",
+            "ab_get_config",
+            "ab_get_policy",
+            "ab_explain_decision",
+            "ab_get_stats",
         }
         tool_names = {t.name for t in self.tools}
         for name in safe_names:
@@ -57,19 +62,34 @@ class TestAgentToolDefinitions:
             assert name in tool_names, f"Missing dangerous tool: {name}"
 
     def test_risk_levels_correct(self) -> None:
-        safe = {"ab_list_sessions", "ab_get_session", "ab_list_prompts",
-                "ab_get_audit_events", "ab_get_traces", "ab_check_integrity",
-                "ab_get_config", "ab_get_policy", "ab_explain_decision", "ab_get_stats"}
+        safe = {
+            "ab_list_sessions",
+            "ab_get_session",
+            "ab_list_prompts",
+            "ab_get_audit_events",
+            "ab_get_traces",
+            "ab_check_integrity",
+            "ab_get_config",
+            "ab_get_policy",
+            "ab_explain_decision",
+            "ab_get_stats",
+        }
         moderate = {"ab_validate_policy", "ab_test_policy"}
         dangerous = {"ab_set_mode", "ab_kill_switch"}
 
         for tool in self.tools:
             if tool.name in safe:
-                assert tool.risk_level == "safe", f"{tool.name} should be safe, got {tool.risk_level}"
+                assert tool.risk_level == "safe", (
+                    f"{tool.name} should be safe, got {tool.risk_level}"
+                )
             elif tool.name in moderate:
-                assert tool.risk_level == "moderate", f"{tool.name} should be moderate, got {tool.risk_level}"
+                assert tool.risk_level == "moderate", (
+                    f"{tool.name} should be moderate, got {tool.risk_level}"
+                )
             elif tool.name in dangerous:
-                assert tool.risk_level == "dangerous", f"{tool.name} should be dangerous, got {tool.risk_level}"
+                assert tool.risk_level == "dangerous", (
+                    f"{tool.name} should be dangerous, got {tool.risk_level}"
+                )
 
     def test_tool_lookup_by_name(self) -> None:
         tool = self.registry.get("ab_list_sessions")

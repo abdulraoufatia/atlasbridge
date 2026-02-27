@@ -27,7 +27,9 @@ def agent_group() -> None:
 )
 @click.option("--json", "as_json", is_flag=True, default=False, help="Output JSON (for dashboard).")
 @click.option(
-    "--background", is_flag=True, default=False,
+    "--background",
+    is_flag=True,
+    default=False,
     help="Launch as a detached background process (used by dashboard).",
 )
 @click.option("--session-id", default="", hidden=True, help="Pre-created session ID (internal).")
@@ -55,6 +57,7 @@ def agent_start_cmd(
     import os
     import shutil
     import subprocess
+    from pathlib import Path
 
     from rich.console import Console
 
@@ -67,7 +70,9 @@ def agent_start_cmd(
         config = load_config()
     except ConfigNotFoundError:
         if as_json:
-            click.echo(json.dumps({"ok": False, "error": "Not configured. Run atlasbridge setup first."}))
+            click.echo(
+                json.dumps({"ok": False, "error": "Not configured. Run atlasbridge setup first."})
+            )
         else:
             console.print("[red]Not configured.[/red] Run [cyan]atlasbridge setup[/cyan] first.")
         raise SystemExit(1) from None
@@ -163,13 +168,21 @@ def agent_start_cmd(
                     start_new_session=True,
                 )
             if as_json:
-                click.echo(json.dumps({
-                    "ok": True, "pid": proc.pid,
-                    "session_id": sid,
-                    "provider": provider_name, "model": model_name,
-                }))
+                click.echo(
+                    json.dumps(
+                        {
+                            "ok": True,
+                            "pid": proc.pid,
+                            "session_id": sid,
+                            "provider": provider_name,
+                            "model": model_name,
+                        }
+                    )
+                )
             else:
-                console.print(f"[green]Agent started in background[/green] (PID {proc.pid}, session {sid[:8]})")
+                console.print(
+                    f"[green]Agent started in background[/green] (PID {proc.pid}, session {sid[:8]})"
+                )
         except Exception as exc:
             if as_json:
                 click.echo(json.dumps({"ok": False, "error": str(exc)}))
@@ -182,7 +195,7 @@ def agent_start_cmd(
     daemon_config: dict = {
         "mode": "agent",
         "dry_run": dry_run,
-        "data_dir": str(config.database.path.parent) if config.database.path else "",
+        "data_dir": str(Path(config.database.path).parent) if config.database.path else "",
         "session_id": session_id or "",
         "chat": {
             "provider_name": provider_name,
@@ -241,7 +254,12 @@ def agent_message_cmd(session_id: str, text: str, as_json: bool) -> None:
 
     db_path = Path(get_config_dir()) / "atlasbridge.db"
     if not db_path.exists():
-        click.echo(json.dumps({"ok": False, "error": "Database not found"}) if as_json else "Database not found", err=True)
+        click.echo(
+            json.dumps({"ok": False, "error": "Database not found"})
+            if as_json
+            else "Database not found",
+            err=True,
+        )
         sys.exit(1)
 
     db = Database(db_path)
@@ -360,8 +378,6 @@ def agent_state_cmd(session_id: str, as_json: bool) -> None:
 
         turns = db.list_agent_turns(session_id)
         plans = db.list_agent_plans(session_id, limit=1)
-        outcomes = db.list_agent_outcomes(session_id, limit=1)
-
         # Derive state from latest records
         latest_turn = turns[-1] if turns else None
         latest_plan = plans[0] if plans else None

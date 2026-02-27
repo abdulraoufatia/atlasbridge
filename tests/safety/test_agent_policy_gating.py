@@ -37,17 +37,22 @@ class TestDangerousToolsAlwaysGated:
     def test_no_safe_tool_is_marked_dangerous(self) -> None:
         """Safe tools must not be incorrectly marked as dangerous."""
         safe_tools = {
-            "ab_list_sessions", "ab_get_session", "ab_list_prompts",
-            "ab_get_audit_events", "ab_get_traces", "ab_check_integrity",
-            "ab_get_config", "ab_get_policy", "ab_explain_decision", "ab_get_stats",
+            "ab_list_sessions",
+            "ab_get_session",
+            "ab_list_prompts",
+            "ab_get_audit_events",
+            "ab_get_traces",
+            "ab_check_integrity",
+            "ab_get_config",
+            "ab_get_policy",
+            "ab_explain_decision",
+            "ab_get_stats",
         }
         registry = get_agent_registry()
         for name in safe_tools:
             tool = registry.get(name)
             assert tool is not None
-            assert tool.risk_level == "safe", (
-                f"Tool {name} should be safe, got '{tool.risk_level}'"
-            )
+            assert tool.risk_level == "safe", f"Tool {name} should be safe, got '{tool.risk_level}'"
 
 
 class TestStateMachinePreventsOutOfOrder:
@@ -107,9 +112,15 @@ class TestGateStateProperties:
         assert sm.is_gated is True
 
     def test_other_states_not_gated(self) -> None:
-        non_gated = [AgentState.INIT, AgentState.READY, AgentState.INTAKE,
-                     AgentState.PLAN, AgentState.EXECUTE, AgentState.SYNTHESISE,
-                     AgentState.RESPOND]
+        non_gated = [
+            AgentState.INIT,
+            AgentState.READY,
+            AgentState.INTAKE,
+            AgentState.PLAN,
+            AgentState.EXECUTE,
+            AgentState.SYNTHESISE,
+            AgentState.RESPOND,
+        ]
         for state in non_gated:
             sm = AgentStateMachine(session_id="s1")
             sm.state = state  # Direct set for testing
@@ -125,8 +136,13 @@ class TestGateStateProperties:
         sm.state = AgentState.GATE
         assert sm.can_accept_input is True
 
-        processing_states = [AgentState.INTAKE, AgentState.PLAN, AgentState.EXECUTE,
-                             AgentState.SYNTHESISE, AgentState.RESPOND]
+        processing_states = [
+            AgentState.INTAKE,
+            AgentState.PLAN,
+            AgentState.EXECUTE,
+            AgentState.SYNTHESISE,
+            AgentState.RESPOND,
+        ]
         for state in processing_states:
             sm.state = state
             assert sm.can_accept_input is False, f"{state} should not accept input"

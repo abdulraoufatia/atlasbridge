@@ -17,7 +17,8 @@ Version history:
   2 → 3: Workspace trust (workspace_trust table for runtime consent model)
   3 → 4: Provider configs + processed_messages (provider key metadata, channel dedup)
   4 → 5: sessions.command column (missing from DBs created before this column was added)
-  5 → 6: Agent SoR tables (agent_turns, agent_plans, agent_decisions, agent_tool_runs, agent_outcomes)
+  5 → 6: Agent SoR tables (agent_turns, agent_plans, agent_decisions,
+         agent_tool_runs, agent_outcomes)
 """
 
 from __future__ import annotations
@@ -311,15 +312,9 @@ def _migrate_5_to_6(conn: sqlite3.Connection) -> None:
     """)
 
     # -- indexes ------------------------------------------------------------
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_agent_turns_session ON agent_turns(session_id)"
-    )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_agent_turns_trace ON agent_turns(trace_id)"
-    )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_agent_plans_session ON agent_plans(session_id)"
-    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_turns_session ON agent_turns(session_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_turns_trace ON agent_turns(trace_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_plans_session ON agent_plans(session_id)")
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_agent_decisions_session ON agent_decisions(session_id)"
     )

@@ -10,10 +10,8 @@ to the System of Record via SystemOfRecordWriter.
 
 from __future__ import annotations
 
-import json
 import time
-import uuid
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import structlog
 
@@ -168,9 +166,7 @@ class ExpertAgentEngine:
             )
 
             # Notify user of pending approval
-            step_summary = "\n".join(
-                f"  {i+1}. {s['tool']}" for i, s in enumerate(plan_steps)
-            )
+            step_summary = "\n".join(f"  {i + 1}. {s['tool']}" for i, s in enumerate(plan_steps))
             await self._channel.notify(
                 f"Plan requires approval (risk: {risk_level}):\n{step_summary}\n\n"
                 f"Plan ID: {plan_id[:8]}\n"
@@ -248,9 +244,7 @@ class ExpertAgentEngine:
             self._state_machine.active_turn_id = ""
             self._state_machine.active_plan_id = ""
 
-    async def _execute_tools(
-        self, turn_id: str, plan_id: str, tool_calls: list[ToolCall]
-    ) -> None:
+    async def _execute_tools(self, turn_id: str, plan_id: str, tool_calls: list[ToolCall]) -> None:
         """Execute tool calls and drive through EXECUTE → SYNTHESISE → RESPOND."""
         self._state_machine.transition(AgentState.EXECUTE, "executing_tools")
         self._sor.resolve_plan(plan_id, status="executing", resolved_by="policy")
@@ -305,7 +299,7 @@ class ExpertAgentEngine:
                 break
 
         self._sor.record_turn(role="assistant", content=final_content, state="respond")
-        outcome_id = self._sor.record_outcome(
+        self._sor.record_outcome(
             turn_id=turn_id,
             status="success",
             summary=final_content[:500],
@@ -348,18 +342,15 @@ class ExpertAgentEngine:
 
     async def _stream_response(self, tools: list | None) -> Message:
         """Stream the LLM response to the channel, editing in-place."""
-        from atlasbridge.providers.base import ToolDefinition
 
-        msg_id = await self._channel.send_output_editable(
-            "...", session_id=self._session_id
-        )
+        msg_id = await self._channel.send_output_editable("...", session_id=self._session_id)
 
         accumulated_text = ""
         final_tool_calls: list[ToolCall] = []
         last_edit_time = 0.0
         usage: dict[str, int] = {}
 
-        async for chunk in self._provider.chat_stream(
+        async for chunk in self._provider.chat_stream(  # type: ignore[attr-defined]
             messages=self._history,
             tools=tools,
             system=self._system_prompt,

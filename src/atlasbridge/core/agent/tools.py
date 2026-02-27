@@ -238,7 +238,10 @@ async def _ab_validate_policy(args: dict[str, Any]) -> str:
         return _json_result("validate_policy", error="path is required")
     try:
         proc = await asyncio.create_subprocess_exec(
-            "atlasbridge", "policy", "validate", policy_path,
+            "atlasbridge",
+            "policy",
+            "validate",
+            policy_path,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -264,8 +267,15 @@ async def _ab_test_policy(args: dict[str, Any]) -> str:
         return _json_result("test_policy", error="path and prompt are required")
     try:
         cmd = [
-            "atlasbridge", "policy", "test", policy_path,
-            "--prompt", prompt, "--type", prompt_type, "--explain",
+            "atlasbridge",
+            "policy",
+            "test",
+            policy_path,
+            "--prompt",
+            prompt,
+            "--type",
+            prompt_type,
+            "--explain",
         ]
         proc = await asyncio.create_subprocess_exec(
             *cmd,
@@ -290,12 +300,16 @@ async def _ab_set_mode(args: dict[str, Any]) -> str:
         return _json_result("set_mode", error=f"Invalid mode: {mode}. Must be off/assist/full")
     try:
         proc = await asyncio.create_subprocess_exec(
-            "atlasbridge", "autopilot", "mode", mode,
+            "atlasbridge",
+            "autopilot",
+            "mode",
+            mode,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
         stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=10.0)
-        return _json_result("set_mode", mode=mode, success=proc.returncode == 0, output=stdout.decode()[:500])
+        out = stdout.decode()[:500]
+        return _json_result("set_mode", mode=mode, success=proc.returncode == 0, output=out)
     except Exception as exc:
         return _json_result("set_mode", error=str(exc))
 
@@ -303,12 +317,15 @@ async def _ab_set_mode(args: dict[str, Any]) -> str:
 async def _ab_kill_switch(args: dict[str, Any]) -> str:
     try:
         proc = await asyncio.create_subprocess_exec(
-            "atlasbridge", "autopilot", "disable",
+            "atlasbridge",
+            "autopilot",
+            "disable",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
         stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=10.0)
-        return _json_result("kill_switch", success=proc.returncode == 0, output=stdout.decode()[:500])
+        out = stdout.decode()[:500]
+        return _json_result("kill_switch", success=proc.returncode == 0, output=out)
     except Exception as exc:
         return _json_result("kill_switch", error=str(exc))
 
@@ -407,7 +424,15 @@ def get_agent_registry() -> ToolRegistry:
             _ab_get_stats,
         ),
     ]:
-        registry.register(Tool(name=name, description=desc, parameters=params, risk_level="safe", executor=executor))
+        registry.register(
+            Tool(
+                name=name,
+                description=desc,
+                parameters=params,
+                risk_level="safe",
+                executor=executor,
+            )
+        )
 
     # Moderate tools
     registry.register(
@@ -416,7 +441,9 @@ def get_agent_registry() -> ToolRegistry:
             description="Validate a policy YAML file against the schema.",
             parameters={
                 "type": "object",
-                "properties": {"path": {"type": "string", "description": "Path to policy YAML file"}},
+                "properties": {
+                    "path": {"type": "string", "description": "Path to policy YAML file"},
+                },
                 "required": ["path"],
             },
             risk_level="moderate",
