@@ -1253,3 +1253,73 @@ class TestAutoInjectTrustedWorkspace:
         mock_channel.notify.assert_called_once()
         call_args = mock_channel.notify.call_args[0][0]
         assert "auto-confirm failed" in call_args
+
+
+# ---------------------------------------------------------------------------
+# Save prompt to DB on route_event
+# ---------------------------------------------------------------------------
+
+
+class TestSavePromptOnRouteEvent:
+    """Verify that route_event persists prompts to the DB store."""
+
+    @pytest.mark.asyncio
+    async def test_save_prompt_called_with_correct_args(
+        self, session_manager: SessionManager, mock_channel: AsyncMock
+    ) -> None:
+        store = _mock_store()
+        store.save_prompt = MagicMock()
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},
+            store=store,
+        )
+        s = _session()
+        session_manager.register(s)
+        event = _event(s.session_id)
+        await router.route_event(event)
+        store.save_prompt.assert_called_once()
+        call_kwargs = store.save_prompt.call_args
+        assert call_kwargs.kwargs["prompt_id"] == event.prompt_id
+        assert call_kwargs.kwargs["session_id"] == event.session_id
+        assert call_kwargs.kwargs["prompt_type"] == "yes_no"
+        assert call_kwargs.kwargs["confidence"] == "high"
+        assert call_kwargs.kwargs["excerpt"] == event.excerpt
+
+    @pytest.mark.asyncio
+    async def test_save_prompt_failure_does_not_crash_routing(
+        self, session_manager: SessionManager, mock_channel: AsyncMock
+    ) -> None:
+        """If save_prompt raises, routing should continue normally."""
+        store = _mock_store()
+        store.save_prompt = MagicMock(side_effect=Exception("db error"))
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},
+            store=store,
+        )
+        s = _session()
+        session_manager.register(s)
+        event = _event(s.session_id)
+        await router.route_event(event)
+        # Routing should still succeed — channel.send_prompt was called
+        mock_channel.send_prompt.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_save_prompt_skipped_when_no_store(
+        self, session_manager: SessionManager, mock_channel: AsyncMock
+    ) -> None:
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},
+            store=None,
+        )
+        s = _session()
+        session_manager.register(s)
+        event = _event(s.session_id)
+        await router.route_event(event)
+        # No error — routing still works without a store
+        mock_channel.send_prompt.assert_called_once()

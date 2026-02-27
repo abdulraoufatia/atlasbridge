@@ -268,3 +268,53 @@ class TestRunLoop:
         await manager.stop()
         await manager._run_loop()
         # No error = pass (reply_consumer was not started)
+
+
+# ---------------------------------------------------------------------------
+# Intent router initialization tests
+# ---------------------------------------------------------------------------
+
+
+class TestInitIntentRouter:
+    """Tests for DaemonManager._init_intent_router() code paths."""
+
+    def test_autonomy_mode_off_skips_intent_router(self) -> None:
+        """When autonomy_mode='off', _init_intent_router is a no-op."""
+        config = _minimal_config()
+        config["autonomy_mode"] = "off"
+        manager = DaemonManager(config)
+        manager._router = AsyncMock()
+        manager._policy = MagicMock()
+        manager._init_intent_router()
+        assert manager._intent_router is None
+
+    def test_no_router_skips_intent_router(self) -> None:
+        """When router is None, _init_intent_router is a no-op."""
+        config = _minimal_config()
+        config["autonomy_mode"] = "assist"
+        manager = DaemonManager(config)
+        manager._router = None
+        manager._policy = MagicMock()
+        manager._init_intent_router()
+        assert manager._intent_router is None
+
+    def test_no_policy_skips_intent_router(self) -> None:
+        """When policy is None, _init_intent_router is a no-op."""
+        config = _minimal_config()
+        config["autonomy_mode"] = "assist"
+        manager = DaemonManager(config)
+        manager._router = AsyncMock()
+        manager._policy = None
+        manager._init_intent_router()
+        assert manager._intent_router is None
+
+    def test_assist_mode_creates_intent_router(self) -> None:
+        """When mode='assist' with router+policy, intent router is created."""
+        config = _minimal_config()
+        config["autonomy_mode"] = "assist"
+        manager = DaemonManager(config)
+        manager._router = AsyncMock()
+        manager._policy = MagicMock()
+        manager._policy.rules = []
+        manager._init_intent_router()
+        assert manager._intent_router is not None
