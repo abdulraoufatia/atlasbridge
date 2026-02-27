@@ -11,6 +11,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.0] — 2026-02-27
+
+### Added
+- **Dashboard: Session lifecycle controls** — pause, resume, and stop sessions directly from the dashboard with real-time status updates (#372)
+- **Dashboard: Chat page** — reply to pending agent prompts from the browser; no Telegram/Slack required (#372)
+- **`sessions pause/resume/stop` CLI** — signal-based session control (SIGSTOP/SIGCONT/SIGTERM) with short-ID resolution (#372)
+- **Chat API routes** — `GET /api/chat/prompts` and `POST /api/chat/reply` for dashboard prompt relay (#372)
+- **Channels now optional** — removed `at_least_one_channel` validator; AtlasBridge starts without Telegram or Slack configured (#372)
+- **Prompt persistence** — `route_event()` saves prompts to SQLite for dashboard visibility (#372)
+- **Custom adapter fallback** — unknown adapter names resolve to `CustomCLIAdapter` instead of raising errors (#372)
+- **Comprehensive tests** — 28 unit, 10 integration, 6 E2E, and 7 vitest tests covering session lifecycle, pause/resume/stop, chat relay, and adapter fallback (#372)
+
+### Changed
+- **Settings page** — removed Channels tab (channels are now optional background config) (#372)
+
+---
+
 ## [1.6.7] — 2026-02-26
 
 ### Added
