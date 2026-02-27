@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard, MonitorDot, MessageSquare, GitBranch,
   ShieldCheck, FileText, Settings, Sun, Moon, Menu, X, Plug, Terminal, FileCheck,
-  ArrowUpCircle
+  ArrowUpCircle, Bot
 } from "lucide-react";
 import { useState } from "react";
 import type { VersionInfo } from "@shared/schema";
@@ -21,6 +21,7 @@ const navItems = [
   { path: "/repositories", label: "Repositories", icon: Plug },
   { path: "/evidence", label: "Evidence", icon: FileCheck },
   { path: "/terminal", label: "Terminal", icon: Terminal },
+  { path: "/chat", label: "Chat", icon: Bot },
   { path: "/settings", label: "Settings", icon: Settings },
 ];
 

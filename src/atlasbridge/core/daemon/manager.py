@@ -67,6 +67,7 @@ class DaemonManager:
         self._policy: Policy | PolicyV1 | None = None
         self._intent_router: IntentRouter | None = None
         self._conversation_registry: Any = None  # ConversationRegistry
+        self._autopilot_trace: Any = None  # DecisionTrace | None
 
     async def start(self) -> None:
         """Start all subsystems and run until shutdown."""
@@ -208,6 +209,7 @@ class DaemonManager:
 
     async def _init_autopilot(self) -> None:
         """Load the policy for this session (from --policy file or built-in default)."""
+        from atlasbridge.core.autopilot.trace import DecisionTrace
         from atlasbridge.core.policy.parser import PolicyParseError, default_policy, load_policy
 
         policy_file = self._config.get("policy_file", "")
@@ -221,19 +223,80 @@ class DaemonManager:
         else:
             self._policy = default_policy()
 
+        trace_path = self._data_dir / "autopilot_decisions.jsonl"
+        self._autopilot_trace = DecisionTrace(trace_path)
+
     def _init_intent_router(self) -> None:
-        """Wrap the PromptRouter with intent classification."""
+        """Wrap the PromptRouter with intent classification and autopilot execution."""
         if self._router is None or self._policy is None:
+            return
+
+        # In "off" mode, skip autopilot entirely — all prompts go to the human channel.
+        autonomy_mode = self._config.get("autonomy_mode", "assist")
+        if autonomy_mode == "off":
+            logger.info("autonomy_mode_off_skipping_intent_router")
             return
 
         from atlasbridge.core.routing.intent import IntentRouter, PolicyRouteClassifier
 
         classifier = PolicyRouteClassifier(policy=self._policy)
+
+        async def _autopilot_handler(event: Any, result: Any) -> None:
+            """Auto-inject the reply value for prompts matched by an auto_reply rule."""
+            if result.action_type != "auto_reply":
+                # require_human or unknown — fall through to channel
+                if self._router is not None:
+                    await self._router.route_event(event)
+                return
+
+            # Delegate injection to router (router.py is in ALLOWED_INJECTION_MODULES)
+            if self._router is not None:
+                await self._router.inject_autopilot_reply(event, result.action_value)
+                logger.info(
+                    "autopilot_auto_replied",
+                    rule=result.matched_rule_id,
+                    value=repr(result.action_value[:20]),
+                    session_id=event.session_id[:8],
+                )
+                # Record to decision trace for audit/explain
+                if self._autopilot_trace is not None and self._policy is not None:
+                    try:
+                        from atlasbridge.core.policy.evaluator import evaluate
+                        pt = event.prompt_type.value if hasattr(event.prompt_type, "value") else str(event.prompt_type)
+                        conf_str = event.confidence.value if hasattr(event.confidence, "value") else str(event.confidence)
+                        decision = evaluate(
+                            policy=self._policy,
+                            prompt_text=event.excerpt,
+                            prompt_type=pt,
+                            confidence=conf_str,
+                            prompt_id=event.prompt_id,
+                            session_id=event.session_id,
+                            tool_id=event.tool or self._config.get("tool", ""),
+                            repo=event.cwd or "",
+                        )
+                        self._autopilot_trace.record(decision)
+                    except Exception as trace_exc:
+                        logger.warning("autopilot_trace_failed", error=str(trace_exc))
+
+        async def _deny_handler(event: Any, result: Any) -> None:
+            """Log and notify on deny — do NOT inject."""
+            logger.warning(
+                "autopilot_prompt_denied",
+                rule=result.matched_rule_id,
+                session_id=event.session_id[:8],
+            )
+            if self._channel is not None:
+                try:
+                    msg = f"Prompt denied by policy rule '{result.matched_rule_id}': {result.explanation or ''}"
+                    await self._channel.notify(msg, session_id=event.session_id)
+                except Exception:
+                    pass
+
         self._intent_router = IntentRouter(
             prompt_router=self._router,
             classifier=classifier,
-            # Handlers are None in Feature 1 — all intents fall through to channel.
-            # Wired in Feature 2: autopilot_handler, deny_handler.
+            autopilot_handler=_autopilot_handler,
+            deny_handler=_deny_handler,
         )
         logger.info("intent_router_initialized")
 
@@ -304,6 +367,12 @@ class DaemonManager:
 
         logger.info("session_starting", tool=tool, session_id=session_id[:8])
 
+        # Persist session to DB so the dashboard can see it
+        if self._db is not None:
+            cwd = self._config.get("cwd", "") or ""
+            label = self._config.get("session_label", "") or ""
+            self._db.save_session(session_id, tool, list(command), cwd=cwd, label=label)
+
         # Session lifecycle: notify channel of session start
         if self._channel is not None and not self._dry_run:
             await self._channel.notify(
@@ -318,6 +387,9 @@ class DaemonManager:
         pid = ctx.get("pid", -1)
         if pid and pid > 0:
             self._session_manager.mark_running(session_id, pid)
+            if self._db is not None:
+                import os as _os
+                self._db.update_session(session_id, status="running", pid=pid or _os.getpid())
 
         # Re-use the detector the adapter already created for this session.
         # This ensures inject_reply() → mark_injected() shares the same state
@@ -447,6 +519,8 @@ class DaemonManager:
         finally:
             logger.info("session_ended", session_id=session_id[:8])
             self._session_manager.mark_ended(session_id)
+            if self._db is not None:
+                self._db.update_session(session_id, status="completed")
 
             # Unbind conversation threads for this session
             if self._conversation_registry is not None:

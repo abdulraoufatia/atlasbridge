@@ -16,6 +16,7 @@ Version history:
   1 → 2: Delivery tracking (prompt_deliveries table for idempotent channel sends)
   2 → 3: Workspace trust (workspace_trust table for runtime consent model)
   3 → 4: Provider configs + processed_messages (provider key metadata, channel dedup)
+  4 → 5: sessions.command column (missing from DBs created before this column was added)
 """
 
 from __future__ import annotations
@@ -29,7 +30,7 @@ import structlog
 logger = structlog.get_logger()
 
 # Bump this when adding a new migration.
-LATEST_SCHEMA_VERSION = 4
+LATEST_SCHEMA_VERSION = 5
 
 
 # ---------------------------------------------------------------------------
@@ -122,6 +123,7 @@ def _migrate_0_to_1(conn: sqlite3.Connection) -> None:
     _add_column_if_missing(conn, "audit_events", "timestamp", "TEXT NOT NULL DEFAULT ''")
     _add_column_if_missing(conn, "audit_events", "prev_hash", "TEXT NOT NULL DEFAULT ''")
     _add_column_if_missing(conn, "audit_events", "hash", "TEXT NOT NULL DEFAULT ''")
+    _add_column_if_missing(conn, "sessions", "command", "TEXT NOT NULL DEFAULT ''")
     _add_column_if_missing(conn, "sessions", "label", "TEXT NOT NULL DEFAULT ''")
     _add_column_if_missing(conn, "sessions", "metadata", "TEXT NOT NULL DEFAULT '{}'")
     _add_column_if_missing(conn, "prompts", "channel_message_id", "TEXT NOT NULL DEFAULT ''")
@@ -218,11 +220,17 @@ def _migrate_3_to_4(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _migrate_4_to_5(conn: sqlite3.Connection) -> None:
+    """Version 4 → 5: add sessions.command column for DBs created before it was added."""
+    _add_column_if_missing(conn, "sessions", "command", "TEXT NOT NULL DEFAULT ''")
+
+
 _MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     0: _migrate_0_to_1,
     1: _migrate_1_to_2,
     2: _migrate_2_to_3,
     3: _migrate_3_to_4,
+    4: _migrate_4_to_5,
 }
 
 

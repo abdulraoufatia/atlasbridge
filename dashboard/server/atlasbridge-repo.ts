@@ -320,6 +320,43 @@ export class AtlasBridgeRepo {
   }
 
   // -----------------------------------------------------------------------
+  // Pending prompts (for chat panel)
+  // -----------------------------------------------------------------------
+
+  getPendingPrompts(sessionId: string): {
+    id: string;
+    excerpt: string;
+    prompt_type: string;
+    confidence: string;
+    created_at: string;
+    session_id: string;
+  }[] {
+    const db = getAtlasBridgeDb();
+    if (!db) return [];
+
+    const rows = (sessionId
+      ? db
+          .prepare(
+            "SELECT id, excerpt, prompt_type, confidence, created_at, session_id FROM prompts WHERE status = 'awaiting_reply' AND session_id = ? ORDER BY created_at ASC"
+          )
+          .all(sessionId)
+      : db
+          .prepare(
+            "SELECT id, excerpt, prompt_type, confidence, created_at, session_id FROM prompts WHERE status = 'awaiting_reply' ORDER BY created_at ASC"
+          )
+          .all()) as Record<string, unknown>[];
+
+    return rows.map((r) => ({
+      id: r["id"] as string,
+      excerpt: sanitizeForDisplay((r["excerpt"] as string) || ""),
+      prompt_type: (r["prompt_type"] as string) || "unknown",
+      confidence: (r["confidence"] as string) || "medium",
+      created_at: (r["created_at"] as string) || new Date().toISOString(),
+      session_id: (r["session_id"] as string) || "",
+    }));
+  }
+
+  // -----------------------------------------------------------------------
   // Audit events
   // -----------------------------------------------------------------------
 

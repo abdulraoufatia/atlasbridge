@@ -33,7 +33,7 @@ export function getTracePath(): string {
 }
 
 export function getConfigPath(): string {
-  return path.join(getAtlasBridgeDir(), "config.yaml");
+  return path.join(getAtlasBridgeDir(), "config.toml");
 }
 
 export function ensureDir(dirPath: string): void {

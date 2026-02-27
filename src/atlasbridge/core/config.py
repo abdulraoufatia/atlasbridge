@@ -295,15 +295,6 @@ class AtlasBridgeConfig(BaseModel):
     chat: ChatConfig = Field(default_factory=ChatConfig)
     runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)
 
-    @model_validator(mode="after")
-    def at_least_one_channel(self) -> AtlasBridgeConfig:
-        if self.telegram is None and self.slack is None:
-            raise ValueError(
-                "At least one channel must be configured: [telegram] or [slack]. "
-                "Run 'atlasbridge setup' to configure a channel."
-            )
-        return self
-
     # Computed paths (not stored in config file)
     _config_path: Path | None = None
 

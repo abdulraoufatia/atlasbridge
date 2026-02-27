@@ -81,6 +81,15 @@ dashboardSqlite.exec(`
     min_severity TEXT NOT NULL DEFAULT 'info',
     last_delivered TEXT
   );
+  CREATE TABLE IF NOT EXISTS rbac_permissions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    external_id TEXT NOT NULL UNIQUE,
+    resource TEXT NOT NULL,
+    actions TEXT NOT NULL DEFAULT '[]',
+    description TEXT NOT NULL DEFAULT '',
+    category TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
   CREATE TABLE IF NOT EXISTS ip_allowlist (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     external_id TEXT NOT NULL UNIQUE,

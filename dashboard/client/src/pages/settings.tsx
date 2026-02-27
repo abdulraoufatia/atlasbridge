@@ -20,7 +20,7 @@ import {
   UserCog, ChevronDown, Search, ShieldCheck, ShieldAlert, Clock,
   CheckCircle, XCircle, AlertTriangle, Server, Eye, Fingerprint,
   Plus, Trash2, Edit, UserPlus, RotateCcw,
-  Key, FolderCheck, Radio, AlertCircle, ShieldOff
+  Key, FolderCheck, AlertCircle, ShieldOff
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -152,11 +152,79 @@ function OrgProfileTab({ org }: { org: OrgSettingsData }) {
 }
 
 function RbacTab({ org }: { org: OrgSettingsData }) {
+  const { toast } = useToast();
   const [expandedRole, setExpandedRole] = useState<number | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newRole, setNewRole] = useState({ name: "", description: "", permissions: "" });
+  const [editRole, setEditRole] = useState<Role | null>(null);
+  const [editRoleFields, setEditRoleFields] = useState({ name: "", description: "", permissions: "" });
+  const [showCreatePerm, setShowCreatePerm] = useState(false);
+  const [newPerm, setNewPerm] = useState({ resource: "", actions: "", description: "", category: "" });
+  const [editPerm, setEditPerm] = useState<typeof org.permissions[0] | null>(null);
+  const [editPermFields, setEditPermFields] = useState({ resource: "", actions: "", description: "", category: "" });
+
+  const createRoleMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/roles", data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ORG_QUERY_KEY }); setShowCreate(false); setNewRole({ name: "", description: "", permissions: "" }); toast({ title: "Role created" }); },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const editRoleMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PATCH", `/api/roles/${id}`, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ORG_QUERY_KEY }); setEditRole(null); toast({ title: "Role updated" }); },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteRoleMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/roles/${id}`),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ORG_QUERY_KEY }); toast({ title: "Role deleted" }); },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const createPermMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/permissions", data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ORG_QUERY_KEY }); setShowCreatePerm(false); setNewPerm({ resource: "", actions: "", description: "", category: "" }); toast({ title: "Permission created" }); },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const editPermMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => apiRequest("PATCH", `/api/permissions/${id}`, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ORG_QUERY_KEY }); setEditPerm(null); toast({ title: "Permission updated" }); },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const deletePermMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/permissions/${id}`),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ORG_QUERY_KEY }); toast({ title: "Permission deleted" }); },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const parsePerms = (s: string) => s.split(",").map(p => p.trim()).filter(Boolean);
+  const parseActions = (s: string) => s.split(",").map(a => a.trim()).filter(Boolean);
+
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-sm font-medium flex items-center gap-2"><Shield className="w-4 h-4 text-primary" />RBAC Roles ({org.roles.length})</CardTitle></CardHeader>
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+          <CardTitle className="text-sm font-medium flex items-center gap-2"><Shield className="w-4 h-4 text-primary" />RBAC Roles ({org.roles.length})</CardTitle>
+          <Dialog open={showCreate} onOpenChange={setShowCreate}>
+            <DialogTrigger asChild><Button size="sm" data-testid="button-create-role"><Plus className="w-3.5 h-3.5 mr-1" />Create Role</Button></DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Create Role</DialogTitle></DialogHeader>
+              <div className="space-y-4">
+                <div><Label>Name</Label><Input value={newRole.name} onChange={e => setNewRole(p => ({ ...p, name: e.target.value }))} data-testid="input-role-name" /></div>
+                <div><Label>Description</Label><Input value={newRole.description} onChange={e => setNewRole(p => ({ ...p, description: e.target.value }))} data-testid="input-role-description" /></div>
+                <div><Label>Permissions</Label><Input value={newRole.permissions} onChange={e => setNewRole(p => ({ ...p, permissions: e.target.value }))} placeholder="sessions:view, prompts:respond" data-testid="input-role-permissions" /><p className="text-[11px] text-muted-foreground mt-1">Comma-separated permission strings</p></div>
+              </div>
+              <DialogFooter>
+                <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                <Button onClick={() => createRoleMutation.mutate({ name: newRole.name, description: newRole.description, permissions: parsePerms(newRole.permissions) })} disabled={!newRole.name || createRoleMutation.isPending} data-testid="button-submit-role">
+                  {createRoleMutation.isPending ? "Creating..." : "Create"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </CardHeader>
         <CardContent className="space-y-2 p-3">
           {org.roles.map(role => (
             <Collapsible key={role.id} open={expandedRole === role.id} onOpenChange={(open) => setExpandedRole(open ? role.id : null)}>
@@ -169,6 +237,16 @@ function RbacTab({ org }: { org: OrgSettingsData }) {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <Badge variant="secondary" className="text-[10px]"><Users className="w-2.5 h-2.5 mr-1" />{role.memberCount}</Badge>
+                    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" data-testid={`button-edit-role-${role.id}`} onClick={() => { setEditRole(role); setEditRoleFields({ name: role.name, description: role.description || "", permissions: (role.permissions || []).join(", ") }); }}><Edit className="w-3 h-3" /></Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild><Button variant="ghost" size="sm" className="h-6 w-6 p-0" data-testid={`button-delete-role-${role.id}`}><Trash2 className="w-3 h-3 text-destructive" /></Button></AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader><AlertDialogTitle>Delete Role</AlertDialogTitle><AlertDialogDescription>Delete "{role.name}"? This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => deleteRoleMutation.mutate(role.id)}>Delete</AlertDialogAction></AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                     <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${expandedRole === role.id ? "rotate-180" : ""}`} />
                   </div>
                 </div>
@@ -189,23 +267,90 @@ function RbacTab({ org }: { org: OrgSettingsData }) {
           ))}
         </CardContent>
       </Card>
+
+      <Dialog open={!!editRole} onOpenChange={(open) => { if (!open) setEditRole(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Role</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div><Label>Name</Label><Input value={editRoleFields.name} onChange={e => setEditRoleFields(p => ({ ...p, name: e.target.value }))} data-testid="input-edit-role-name" /></div>
+            <div><Label>Description</Label><Input value={editRoleFields.description} onChange={e => setEditRoleFields(p => ({ ...p, description: e.target.value }))} data-testid="input-edit-role-description" /></div>
+            <div><Label>Permissions</Label><Input value={editRoleFields.permissions} onChange={e => setEditRoleFields(p => ({ ...p, permissions: e.target.value }))} placeholder="sessions:view, prompts:respond" data-testid="input-edit-role-permissions" /><p className="text-[11px] text-muted-foreground mt-1">Comma-separated permission strings</p></div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <Button onClick={() => editRole && editRoleMutation.mutate({ id: editRole.id, data: { name: editRoleFields.name, description: editRoleFields.description, permissions: parsePerms(editRoleFields.permissions) } })} disabled={!editRoleFields.name || editRoleMutation.isPending} data-testid="button-submit-edit-role">
+              {editRoleMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-sm font-medium flex items-center gap-2"><Eye className="w-4 h-4 text-primary" />Permission Matrix ({org.permissions.length})</CardTitle></CardHeader>
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+          <CardTitle className="text-sm font-medium flex items-center gap-2"><Eye className="w-4 h-4 text-primary" />Permission Matrix ({org.permissions.length})</CardTitle>
+          <Dialog open={showCreatePerm} onOpenChange={setShowCreatePerm}>
+            <DialogTrigger asChild><Button size="sm" variant="secondary" data-testid="button-create-perm"><Plus className="w-3.5 h-3.5 mr-1" />Add Permission</Button></DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Add Permission</DialogTitle></DialogHeader>
+              <div className="space-y-4">
+                <div><Label>Resource</Label><Input value={newPerm.resource} onChange={e => setNewPerm(p => ({ ...p, resource: e.target.value }))} placeholder="e.g. Dashboards" data-testid="input-perm-resource" /></div>
+                <div><Label>Actions</Label><Input value={newPerm.actions} onChange={e => setNewPerm(p => ({ ...p, actions: e.target.value }))} placeholder="view, manage, export" data-testid="input-perm-actions" /><p className="text-[11px] text-muted-foreground mt-1">Comma-separated action names</p></div>
+                <div><Label>Category</Label><Input value={newPerm.category} onChange={e => setNewPerm(p => ({ ...p, category: e.target.value }))} placeholder="e.g. Operations" data-testid="input-perm-category" /></div>
+                <div><Label>Description</Label><Input value={newPerm.description} onChange={e => setNewPerm(p => ({ ...p, description: e.target.value }))} data-testid="input-perm-description" /></div>
+              </div>
+              <DialogFooter>
+                <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                <Button onClick={() => createPermMutation.mutate({ resource: newPerm.resource, actions: parseActions(newPerm.actions), description: newPerm.description, category: newPerm.category })} disabled={!newPerm.resource || createPermMutation.isPending} data-testid="button-submit-perm">
+                  {createPermMutation.isPending ? "Adding..." : "Add"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </CardHeader>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead><tr className="border-b text-left"><th className="px-4 py-2 font-medium text-muted-foreground text-xs">Resource</th><th className="px-4 py-2 font-medium text-muted-foreground text-xs">Actions</th><th className="px-4 py-2 font-medium text-muted-foreground text-xs hidden md:table-cell">Category</th></tr></thead>
+            <thead><tr className="border-b text-left"><th className="px-4 py-2 font-medium text-muted-foreground text-xs">Resource</th><th className="px-4 py-2 font-medium text-muted-foreground text-xs">Actions</th><th className="px-4 py-2 font-medium text-muted-foreground text-xs hidden md:table-cell">Category</th><th className="px-4 py-2 font-medium text-muted-foreground text-xs w-16"></th></tr></thead>
             <tbody>
               {org.permissions.map(perm => (
                 <tr key={perm.id} className="border-b last:border-0" data-testid={`perm-${perm.id}`}>
                   <td className="px-4 py-2 font-medium text-sm">{perm.resource}</td>
-                  <td className="px-4 py-2"><div className="flex flex-wrap gap-1">{perm.actions.map(a => <Badge key={a} variant="secondary" className="text-[10px]">{a}</Badge>)}</div></td>
+                  <td className="px-4 py-2"><div className="flex flex-wrap gap-1">{perm.actions.map(a => <Badge key={a} variant="secondary" className="text-[10px] pointer-events-none cursor-default">{a}</Badge>)}</div></td>
                   <td className="px-4 py-2 hidden md:table-cell text-xs text-muted-foreground">{perm.category}</td>
+                  <td className="px-4 py-2">
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" data-testid={`button-edit-perm-${perm.id}`} onClick={() => { setEditPerm(perm); setEditPermFields({ resource: perm.resource, actions: perm.actions.join(", "), description: perm.description, category: perm.category }); }}><Edit className="w-3 h-3" /></Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild><Button variant="ghost" size="sm" className="h-6 w-6 p-0" data-testid={`button-delete-perm-${perm.id}`}><Trash2 className="w-3 h-3 text-destructive" /></Button></AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader><AlertDialogTitle>Delete Permission</AlertDialogTitle><AlertDialogDescription>Delete "{perm.resource}" permission? This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => deletePermMutation.mutate(perm.id)}>Delete</AlertDialogAction></AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </Card>
+
+      <Dialog open={!!editPerm} onOpenChange={(open) => { if (!open) setEditPerm(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Permission</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div><Label>Resource</Label><Input value={editPermFields.resource} onChange={e => setEditPermFields(p => ({ ...p, resource: e.target.value }))} data-testid="input-edit-perm-resource" /></div>
+            <div><Label>Actions</Label><Input value={editPermFields.actions} onChange={e => setEditPermFields(p => ({ ...p, actions: e.target.value }))} placeholder="view, manage, export" data-testid="input-edit-perm-actions" /><p className="text-[11px] text-muted-foreground mt-1">Comma-separated action names</p></div>
+            <div><Label>Category</Label><Input value={editPermFields.category} onChange={e => setEditPermFields(p => ({ ...p, category: e.target.value }))} data-testid="input-edit-perm-category" /></div>
+            <div><Label>Description</Label><Input value={editPermFields.description} onChange={e => setEditPermFields(p => ({ ...p, description: e.target.value }))} data-testid="input-edit-perm-description" /></div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <Button onClick={() => editPerm && editPermMutation.mutate({ id: editPerm.id, data: { resource: editPermFields.resource, actions: parseActions(editPermFields.actions), description: editPermFields.description, category: editPermFields.category } })} disabled={!editPermFields.resource || editPermMutation.isPending} data-testid="button-submit-edit-perm">
+              {editPermMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -214,10 +359,18 @@ function GbacTab({ org }: { org: OrgSettingsData }) {
   const { toast } = useToast();
   const [showCreate, setShowCreate] = useState(false);
   const [newGroup, setNewGroup] = useState({ name: "", description: "", permissionLevel: "read" as string });
+  const [editGroup, setEditGroup] = useState<Group | null>(null);
+  const [editFields, setEditFields] = useState({ name: "", description: "", permissionLevel: "read" as string });
 
   const createMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/groups", data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ORG_QUERY_KEY }); setShowCreate(false); setNewGroup({ name: "", description: "", permissionLevel: "read" }); toast({ title: "Group created" }); },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const editMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PATCH", `/api/groups/${id}`, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ORG_QUERY_KEY }); setEditGroup(null); toast({ title: "Group updated" }); },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
@@ -276,13 +429,16 @@ function GbacTab({ org }: { org: OrgSettingsData }) {
                   <td className="px-4 py-2.5 hidden md:table-cell"><div className="flex flex-wrap gap-1">{(group.roles || []).map(r => <Badge key={r} variant="secondary" className="text-[10px]">{r}</Badge>)}</div></td>
                   <td className="px-4 py-2.5 hidden md:table-cell"><Badge variant="secondary" className="text-[10px]">{group.syncSource}</Badge></td>
                   <td className="px-4 py-2.5">
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" data-testid={`button-delete-group-${group.id}`}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button></AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader><AlertDialogTitle>Delete Group</AlertDialogTitle><AlertDialogDescription>Delete "{group.name}"? This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-                        <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => deleteMutation.mutate(group.id)}>Delete</AlertDialogAction></AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" data-testid={`button-edit-group-${group.id}`} onClick={() => { setEditGroup(group); setEditFields({ name: group.name, description: group.description || "", permissionLevel: group.permissionLevel }); }}><Edit className="w-3.5 h-3.5" /></Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" data-testid={`button-delete-group-${group.id}`}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button></AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader><AlertDialogTitle>Delete Group</AlertDialogTitle><AlertDialogDescription>Delete "{group.name}"? This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => deleteMutation.mutate(group.id)}>Delete</AlertDialogAction></AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -290,6 +446,33 @@ function GbacTab({ org }: { org: OrgSettingsData }) {
           </table>
         </div>
       </Card>
+
+      <Dialog open={!!editGroup} onOpenChange={(open) => { if (!open) setEditGroup(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Group</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div><Label>Name</Label><Input value={editFields.name} onChange={e => setEditFields(p => ({ ...p, name: e.target.value }))} data-testid="input-edit-group-name" /></div>
+            <div><Label>Description</Label><Input value={editFields.description} onChange={e => setEditFields(p => ({ ...p, description: e.target.value }))} data-testid="input-edit-group-description" /></div>
+            <div>
+              <Label>Permission Level</Label>
+              <Select value={editFields.permissionLevel} onValueChange={v => setEditFields(p => ({ ...p, permissionLevel: v }))}>
+                <SelectTrigger data-testid="select-edit-group-permission"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="read">Read Only</SelectItem>
+                  <SelectItem value="read-write">Read & Write</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <Button onClick={() => editGroup && editMutation.mutate({ id: editGroup.id, data: editFields })} disabled={!editFields.name || editMutation.isPending} data-testid="button-submit-edit-group">
+              {editMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -299,6 +482,21 @@ function UsersTab({ org }: { org: OrgSettingsData }) {
   const [search, setSearch] = useState("");
   const [showInvite, setShowInvite] = useState(false);
   const [invite, setInvite] = useState({ username: "", email: "", displayName: "", role: "Viewer" });
+  const [editUser, setEditUser] = useState<User | null>(null);
+  const [editFields, setEditFields] = useState({ displayName: "", username: "", email: "", role: "", status: "", mfaStatus: "", groups: "" });
+
+  const openEdit = (user: User) => {
+    setEditUser(user);
+    setEditFields({
+      displayName: user.displayName,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+      mfaStatus: user.mfaStatus,
+      groups: (user.groups ?? []).join(", "),
+    });
+  };
 
   const inviteMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/users", data),
@@ -306,9 +504,16 @@ function UsersTab({ org }: { org: OrgSettingsData }) {
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  const updateMutation = useMutation({
+  const quickUpdateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PATCH", `/api/users/${id}`, data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ORG_QUERY_KEY }); toast({ title: "User updated" }); },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PATCH", `/api/users/${id}`, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ORG_QUERY_KEY }); setEditUser(null); toast({ title: "User updated" }); },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -317,6 +522,8 @@ function UsersTab({ org }: { org: OrgSettingsData }) {
   });
 
   const roleOptions = ["Super Admin", "Org Admin", "Security Officer", "Operator", "Viewer", "Compliance Auditor", "Incident Responder", "API Consumer"];
+  const statusOptions = ["active", "inactive", "suspended", "pending"];
+  const mfaOptions = ["disabled", "enabled", "enforced"];
 
   const filtered = org.users.filter(u => {
     if (!search) return true;
@@ -335,6 +542,12 @@ function UsersTab({ org }: { org: OrgSettingsData }) {
   };
 
   const mfaCls = (m: string) => m === "enforced" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : m === "enabled" ? "bg-blue-500/10 text-blue-700 dark:text-blue-300" : "bg-muted text-muted-foreground";
+
+  const handleSaveEdit = () => {
+    if (!editUser) return;
+    const groups = editFields.groups.split(",").map(g => g.trim()).filter(Boolean);
+    updateMutation.mutate({ id: editUser.id, data: { ...editFields, groups } });
+  };
 
   return (
     <div className="space-y-4">
@@ -370,17 +583,70 @@ function UsersTab({ org }: { org: OrgSettingsData }) {
           </Dialog>
         </CardContent>
       </Card>
+
+      {/* Full edit dialog */}
+      <Dialog open={editUser !== null} onOpenChange={open => { if (!open) setEditUser(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Edit User</DialogTitle></DialogHeader>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2 sm:col-span-1">
+              <Label>Display Name</Label>
+              <Input value={editFields.displayName} onChange={e => setEditFields(p => ({ ...p, displayName: e.target.value }))} data-testid="input-edit-displayname" />
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <Label>Username</Label>
+              <Input value={editFields.username} onChange={e => setEditFields(p => ({ ...p, username: e.target.value }))} data-testid="input-edit-username" />
+            </div>
+            <div className="col-span-2">
+              <Label>Email</Label>
+              <Input type="email" value={editFields.email} onChange={e => setEditFields(p => ({ ...p, email: e.target.value }))} data-testid="input-edit-email" />
+            </div>
+            <div>
+              <Label>Role</Label>
+              <Select value={editFields.role} onValueChange={v => setEditFields(p => ({ ...p, role: v }))}>
+                <SelectTrigger data-testid="select-edit-role"><SelectValue /></SelectTrigger>
+                <SelectContent>{roleOptions.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Status</Label>
+              <Select value={editFields.status} onValueChange={v => setEditFields(p => ({ ...p, status: v }))}>
+                <SelectTrigger data-testid="select-edit-status"><SelectValue /></SelectTrigger>
+                <SelectContent>{statusOptions.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>MFA</Label>
+              <Select value={editFields.mfaStatus} onValueChange={v => setEditFields(p => ({ ...p, mfaStatus: v }))}>
+                <SelectTrigger data-testid="select-edit-mfa"><SelectValue /></SelectTrigger>
+                <SelectContent>{mfaOptions.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Groups <span className="text-muted-foreground text-xs">(comma-separated)</span></Label>
+              <Input value={editFields.groups} onChange={e => setEditFields(p => ({ ...p, groups: e.target.value }))} placeholder="e.g. platform, security" data-testid="input-edit-groups" />
+            </div>
+          </div>
+          <DialogFooter className="mt-2">
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <Button onClick={handleSaveEdit} disabled={updateMutation.isPending} data-testid="button-save-edit-user">
+              {updateMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Card>
         <CardHeader className="pb-3"><CardTitle className="text-sm font-medium flex items-center gap-2"><UserCog className="w-4 h-4 text-primary" />Users ({filtered.length})</CardTitle></CardHeader>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead><tr className="border-b text-left"><th className="px-4 py-2 font-medium text-muted-foreground text-xs">User</th><th className="px-4 py-2 font-medium text-muted-foreground text-xs">Role</th><th className="px-4 py-2 font-medium text-muted-foreground text-xs">Status</th><th className="px-4 py-2 font-medium text-muted-foreground text-xs hidden sm:table-cell">MFA</th><th className="px-4 py-2 font-medium text-muted-foreground text-xs hidden lg:table-cell">Last Active</th><th className="px-4 py-2 font-medium text-muted-foreground text-xs w-24">Actions</th></tr></thead>
+            <thead><tr className="border-b text-left"><th className="px-4 py-2 font-medium text-muted-foreground text-xs">User</th><th className="px-4 py-2 font-medium text-muted-foreground text-xs">Role</th><th className="px-4 py-2 font-medium text-muted-foreground text-xs">Status</th><th className="px-4 py-2 font-medium text-muted-foreground text-xs hidden sm:table-cell">MFA</th><th className="px-4 py-2 font-medium text-muted-foreground text-xs hidden lg:table-cell">Last Active</th><th className="px-4 py-2 font-medium text-muted-foreground text-xs w-28">Actions</th></tr></thead>
             <tbody>
               {filtered.map(user => (
                 <tr key={user.id} className="border-b last:border-0" data-testid={`user-${user.id}`}>
-                  <td className="px-4 py-2.5"><div><p className="font-medium text-sm">{user.displayName}</p><p className="text-xs text-muted-foreground font-mono">@{user.username}</p></div></td>
+                  <td className="px-4 py-2.5"><div><p className="font-medium text-sm">{user.displayName}</p><p className="text-xs text-muted-foreground font-mono">@{user.username}</p><p className="text-xs text-muted-foreground">{user.email}</p></div></td>
                   <td className="px-4 py-2.5">
-                    <Select value={user.role} onValueChange={v => updateMutation.mutate({ id: user.id, data: { role: v } })}>
+                    <Select value={user.role} onValueChange={v => quickUpdateMutation.mutate({ id: user.id, data: { role: v } })} disabled={quickUpdateMutation.isPending}>
                       <SelectTrigger className="h-7 text-xs w-32" data-testid={`select-role-${user.id}`}><SelectValue /></SelectTrigger>
                       <SelectContent>{roleOptions.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
                     </Select>
@@ -390,12 +656,9 @@ function UsersTab({ org }: { org: OrgSettingsData }) {
                   <td className="px-4 py-2.5 hidden lg:table-cell text-xs text-muted-foreground">{ago(user.lastActive)}</td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-1">
-                      {user.status === "active" && (
-                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => updateMutation.mutate({ id: user.id, data: { status: "inactive" } })} data-testid={`button-deactivate-${user.id}`}>Deactivate</Button>
-                      )}
-                      {user.status === "inactive" && (
-                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => updateMutation.mutate({ id: user.id, data: { status: "active" } })} data-testid={`button-activate-${user.id}`}>Activate</Button>
-                      )}
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(user)} data-testid={`button-edit-user-${user.id}`}>
+                        <Edit className="w-3.5 h-3.5" />
+                      </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" data-testid={`button-delete-user-${user.id}`}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button></AlertDialogTrigger>
                         <AlertDialogContent>
@@ -419,6 +682,7 @@ function ApiKeysTab({ org }: { org: OrgSettingsData }) {
   const { toast } = useToast();
   const [showCreate, setShowCreate] = useState(false);
   const [newKey, setNewKey] = useState({ name: "", rateLimit: 100, createdBy: "admin" });
+  const [rotatedKey, setRotatedKey] = useState<string | null>(null);
 
   const createMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/api-keys", data),
@@ -429,6 +693,12 @@ function ApiKeysTab({ org }: { org: OrgSettingsData }) {
   const revokeMutation = useMutation({
     mutationFn: (id: number) => apiRequest("PATCH", `/api/api-keys/${id}`, { status: "revoked" }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ORG_QUERY_KEY }); toast({ title: "Key revoked" }); },
+  });
+
+  const rotateMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("POST", `/api/api-keys/${id}/rotate`),
+    onSuccess: (data: any) => { queryClient.invalidateQueries({ queryKey: ORG_QUERY_KEY }); setRotatedKey(data.newKey); },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const deleteIpMutation = useMutation({
@@ -480,7 +750,10 @@ function ApiKeysTab({ org }: { org: OrgSettingsData }) {
                   <td className="px-4 py-2.5 hidden lg:table-cell text-xs text-muted-foreground">{ago(key.lastUsed)}</td>
                   <td className="px-4 py-2.5">
                     {key.status === "active" && (
-                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-destructive" onClick={() => revokeMutation.mutate(key.id)} data-testid={`button-revoke-${key.id}`}>Revoke</Button>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => rotateMutation.mutate(key.id)} disabled={rotateMutation.isPending} data-testid={`button-rotate-${key.id}`}><RotateCcw className="w-3 h-3 mr-1" />Rotate</Button>
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-destructive" onClick={() => revokeMutation.mutate(key.id)} data-testid={`button-revoke-${key.id}`}>Revoke</Button>
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -523,6 +796,18 @@ function ApiKeysTab({ org }: { org: OrgSettingsData }) {
           </table>
         </div>
       </Card>
+
+      <Dialog open={!!rotatedKey} onOpenChange={(open) => { if (!open) setRotatedKey(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>New API Key</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">Copy this key now — it will not be shown again.</p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 text-xs font-mono bg-muted px-3 py-2 rounded break-all">{rotatedKey}</code>
+            <Button size="sm" variant="outline" onClick={() => { if (rotatedKey) navigator.clipboard.writeText(rotatedKey); toast({ title: "Copied" }); }} data-testid="button-copy-rotated-key"><Copy className="w-3.5 h-3.5" /></Button>
+          </div>
+          <DialogFooter><DialogClose asChild><Button>Done</Button></DialogClose></DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -945,140 +1230,6 @@ function WorkspacesTab() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Channels tab
-// ---------------------------------------------------------------------------
-
-interface ChannelConfig {
-  telegram: { bot_token: string; allowed_users: number[] } | null;
-  slack: { bot_token: string; app_token: string; allowed_users: string[] } | null;
-}
-
-const CHANNELS_QUERY_KEY = ["/api/channels"];
-
-function ChannelCard({
-  name,
-  label,
-  isConfigured,
-  fields,
-  onSave,
-  onRemove,
-  isPending,
-}: {
-  name: string;
-  label: string;
-  isConfigured: boolean;
-  fields: { id: string; label: string; placeholder: string; hint?: string }[];
-  onSave: (values: Record<string, string>) => void;
-  onRemove: () => void;
-  isPending: boolean;
-}) {
-  const [showForm, setShowForm] = useState(false);
-  const [values, setValues] = useState<Record<string, string>>({});
-
-  const handleSave = () => {
-    onSave(values);
-    setValues({});
-    setShowForm(false);
-  };
-
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2"><Radio className="w-4 h-4 text-muted-foreground" />{label}</CardTitle>
-          <Badge variant={isConfigured ? "default" : "secondary"} className={isConfigured ? "bg-emerald-600 text-white" : ""}>{isConfigured ? "Configured" : "Not configured"}</Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {showForm ? (
-          <div className="space-y-3">
-            {fields.map(f => (
-              <div key={f.id} className="space-y-1">
-                <Label className="text-xs text-muted-foreground">{f.label}</Label>
-                <Input type="password" placeholder={f.placeholder} value={values[f.id] ?? ""} onChange={e => setValues(v => ({ ...v, [f.id]: e.target.value }))} className="font-mono text-sm" />
-                {f.hint && <p className="text-[11px] text-muted-foreground">{f.hint}</p>}
-              </div>
-            ))}
-            <div className="flex gap-2">
-              <Button size="sm" onClick={handleSave} disabled={fields.some(f => !values[f.id]) || isPending}>{isPending ? "Saving…" : "Save"}</Button>
-              <Button size="sm" variant="ghost" onClick={() => { setShowForm(false); setValues({}); }}>Cancel</Button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant={isConfigured ? "outline" : "default"} onClick={() => setShowForm(true)}>{isConfigured ? "Reconfigure" : "Configure"}</Button>
-            {isConfigured && (
-              <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={onRemove} disabled={isPending}><Trash2 className="w-3.5 h-3.5 mr-1" />Remove</Button>
-            )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function ChannelsTab() {
-  const { toast } = useToast();
-  const { data: channels, isLoading } = useQuery<ChannelConfig>({ queryKey: CHANNELS_QUERY_KEY, refetchInterval: 15_000 });
-
-  const telegramMutation = useMutation({
-    mutationFn: (vals: Record<string, string>) => apiRequest("POST", "/api/channels/telegram", { token: vals.token, users: vals.users }),
-    onSuccess: () => { toast({ title: "Telegram configured" }); queryClient.invalidateQueries({ queryKey: CHANNELS_QUERY_KEY }); },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const slackMutation = useMutation({
-    mutationFn: (vals: Record<string, string>) => apiRequest("POST", "/api/channels/slack", { token: vals.token, appToken: vals.appToken, users: vals.users }),
-    onSuccess: () => { toast({ title: "Slack configured" }); queryClient.invalidateQueries({ queryKey: CHANNELS_QUERY_KEY }); },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const removeMutation = useMutation({
-    mutationFn: (name: string) => apiRequest("DELETE", `/api/channels/${name}`),
-    onSuccess: () => { toast({ title: "Channel removed" }); queryClient.invalidateQueries({ queryKey: CHANNELS_QUERY_KEY }); },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  if (isLoading) return <div className="grid gap-4 sm:grid-cols-2"><Skeleton className="h-40 w-full" /><Skeleton className="h-40 w-full" /></div>;
-
-  return (
-    <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <ChannelCard
-          name="telegram"
-          label="Telegram"
-          isConfigured={Boolean(channels?.telegram)}
-          fields={[
-            { id: "token", label: "Bot token", placeholder: "123456789:AAF…", hint: "Get from @BotFather on Telegram" },
-            { id: "users", label: "Allowed user IDs", placeholder: "123456789, 987654321", hint: "Comma-separated numeric Telegram user IDs" },
-          ]}
-          onSave={vals => telegramMutation.mutate(vals)}
-          onRemove={() => removeMutation.mutate("telegram")}
-          isPending={telegramMutation.isPending || removeMutation.isPending}
-        />
-        <ChannelCard
-          name="slack"
-          label="Slack"
-          isConfigured={Boolean(channels?.slack)}
-          fields={[
-            { id: "token", label: "Bot token", placeholder: "xoxb-…", hint: "OAuth & Permissions page in your Slack App" },
-            { id: "appToken", label: "App-level token", placeholder: "xapp-…", hint: "Basic Information → App-Level Tokens (Socket Mode)" },
-            { id: "users", label: "Allowed user IDs", placeholder: "U1234567890, U0987654321", hint: "Comma-separated Slack user IDs" },
-          ]}
-          onSave={vals => slackMutation.mutate(vals)}
-          onRemove={() => removeMutation.mutate("slack")}
-          isPending={slackMutation.isPending || removeMutation.isPending}
-        />
-      </div>
-      <Card className="border-dashed">
-        <CardContent className="p-4">
-          <p className="text-xs text-muted-foreground"><strong>Storage:</strong> Channel tokens are stored in your OS keychain (macOS Keychain, Linux Secret Service). They are never logged or transmitted to AtlasBridge servers. Only users in the allowed list can send commands to your agent.</p>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
 
 export default function SettingsPage() {
   const { data: settings, isLoading: settingsLoading } = useQuery<SettingsData>({ queryKey: ["/api/settings"] });
@@ -1111,7 +1262,6 @@ export default function SettingsPage() {
             <TabsTrigger value="security" data-testid="tab-security"><ShieldCheck className="w-3.5 h-3.5 mr-1.5" />Security</TabsTrigger>
             <TabsTrigger value="compliance" data-testid="tab-compliance"><FileCheck className="w-3.5 h-3.5 mr-1.5" />Compliance</TabsTrigger>
             <TabsTrigger value="notifications" data-testid="tab-notifications"><Bell className="w-3.5 h-3.5 mr-1.5" />Alerts</TabsTrigger>
-            <TabsTrigger value="channels" data-testid="tab-channels"><Radio className="w-3.5 h-3.5 mr-1.5" />Channels</TabsTrigger>
             <TabsTrigger value="providers" data-testid="tab-providers"><Key className="w-3.5 h-3.5 mr-1.5" />Providers</TabsTrigger>
             <TabsTrigger value="workspaces" data-testid="tab-workspaces"><FolderCheck className="w-3.5 h-3.5 mr-1.5" />Workspaces</TabsTrigger>
           </TabsList>
@@ -1125,7 +1275,6 @@ export default function SettingsPage() {
         <TabsContent value="security"><SecurityTab org={orgData} /></TabsContent>
         <TabsContent value="compliance"><ComplianceTab org={orgData} /></TabsContent>
         <TabsContent value="notifications"><NotificationsTab org={orgData} /></TabsContent>
-        <TabsContent value="channels"><ChannelsTab /></TabsContent>
         <TabsContent value="providers"><ProvidersTab /></TabsContent>
         <TabsContent value="workspaces"><WorkspacesTab /></TabsContent>
       </Tabs>

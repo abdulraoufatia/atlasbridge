@@ -167,6 +167,25 @@ class PromptRouter:
         sm = PromptStateMachine(event=event)
         self._machines[event.prompt_id] = sm
 
+        # Persist prompt to DB so the dashboard can display it
+        if self._store is not None and hasattr(self._store, "save_prompt"):
+            try:
+                from datetime import datetime, timezone
+                pt_str = event.prompt_type.value if hasattr(event.prompt_type, "value") else str(event.prompt_type)
+                conf_str = event.confidence.value if hasattr(event.confidence, "value") else str(event.confidence)
+                expires_at = datetime.now(timezone.utc).isoformat()  # TTL baked into event
+                self._store.save_prompt(
+                    prompt_id=event.prompt_id,
+                    session_id=event.session_id,
+                    prompt_type=pt_str,
+                    confidence=conf_str,
+                    excerpt=event.excerpt,
+                    nonce=event.idempotency_key,
+                    expires_at=expires_at,
+                )
+            except Exception:
+                pass  # Prompt persistence must never crash the router
+
         if self._dry_run:
             sm.transition(PromptStatus.ROUTED, "dry run — channel suppressed")
             log.info(
@@ -444,6 +463,62 @@ class PromptRouter:
                     "Reply failed. Try again.",
                     session_id=sm.event.session_id,
                 )
+
+    # ------------------------------------------------------------------
+    # Autopilot injection (internal policy-driven path)
+    # ------------------------------------------------------------------
+
+    async def inject_autopilot_reply(self, event: PromptEvent, value: str) -> None:
+        """Inject a reply decided by the autopilot policy engine.
+
+        This path skips channel dispatch and gate evaluation because the
+        decision comes from the local policy engine, not a channel message.
+        The call is idempotent: if the state machine is already terminal
+        (e.g. expired), the injection is silently skipped.
+        """
+        log = logger.bind(
+            session_id=event.session_id[:8],
+            prompt_id=event.prompt_id,
+            value=repr(value[:20]),
+        )
+
+        # Create or retrieve state machine for this prompt
+        sm = self._machines.get(event.prompt_id)
+        if sm is None:
+            sm = PromptStateMachine(event=event)
+            self._machines[event.prompt_id] = sm
+
+        if sm.is_terminal:
+            log.debug("autopilot_inject_skipped_terminal")
+            return
+
+        sm.transition(PromptStatus.REPLY_RECEIVED, "autopilot policy decision")
+
+        adapter = self._adapter_map.get(event.session_id)
+        if adapter is None:
+            log.warning("autopilot_inject_no_adapter")
+            sm.transition(PromptStatus.FAILED, "no adapter")
+            # Escalate to channel so a human can respond
+            await self.route_event(event)
+            return
+
+        try:
+            await adapter.inject_reply(
+                session_id=event.session_id,
+                value=value,
+                prompt_type=event.prompt_type,
+            )
+            sm.transition(PromptStatus.INJECTED, "autopilot injected")
+            sm.transition(PromptStatus.RESOLVED, "autopilot resolved")
+            self._sessions.mark_reply_received(event.session_id)
+            # Reset failsafe counter — successful auto-reply completes the prompt cycle
+            self._session_dispatch_counts.pop(event.session_id, None)
+            log.info("autopilot_injected")
+        except Exception as exc:  # noqa: BLE001
+            log.error("autopilot_inject_failed", error=str(exc))
+            sm.transition(PromptStatus.FAILED, str(exc))
+            # Escalate to channel so a human can respond
+            await self.route_event(event)
 
     # ------------------------------------------------------------------
     # Workspace trust helpers

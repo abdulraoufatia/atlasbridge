@@ -15,9 +15,10 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { riskBg, statusColor, ciColor, formatTimestamp, timeAgo } from "@/lib/utils";
-import { Search, ExternalLink, Play, Square } from "lucide-react";
+import { Search, ExternalLink, Play, Square, Pause } from "lucide-react";
 
 const ACTIVE_STATUSES = new Set(["starting", "running", "awaiting_reply"]);
+const PAUSABLE_STATUSES = new Set(["running", "awaiting_reply"]);
 
 function StartSessionDialog({
   open,
@@ -33,18 +34,29 @@ function StartSessionDialog({
   const [mode, setMode] = useState("off");
   const [cwd, setCwd] = useState("");
   const [label, setLabel] = useState("");
+  const [customCommand, setCustomCommand] = useState("");
 
   const startMutation = useMutation({
     mutationFn: () =>
-      apiRequest("POST", "/api/sessions/start", { adapter, mode, cwd: cwd || undefined, label: label || undefined }),
+      apiRequest("POST", "/api/sessions/start", {
+        adapter,
+        mode,
+        cwd: cwd || undefined,
+        label: label || undefined,
+        ...(adapter === "custom" ? { customCommand } : {}),
+      }),
     onSuccess: () => {
-      toast({ title: "Session started", description: `${adapter} (${mode}) session launched.` });
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      toast({ title: "Session started", description: `${adapter === "custom" ? customCommand.split(" ")[0] : adapter} (${mode}) session launched.` });
+      queryClient.refetchQueries({ queryKey: ["/api/sessions"] });
+      // The background process needs a moment to write to the DB — refetch again shortly
+      setTimeout(() => queryClient.refetchQueries({ queryKey: ["/api/sessions"] }), 1500);
+      setTimeout(() => queryClient.refetchQueries({ queryKey: ["/api/sessions"] }), 3000);
       onOpenChange(false);
       setAdapter("claude");
       setMode("off");
       setCwd("");
       setLabel("");
+      setCustomCommand("");
     },
     onError: (e: Error) =>
       toast({ title: "Failed to start session", description: e.message, variant: "destructive" }),
@@ -59,7 +71,7 @@ function StartSessionDialog({
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
             <Label htmlFor="adapter-select" className="text-xs text-muted-foreground">Adapter</Label>
-            <Select value={adapter} onValueChange={setAdapter}>
+            <Select value={adapter} onValueChange={v => { setAdapter(v); setCustomCommand(""); }}>
               <SelectTrigger id="adapter-select" data-testid="select-adapter">
                 <SelectValue />
               </SelectTrigger>
@@ -68,9 +80,25 @@ function StartSessionDialog({
                 <SelectItem value="claude-code">Claude Code (alias)</SelectItem>
                 <SelectItem value="openai">OpenAI CLI</SelectItem>
                 <SelectItem value="gemini">Gemini CLI</SelectItem>
+                <SelectItem value="custom">Custom (any tool)</SelectItem>
               </SelectContent>
             </Select>
           </div>
+          {adapter === "custom" && (
+            <div className="space-y-1.5">
+              <Label htmlFor="custom-command-input" className="text-xs text-muted-foreground">
+                Command
+              </Label>
+              <Input
+                id="custom-command-input"
+                placeholder="e.g. cursor, aider --model gpt-4o"
+                value={customCommand}
+                onChange={e => setCustomCommand(e.target.value)}
+                data-testid="input-custom-command"
+                className="font-mono text-sm"
+              />
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="mode-select" className="text-xs text-muted-foreground">Autonomy Mode</Label>
             <Select value={mode} onValueChange={setMode}>
@@ -121,7 +149,7 @@ function StartSessionDialog({
           </Button>
           <Button
             onClick={() => startMutation.mutate()}
-            disabled={startMutation.isPending}
+            disabled={startMutation.isPending || (adapter === "custom" && !customCommand.trim())}
             data-testid="button-confirm-start"
           >
             {startMutation.isPending ? "Starting…" : "Start Session"}
@@ -138,7 +166,7 @@ export default function SessionsPage() {
 
   const { data: sessions, isLoading } = useQuery<Session[]>({
     queryKey: ["/api/sessions"],
-    refetchInterval: 5_000,
+    refetchInterval: 2_000,
   });
 
   const [search, setSearch] = useState("");
@@ -147,13 +175,14 @@ export default function SessionsPage() {
   const [ciFilter, setCiFilter] = useState<string>("all");
   const [startDialogOpen, setStartDialogOpen] = useState(false);
   const [stoppingId, setStoppingId] = useState<string | null>(null);
+  const [pausingId, setPausingId] = useState<string | null>(null);
 
   const stopMutation = useMutation({
     mutationFn: (sessionId: string) =>
       apiRequest("POST", `/api/sessions/${sessionId}/stop`, {}),
     onSuccess: (_data, sessionId) => {
       toast({ title: "Session stopped", description: `Session ${sessionId.slice(0, 8)} received stop signal.` });
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      queryClient.refetchQueries({ queryKey: ["/api/sessions"] });
       setStoppingId(null);
     },
     onError: (e: Error) => {
@@ -162,9 +191,40 @@ export default function SessionsPage() {
     },
   });
 
+  const pauseMutation = useMutation({
+    mutationFn: (sessionId: string) =>
+      apiRequest("POST", `/api/sessions/${sessionId}/pause`, {}),
+    onSuccess: (_data, sessionId) => {
+      toast({ title: "Session paused", description: `Session ${sessionId.slice(0, 8)} paused.` });
+      queryClient.refetchQueries({ queryKey: ["/api/sessions"] });
+      setPausingId(null);
+    },
+    onError: (e: Error) => {
+      toast({ title: "Pause failed", description: e.message, variant: "destructive" });
+      setPausingId(null);
+    },
+  });
+
+  const resumeMutation = useMutation({
+    mutationFn: (sessionId: string) =>
+      apiRequest("POST", `/api/sessions/${sessionId}/resume`, {}),
+    onSuccess: (_data, sessionId) => {
+      toast({ title: "Session resumed", description: `Session ${sessionId.slice(0, 8)} resumed.` });
+      queryClient.refetchQueries({ queryKey: ["/api/sessions"] });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Resume failed", description: e.message, variant: "destructive" });
+    },
+  });
+
   const handleStop = (sessionId: string) => {
     setStoppingId(sessionId);
     stopMutation.mutate(sessionId);
+  };
+
+  const handlePause = (sessionId: string) => {
+    setPausingId(sessionId);
+    pauseMutation.mutate(sessionId);
   };
 
   const filtered = sessions?.filter(s => {
@@ -324,7 +384,31 @@ export default function SessionsPage() {
                               View <ExternalLink className="w-3 h-3" />
                             </button>
                           </Link>
-                          {ACTIVE_STATUSES.has(session.status) && (
+                          {PAUSABLE_STATUSES.has(session.status) && (
+                            <button
+                              className="text-amber-600 dark:text-amber-400 text-xs flex items-center gap-1 disabled:opacity-50"
+                              onClick={() => handlePause(session.id)}
+                              disabled={pausingId === session.id}
+                              data-testid={`button-pause-${session.id}`}
+                              title="Pause session"
+                            >
+                              <Pause className="w-3 h-3" />
+                              {pausingId === session.id ? "…" : "Pause"}
+                            </button>
+                          )}
+                          {session.status === "paused" && (
+                            <button
+                              className="text-green-600 dark:text-green-400 text-xs flex items-center gap-1 disabled:opacity-50"
+                              onClick={() => resumeMutation.mutate(session.id)}
+                              disabled={resumeMutation.isPending}
+                              data-testid={`button-resume-${session.id}`}
+                              title="Resume session"
+                            >
+                              <Play className="w-3 h-3" />
+                              Resume
+                            </button>
+                          )}
+                          {(ACTIVE_STATUSES.has(session.status) || session.status === "paused") && (
                             <button
                               className="text-destructive text-xs flex items-center gap-1 disabled:opacity-50"
                               onClick={() => handleStop(session.id)}
