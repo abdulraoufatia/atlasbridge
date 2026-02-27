@@ -15,7 +15,6 @@ export function stripAnsi(text: string): string {
 
 // Token redaction patterns: [regex, replacement label]
 const TOKEN_PATTERNS: [RegExp, string][] = [
-  [/\b\d{8,10}:[A-Za-z0-9_-]{35,}\b/g, "[REDACTED:telegram-token]"],
   [/\bxox[bpsar]-[A-Za-z0-9-]{10,}\b/g, "[REDACTED:slack-token]"],
   [/\b(?:sk|ak|key)-[A-Za-z0-9]{20,}\b/g, "[REDACTED:api-key]"],
   [/\bgh[pousr]_[A-Za-z0-9]{36,}\b/g, "[REDACTED:github-pat]"],

@@ -316,9 +316,8 @@ class DaemonManager:
     async def _init_router(self) -> None:
         if self._session_manager is None:
             return
-        # In dry-run mode, channel is None but router still needed for event logging
-        if self._channel is None and not self._dry_run:
-            return
+        # Router is needed even without a channel — the dashboard Chat page
+        # serves as a standalone relay when no Telegram/Slack is configured.
         from atlasbridge.core.routing.router import PromptRouter
 
         self._router = PromptRouter(
@@ -832,6 +831,9 @@ class DaemonManager:
             # Adapter (PTY) mode: reply consumer + adapter session
             if self._channel and router:
                 tasks.append(asyncio.create_task(self._reply_consumer(), name="reply_consumer"))
+            elif not self._channel and router:
+                # Channelless mode — poll DB for dashboard-originated replies
+                tasks.append(asyncio.create_task(self._db_reply_poller(), name="db_reply_poller"))
             if self._config.get("tool") and self._config.get("command"):
                 tasks.append(
                     asyncio.create_task(self._run_adapter_session(), name="adapter_session")
@@ -855,6 +857,33 @@ class DaemonManager:
                 await router.handle_reply(reply)
             except Exception as exc:  # noqa: BLE001
                 logger.error("reply_handling_error", error=str(exc))
+
+    async def _db_reply_poller(self) -> None:
+        """Poll DB for dashboard-originated replies (channelless mode).
+
+        When no channel is configured, the dashboard Chat page is the relay.
+        Users reply via ``POST /api/chat/reply`` → ``atlasbridge sessions reply``
+        which atomically sets ``status = 'reply_received'`` in the DB.
+        This loop detects those rows and injects them into the PTY.
+        """
+        router = self._intent_router or self._router
+        assert router is not None
+        while self._running:
+            await asyncio.sleep(0.5)
+            if self._db is None:
+                continue
+            try:
+                rows = self._db.list_reply_received()
+                for row in rows:
+                    ok = await router.inject_dashboard_reply(
+                        prompt_id=row["id"],
+                        session_id=row["session_id"],
+                        value=row["response_normalized"],
+                    )
+                    if ok:
+                        self._db.update_prompt_status(row["id"], "resolved")
+            except Exception as exc:  # noqa: BLE001
+                logger.error("db_reply_poller_error", error=str(exc))
 
     async def _ttl_sweeper(self) -> None:
         """Periodically expire overdue prompts."""

@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   AlertDialog,
@@ -31,10 +32,17 @@ interface OperatorPanelProps {
 export function OperatorPanel({ currentMode }: OperatorPanelProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [displayMode, setDisplayMode] = useState(currentMode.toLowerCase());
+
+  // Sync local state when server data changes (e.g. after query refetch)
+  useEffect(() => {
+    setDisplayMode(currentMode.toLowerCase());
+  }, [currentMode]);
 
   const killSwitch = useMutation({
     mutationFn: () => apiRequest("POST", "/api/operator/kill-switch"),
     onSuccess: () => {
+      setDisplayMode("off");
       toast({ title: "Kill switch activated", description: "Autopilot has been disabled." });
       queryClient.invalidateQueries({ queryKey: ["/api/overview"] });
     },
@@ -46,10 +54,12 @@ export function OperatorPanel({ currentMode }: OperatorPanelProps) {
   const setMode = useMutation({
     mutationFn: (mode: string) => apiRequest("POST", "/api/operator/mode", { mode }),
     onSuccess: (_data, mode) => {
+      setDisplayMode(mode);
       toast({ title: "Mode updated", description: `Autonomy mode set to ${mode}.` });
       queryClient.invalidateQueries({ queryKey: ["/api/overview"] });
     },
     onError: (err: Error) => {
+      setDisplayMode(currentMode.toLowerCase());
       toast({ title: "Mode change failed", description: err.message, variant: "destructive" });
     },
   });
@@ -68,7 +78,7 @@ export function OperatorPanel({ currentMode }: OperatorPanelProps) {
             <div>
               <p className="text-xs text-muted-foreground mb-1">Autonomy Mode</p>
               <Select
-                value={currentMode.toLowerCase()}
+                value={displayMode}
                 onValueChange={(v) => setMode.mutate(v)}
                 disabled={setMode.isPending}
               >

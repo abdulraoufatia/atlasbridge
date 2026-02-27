@@ -1448,38 +1448,11 @@ export async function registerRoutes(
 
   app.get("/api/channels", (_req, res) => {
     const cfg = readAtlasBridgeConfig();
-    const tg = cfg.telegram as Record<string, unknown> | undefined;
     const sl = cfg.slack as Record<string, unknown> | undefined;
     res.json({
-      telegram: tg ? { configured: true, users: tg.allowed_users } : null,
       slack: sl ? { configured: true, users: sl.allowed_users } : null,
     });
   });
-
-  app.post(
-    "/api/channels/telegram",
-    requireCsrf,
-    operatorRateLimiter,
-    (req, res) => {
-      const { token, users } = req.body as { token?: string; users?: string };
-      if (!token || !users) {
-        res.status(400).json({ error: "token and users are required" });
-        return;
-      }
-      try {
-        const cfg = readAtlasBridgeConfig();
-        const userIds = String(users).split(",").map(u => {
-          const n = parseInt(u.trim(), 10);
-          return isNaN(n) ? u.trim() : n;
-        });
-        cfg.telegram = { bot_token: token, allowed_users: userIds };
-        writeAtlasBridgeConfig(cfg);
-        res.json({ ok: true });
-      } catch (err: any) {
-        res.status(500).json({ error: "Failed to configure Telegram channel", detail: err.message });
-      }
-    },
-  );
 
   app.post(
     "/api/channels/slack",
@@ -1509,7 +1482,7 @@ export async function registerRoutes(
     operatorRateLimiter,
     (req, res) => {
       const name = String(req.params.name);
-      if (!["telegram", "slack"].includes(name)) {
+      if (name !== "slack") {
         res.status(400).json({ error: "Invalid channel name" });
         return;
       }

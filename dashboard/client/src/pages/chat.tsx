@@ -1,5 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearch } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,7 @@ function ago(d: string): string {
 
 export default function ChatPage() {
   const { toast } = useToast();
+  const searchString = useSearch();
   const [selectedSession, setSelectedSession] = useState<string>("");
   const [replyValues, setReplyValues] = useState<Record<string, string>>({});
 
@@ -40,6 +42,16 @@ export default function ChatPage() {
   });
 
   const activeSessions = (sessions ?? []).filter((s) => s.status === "running");
+
+  // Auto-select session from URL param (e.g. /chat?sessionId=abc123)
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    const sid = params.get("sessionId");
+    if (sid && !selectedSession && activeSessions.length > 0) {
+      const match = activeSessions.find((s) => s.id === sid || s.id.startsWith(sid));
+      if (match) setSelectedSession(match.id);
+    }
+  }, [searchString, activeSessions, selectedSession]);
 
   const promptsQueryKey = ["/api/chat/prompts", selectedSession];
   const { data: prompts, isLoading: promptsLoading } = useQuery<PendingPrompt[]>({

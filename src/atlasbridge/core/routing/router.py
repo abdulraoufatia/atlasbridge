@@ -208,6 +208,14 @@ class PromptRouter:
         try:
             sm.transition(PromptStatus.ROUTED, "dispatching to channel")
 
+            # No channel configured — dashboard Chat page is the relay.
+            # Save prompt as awaiting_reply so the dashboard can display it.
+            if self._channel is None:
+                sm.transition(PromptStatus.AWAITING_REPLY, "dashboard relay — no channel")
+                self._sessions.mark_awaiting_reply(event.session_id, event.prompt_id)
+                log.info("prompt_routed_dashboard", prompt_id=event.prompt_id)
+                return
+
             # Delivery dedup: skip if already delivered (survives daemon restarts)
             if self._store is not None and hasattr(self._store, "was_delivered"):
                 ch_name = getattr(self._channel, "channel_name", "unknown")
@@ -528,6 +536,62 @@ class PromptRouter:
             sm.transition(PromptStatus.FAILED, str(exc))
             # Escalate to channel so a human can respond
             await self.route_event(event)
+
+    # ------------------------------------------------------------------
+    # Dashboard relay injection (channelless mode)
+    # ------------------------------------------------------------------
+
+    async def inject_dashboard_reply(
+        self, prompt_id: str, session_id: str, value: str
+    ) -> bool:
+        """Inject a reply submitted via the dashboard Chat page.
+
+        Similar to inject_autopilot_reply() but for dashboard-originated
+        replies.  Skips channel dispatch, gate evaluation, and identity
+        checks because the reply already passed the atomic decide_prompt()
+        guard in the CLI layer.
+
+        Returns True if injection succeeded, False otherwise.
+        """
+        log = logger.bind(
+            session_id=session_id[:8],
+            prompt_id=prompt_id,
+            value=repr(value[:20]),
+        )
+
+        sm = self._machines.get(prompt_id)
+        if sm is None:
+            log.debug("dashboard_reply_skipped", reason="unknown_prompt")
+            return False
+
+        if sm.is_terminal:
+            log.debug("dashboard_reply_skipped", reason="already_resolved")
+            return True  # Already handled
+
+        sm.transition(PromptStatus.REPLY_RECEIVED, "dashboard relay")
+
+        adapter = self._adapter_map.get(session_id)
+        if adapter is None:
+            log.warning("dashboard_reply_no_adapter")
+            sm.transition(PromptStatus.FAILED, "no adapter")
+            return False
+
+        try:
+            await adapter.inject_reply(
+                session_id=session_id,
+                value=value,
+                prompt_type=sm.event.prompt_type,
+            )
+            sm.transition(PromptStatus.INJECTED, "dashboard relay injected")
+            sm.transition(PromptStatus.RESOLVED, "dashboard relay resolved")
+            self._sessions.mark_reply_received(session_id)
+            self._session_dispatch_counts.pop(session_id, None)
+            log.info("dashboard_reply_injected")
+            return True
+        except Exception as exc:  # noqa: BLE001
+            log.error("dashboard_reply_inject_failed", error=str(exc))
+            sm.transition(PromptStatus.FAILED, str(exc))
+            return False
 
     # ------------------------------------------------------------------
     # Workspace trust helpers

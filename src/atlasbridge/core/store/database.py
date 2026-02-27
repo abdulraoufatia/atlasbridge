@@ -239,6 +239,20 @@ class Database:
             ).fetchall()
         return self._db.execute("SELECT * FROM prompts WHERE status = 'awaiting_reply'").fetchall()
 
+    def list_reply_received(self) -> list[sqlite3.Row]:
+        """Return prompts that have been replied to but not yet injected."""
+        return self._db.execute(
+            "SELECT * FROM prompts WHERE status = 'reply_received'"
+        ).fetchall()
+
+    def update_prompt_status(self, prompt_id: str, new_status: str) -> None:
+        """Update a prompt's status (used after dashboard relay injection)."""
+        self._db.execute(
+            "UPDATE prompts SET status = ? WHERE id = ?",
+            (new_status, prompt_id),
+        )
+        self._db.commit()
+
     def list_expired_pending(self) -> list[sqlite3.Row]:
         return self._db.execute(
             """

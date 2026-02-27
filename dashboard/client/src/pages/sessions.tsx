@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import type { Session } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,9 +23,11 @@ const PAUSABLE_STATUSES = new Set(["running", "awaiting_reply"]);
 function StartSessionDialog({
   open,
   onOpenChange,
+  onSessionStarted,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  onSessionStarted?: () => void;
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -52,6 +54,7 @@ function StartSessionDialog({
       setTimeout(() => queryClient.refetchQueries({ queryKey: ["/api/sessions"] }), 1500);
       setTimeout(() => queryClient.refetchQueries({ queryKey: ["/api/sessions"] }), 3000);
       onOpenChange(false);
+      onSessionStarted?.();
       setAdapter("claude");
       setMode("off");
       setCwd("");
@@ -163,6 +166,7 @@ function StartSessionDialog({
 export default function SessionsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
 
   const { data: sessions, isLoading } = useQuery<Session[]>({
     queryKey: ["/api/sessions"],
@@ -176,6 +180,30 @@ export default function SessionsPage() {
   const [startDialogOpen, setStartDialogOpen] = useState(false);
   const [stoppingId, setStoppingId] = useState<string | null>(null);
   const [pausingId, setPausingId] = useState<string | null>(null);
+
+  const navigateToChat = () => {
+    // Wait for the session to appear in the DB, then navigate to chat
+    const pollForSession = (attempts: number) => {
+      if (attempts <= 0) {
+        navigate("/chat");
+        return;
+      }
+      apiRequest("GET", "/api/sessions").then((r) => r.json()).then((list: Session[]) => {
+        const newest = list
+          .filter((s: Session) => s.status === "running")
+          .sort((a: Session, b: Session) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())[0];
+        if (newest) {
+          navigate(`/chat?sessionId=${newest.id}`);
+        } else {
+          setTimeout(() => pollForSession(attempts - 1), 1000);
+        }
+      }).catch(() => {
+        navigate("/chat");
+      });
+    };
+    // Give the daemon ~2s to write the session to the DB
+    setTimeout(() => pollForSession(3), 2000);
+  };
 
   const stopMutation = useMutation({
     mutationFn: (sessionId: string) =>
@@ -252,7 +280,7 @@ export default function SessionsPage() {
         </Button>
       </div>
 
-      <StartSessionDialog open={startDialogOpen} onOpenChange={setStartDialogOpen} />
+      <StartSessionDialog open={startDialogOpen} onOpenChange={setStartDialogOpen} onSessionStarted={navigateToChat} />
 
       <Card>
         <CardContent className="p-4">
