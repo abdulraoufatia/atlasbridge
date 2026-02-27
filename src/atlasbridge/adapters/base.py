@@ -171,10 +171,15 @@ class AdapterRegistry(metaclass=_AdapterRegistryMeta):
 
     @classmethod
     def get(cls, name: str) -> type[BaseAdapter]:
-        if name not in cls._registry:
-            available = ", ".join(sorted(cls._registry.keys())) or "(none)"
-            raise KeyError(f"Unknown adapter: {name!r}. Available: {available}")
-        return cls._registry[name]
+        if name in cls._registry:
+            return cls._registry[name]
+        # Fall back to the generic "custom" adapter for any unregistered tool name.
+        # This allows running any interactive CLI (e.g. cursor, aider) without a
+        # dedicated adapter.
+        if "custom" in cls._registry:
+            return cls._registry["custom"]
+        available = ", ".join(sorted(cls._registry.keys())) or "(none)"
+        raise KeyError(f"Unknown adapter: {name!r}. Available: {available}")
 
     @classmethod
     def list_all(cls) -> dict[str, type[BaseAdapter]]:

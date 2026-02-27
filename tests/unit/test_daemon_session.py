@@ -74,12 +74,16 @@ class TestRunAdapterSessionNoop:
         assert len(manager._adapters) == 0
 
     @pytest.mark.asyncio
-    async def test_unknown_tool_logs_error_returns_immediately(self) -> None:
+    async def test_unknown_tool_falls_back_to_custom_adapter(self) -> None:
+        """Unknown tools resolve to CustomCLIAdapter via fallback."""
         manager = DaemonManager({"tool": "nonexistent", "command": ["foo"], "channels": {}})
         manager._session_manager = SessionManager()
         manager._router = AsyncMock()
-        await manager._run_adapter_session()
-        assert len(manager._adapters) == 0
+        mock_adapter = _make_mock_adapter()
+        mock_cls = MagicMock(return_value=mock_adapter)
+        with patch("atlasbridge.adapters.base.AdapterRegistry.get", return_value=mock_cls):
+            await manager._run_adapter_session()
+        mock_cls.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_no_session_manager_returns_immediately(self) -> None:
@@ -264,3 +268,53 @@ class TestRunLoop:
         await manager.stop()
         await manager._run_loop()
         # No error = pass (reply_consumer was not started)
+
+
+# ---------------------------------------------------------------------------
+# Intent router initialization tests
+# ---------------------------------------------------------------------------
+
+
+class TestInitIntentRouter:
+    """Tests for DaemonManager._init_intent_router() code paths."""
+
+    def test_autonomy_mode_off_skips_intent_router(self) -> None:
+        """When autonomy_mode='off', _init_intent_router is a no-op."""
+        config = _minimal_config()
+        config["autonomy_mode"] = "off"
+        manager = DaemonManager(config)
+        manager._router = AsyncMock()
+        manager._policy = MagicMock()
+        manager._init_intent_router()
+        assert manager._intent_router is None
+
+    def test_no_router_skips_intent_router(self) -> None:
+        """When router is None, _init_intent_router is a no-op."""
+        config = _minimal_config()
+        config["autonomy_mode"] = "assist"
+        manager = DaemonManager(config)
+        manager._router = None
+        manager._policy = MagicMock()
+        manager._init_intent_router()
+        assert manager._intent_router is None
+
+    def test_no_policy_skips_intent_router(self) -> None:
+        """When policy is None, _init_intent_router is a no-op."""
+        config = _minimal_config()
+        config["autonomy_mode"] = "assist"
+        manager = DaemonManager(config)
+        manager._router = AsyncMock()
+        manager._policy = None
+        manager._init_intent_router()
+        assert manager._intent_router is None
+
+    def test_assist_mode_creates_intent_router(self) -> None:
+        """When mode='assist' with router+policy, intent router is created."""
+        config = _minimal_config()
+        config["autonomy_mode"] = "assist"
+        manager = DaemonManager(config)
+        manager._router = AsyncMock()
+        manager._policy = MagicMock()
+        manager._policy.rules = []
+        manager._init_intent_router()
+        assert manager._intent_router is not None

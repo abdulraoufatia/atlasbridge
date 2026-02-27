@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
 from click.testing import CliRunner
 
 # ---------------------------------------------------------------------------
@@ -74,29 +73,30 @@ class TestAdapterResolution:
 
         assert AdapterRegistry.get("claude-code") is AdapterRegistry.get("claude")
 
-    def test_unknown_adapter_raises_key_error(self) -> None:
-        """Unknown adapter name raises KeyError."""
+    def test_unknown_adapter_falls_back_to_custom(self) -> None:
+        """Unknown adapter name falls back to CustomCLIAdapter."""
+        import atlasbridge.adapters  # noqa: F401
+        from atlasbridge.adapters.base import AdapterRegistry
+        from atlasbridge.adapters.openai_cli import CustomCLIAdapter
+
+        cls = AdapterRegistry.get("nonexistent-tool-xyz")
+        assert cls is CustomCLIAdapter
+
+    def test_unknown_adapter_fallback_is_consistent(self) -> None:
+        """Multiple unknown names all resolve to the same custom adapter."""
         import atlasbridge.adapters  # noqa: F401
         from atlasbridge.adapters.base import AdapterRegistry
 
-        with pytest.raises(KeyError):
-            AdapterRegistry.get("nonexistent-tool-xyz")
+        a = AdapterRegistry.get("some-tool")
+        b = AdapterRegistry.get("another-tool")
+        assert a is b
 
-    def test_unknown_adapter_error_includes_available(self) -> None:
-        """KeyError message includes the list of registered adapters."""
+    def test_custom_adapter_explicitly_registered(self) -> None:
+        """The 'custom' key is explicitly registered in the registry."""
         import atlasbridge.adapters  # noqa: F401
         from atlasbridge.adapters.base import AdapterRegistry
 
-        with pytest.raises(KeyError, match="claude"):
-            AdapterRegistry.get("nonexistent-tool-xyz")
-
-    def test_unknown_adapter_error_mentions_unknown_name(self) -> None:
-        """KeyError message includes the unknown name that was requested."""
-        import atlasbridge.adapters  # noqa: F401
-        from atlasbridge.adapters.base import AdapterRegistry
-
-        with pytest.raises(KeyError, match="nonexistent-tool-xyz"):
-            AdapterRegistry.get("nonexistent-tool-xyz")
+        assert "custom" in AdapterRegistry.list_all()
 
 
 # ---------------------------------------------------------------------------
@@ -136,23 +136,12 @@ class TestAdapterListCommand:
 
 
 class TestRunUnknownAdapter:
-    def test_run_unknown_adapter_exits_nonzero(self) -> None:
-        """atlasbridge run <unknown> exits non-zero without crashing."""
-        from atlasbridge.cli.main import cli
+    def test_run_unknown_adapter_falls_back_to_custom(self) -> None:
+        """Unknown adapter falls back to CustomCLIAdapter — run doesn't reject it."""
+        import atlasbridge.adapters  # noqa: F401
+        from atlasbridge.adapters.base import AdapterRegistry
+        from atlasbridge.adapters.openai_cli import CustomCLIAdapter
 
-        result = CliRunner().invoke(cli, ["run", "nonexistent-tool-xyz"])
-        assert result.exit_code != 0
-
-    def test_run_unknown_adapter_mentions_unknown_name(self) -> None:
-        """Error output names the unknown tool."""
-        from atlasbridge.cli.main import cli
-
-        result = CliRunner().invoke(cli, ["run", "nonexistent-tool-xyz"])
-        assert "nonexistent-tool-xyz" in result.output
-
-    def test_run_unknown_adapter_lists_available(self) -> None:
-        """Error output lists at least one available adapter."""
-        from atlasbridge.cli.main import cli
-
-        result = CliRunner().invoke(cli, ["run", "nonexistent-tool-xyz"])
-        assert "claude" in result.output
+        # The registry no longer raises KeyError for unknown tools
+        cls = AdapterRegistry.get("nonexistent-tool-xyz")
+        assert cls is CustomCLIAdapter

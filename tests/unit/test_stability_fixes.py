@@ -37,12 +37,13 @@ class TestAdapterDiscovery:
         assert "openai" in available
         assert "gemini" in available
 
-    def test_adapter_registry_get_raises_keyerror(self):
-        """AdapterRegistry.get() raises KeyError for unknown adapters."""
+    def test_adapter_registry_get_falls_back_to_custom(self):
+        """AdapterRegistry.get() falls back to CustomCLIAdapter for unknown adapters."""
         from atlasbridge.adapters.base import AdapterRegistry
+        from atlasbridge.adapters.openai_cli import CustomCLIAdapter
 
-        with pytest.raises(KeyError, match="Unknown adapter"):
-            AdapterRegistry.get("nonexistent_adapter_xyz")
+        cls = AdapterRegistry.get("nonexistent_adapter_xyz")
+        assert cls is CustomCLIAdapter
 
     def test_adapter_registry_list_all_returns_dict(self):
         """AdapterRegistry.list_all() returns a non-empty dict."""

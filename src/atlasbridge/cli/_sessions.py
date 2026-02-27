@@ -330,6 +330,12 @@ _VALID_ADAPTERS = ("claude", "openai", "gemini", "claude-code")
 @click.option("--profile", "profile_name", default="", help="Agent profile name.")
 @click.option("--label", "session_label", default="", help="Human-readable session label.")
 @click.option("--json", "as_json", is_flag=True, default=False, help="Output session info as JSON.")
+@click.option(
+    "--custom-command",
+    "custom_command",
+    default="",
+    help="Custom command to run when adapter=custom (e.g. 'cursor', 'aider --model gpt-4o').",
+)
 def sessions_start(
     adapter: str,
     mode: str,
@@ -337,18 +343,41 @@ def sessions_start(
     profile_name: str,
     session_label: str,
     as_json: bool,
+    custom_command: str,
 ) -> None:
     """Start a new session in the background.
 
     Launches ``atlasbridge run`` as a detached child process so the dashboard
     can start sessions without blocking.  The session ID is written to stdout
     so callers can poll the sessions list.
+
+    To monitor any CLI tool, use ``--adapter custom --custom-command <cmd>``.
+    The generic adapter works with any interactive CLI.
     """
     import shutil
 
-    atlas_bin = shutil.which("atlasbridge") or sys.executable + " -m atlasbridge"
+    # Prefer ATLASBRIDGE_BIN (set by dashboard/operator.ts) then PATH lookup.
+    # Fall back to running as a Python module (correct multi-arg form, no spaces).
+    atlas_bin = os.environ.get("ATLASBRIDGE_BIN") or shutil.which("atlasbridge")
 
-    args = [atlas_bin, "run", adapter, "--mode", mode]
+    # When --custom-command is provided, use it as the tool name so AtlasBridge
+    # runs that exact command in a PTY. The generic adapter handles any tool.
+    tool_to_run = custom_command.split()[0] if custom_command else adapter
+    extra_tool_args = custom_command.split()[1:] if custom_command else []
+
+    if atlas_bin:
+        args = [atlas_bin, "run", tool_to_run, "--mode", mode] + extra_tool_args
+    else:
+        args = [
+            sys.executable,
+            "-m",
+            "atlasbridge",
+            "run",
+            tool_to_run,
+            "--mode",
+            mode,
+        ] + extra_tool_args
+
     if cwd:
         args += ["--cwd", cwd]
     if profile_name:
@@ -383,6 +412,87 @@ def sessions_start(
         else:
             console.print(f"[red]Failed to start session:[/red] {exc}")
         sys.exit(1)
+
+
+# ------------------------------------------------------------------
+# sessions reply
+# ------------------------------------------------------------------
+
+
+@sessions_group.command("reply")
+@click.argument("session_id")
+@click.argument("prompt_id")
+@click.argument("value")
+def sessions_reply(session_id: str, prompt_id: str, value: str) -> None:
+    """Inject a reply for a pending prompt in an active session."""
+    db = _open_db()
+    if db is None:
+        print(json.dumps({"ok": False, "error": "Database not found"}))
+        sys.exit(1)
+
+    try:
+        # Resolve short session ID
+        full_session_id = _resolve_session_id(db, session_id)
+        if full_session_id is None:
+            print(json.dumps({"ok": False, "error": f"Session not found: {session_id}"}))
+            sys.exit(1)
+
+        # Resolve short prompt ID (prefix match against pending prompts)
+        prompt = db.get_prompt(prompt_id)
+        if prompt is None:
+            pending = db.list_pending_prompts(full_session_id)
+            matches = [p for p in pending if p["id"].startswith(prompt_id)]
+            if len(matches) == 1:
+                prompt = db.get_prompt(matches[0]["id"])
+            elif len(matches) > 1:
+                print(json.dumps({"ok": False, "error": f"Ambiguous prompt ID: {prompt_id}"}))
+                sys.exit(1)
+
+        if prompt is None:
+            print(json.dumps({"ok": False, "error": f"Prompt not found: {prompt_id}"}))
+            sys.exit(1)
+
+        if prompt["status"] != "awaiting_reply":
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "error": f"Prompt is not awaiting reply (status: {prompt['status']})",
+                    }
+                )
+            )
+            sys.exit(1)
+
+        if prompt["session_id"] != full_session_id:
+            print(json.dumps({"ok": False, "error": "Prompt does not belong to this session"}))
+            sys.exit(1)
+
+        nonce = prompt["nonce"]
+        full_prompt_id = prompt["id"]
+
+        rows_updated = db.decide_prompt(
+            prompt_id=full_prompt_id,
+            new_status="reply_received",
+            channel_identity="dashboard",
+            response_normalized=value,
+            nonce=nonce,
+        )
+
+        if rows_updated == 0:
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "error": "Prompt could not be claimed (expired or already resolved)",
+                    }
+                )
+            )
+            sys.exit(1)
+
+        print(json.dumps({"ok": True, "prompt_id": full_prompt_id, "session_id": full_session_id}))
+
+    finally:
+        db.close()
 
 
 # ------------------------------------------------------------------
@@ -431,14 +541,21 @@ def sessions_stop(session_id: str, as_json: bool = False) -> None:
             return
 
         if not pid:
+            # No PID means the session never fully started — mark it canceled.
+            db.update_session(full_id, status="canceled")
             if as_json:
-                print(json.dumps({"ok": False, "error": "No PID recorded for session"}))
+                print(json.dumps({"ok": True, "session_id": full_id, "action": "canceled"}))
             else:
-                console.print("[red]No PID recorded for this session.[/red]")
-            sys.exit(1)
+                console.print(
+                    f"[yellow]No PID recorded — marked session {full_id[:8]} as canceled.[/yellow]"
+                )
+            return
 
         try:
             os.kill(pid, signal.SIGTERM)
+            # Also update DB directly — the daemon's finally block may not run
+            # if the parent process is killed or crashes.
+            db.update_session(full_id, status="canceled")
             if as_json:
                 print(
                     json.dumps({"ok": True, "session_id": full_id, "pid": pid, "signal": "SIGTERM"})
@@ -446,21 +563,190 @@ def sessions_stop(session_id: str, as_json: bool = False) -> None:
             else:
                 console.print(f"[green]SIGTERM sent[/green] to PID {pid} (session {full_id[:8]})")
         except ProcessLookupError:
+            # Process already gone — mark as canceled
+            db.update_session(full_id, status="canceled")
             if as_json:
                 print(
                     json.dumps(
-                        {"ok": False, "error": f"Process {pid} not found (already stopped?)"}
+                        {
+                            "ok": True,
+                            "session_id": full_id,
+                            "action": "canceled",
+                            "note": f"Process {pid} not found (already stopped)",
+                        }
                     )
                 )
             else:
                 console.print(
-                    f"[yellow]Process {pid} not found — session may have already stopped.[/yellow]"
+                    f"[yellow]Process {pid} not found — marked session as canceled.[/yellow]"
                 )
         except PermissionError:
             if as_json:
                 print(json.dumps({"ok": False, "error": f"Permission denied to stop PID {pid}"}))
             else:
                 console.print(f"[red]Permission denied:[/red] cannot stop PID {pid}")
+            sys.exit(1)
+
+    finally:
+        db.close()
+
+
+# ------------------------------------------------------------------
+# sessions pause
+# ------------------------------------------------------------------
+
+
+@sessions_group.command("pause")
+@click.argument("session_id")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output result as JSON.")
+def sessions_pause(session_id: str, as_json: bool = False) -> None:
+    """Pause a running session by sending SIGSTOP to its process."""
+    db = _open_db()
+    if db is None:
+        if as_json:
+            print(json.dumps({"ok": False, "error": "Database not found"}))
+        else:
+            console.print("[red]No database found.[/red]")
+        sys.exit(1)
+
+    try:
+        full_id = _resolve_session_id(db, session_id)
+        if full_id is None:
+            if as_json:
+                print(json.dumps({"ok": False, "error": f"Session not found: {session_id}"}))
+            else:
+                console.print(f"[red]Session not found:[/red] {session_id}")
+            sys.exit(1)
+
+        row = db.get_session(full_id)
+        if row is None:
+            if as_json:
+                print(json.dumps({"ok": False, "error": "Session not found"}))
+            else:
+                console.print(f"[red]Session not found:[/red] {session_id}")
+            sys.exit(1)
+
+        pid = row["pid"]
+        status = row["status"]
+
+        if status not in ("running", "awaiting_reply"):
+            if as_json:
+                print(
+                    json.dumps({"ok": False, "error": f"Cannot pause session in '{status}' state"})
+                )
+            else:
+                console.print(f"[yellow]Cannot pause — session is {status}.[/yellow]")
+            return
+
+        if not pid:
+            if as_json:
+                print(json.dumps({"ok": False, "error": "No PID recorded for session"}))
+            else:
+                console.print("[red]No PID recorded for this session.[/red]")
+            sys.exit(1)
+
+        try:
+            os.kill(pid, signal.SIGSTOP)
+            db.update_session(full_id, status="paused")
+            if as_json:
+                print(
+                    json.dumps({"ok": True, "session_id": full_id, "pid": pid, "signal": "SIGSTOP"})
+                )
+            else:
+                console.print(
+                    f"[green]SIGSTOP sent[/green] to PID {pid} (session {full_id[:8]}) — paused"
+                )
+        except ProcessLookupError:
+            if as_json:
+                print(json.dumps({"ok": False, "error": f"Process {pid} not found"}))
+            else:
+                console.print(f"[yellow]Process {pid} not found.[/yellow]")
+        except PermissionError:
+            if as_json:
+                print(json.dumps({"ok": False, "error": f"Permission denied to pause PID {pid}"}))
+            else:
+                console.print(f"[red]Permission denied:[/red] cannot pause PID {pid}")
+            sys.exit(1)
+
+    finally:
+        db.close()
+
+
+# ------------------------------------------------------------------
+# sessions resume
+# ------------------------------------------------------------------
+
+
+@sessions_group.command("resume")
+@click.argument("session_id")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output result as JSON.")
+def sessions_resume(session_id: str, as_json: bool = False) -> None:
+    """Resume a paused session by sending SIGCONT to its process."""
+    db = _open_db()
+    if db is None:
+        if as_json:
+            print(json.dumps({"ok": False, "error": "Database not found"}))
+        else:
+            console.print("[red]No database found.[/red]")
+        sys.exit(1)
+
+    try:
+        full_id = _resolve_session_id(db, session_id)
+        if full_id is None:
+            if as_json:
+                print(json.dumps({"ok": False, "error": f"Session not found: {session_id}"}))
+            else:
+                console.print(f"[red]Session not found:[/red] {session_id}")
+            sys.exit(1)
+
+        row = db.get_session(full_id)
+        if row is None:
+            if as_json:
+                print(json.dumps({"ok": False, "error": "Session not found"}))
+            else:
+                console.print(f"[red]Session not found:[/red] {session_id}")
+            sys.exit(1)
+
+        pid = row["pid"]
+        status = row["status"]
+
+        if status != "paused":
+            if as_json:
+                print(
+                    json.dumps({"ok": False, "error": f"Session is not paused (status: {status})"})
+                )
+            else:
+                console.print(f"[yellow]Session is not paused — status is {status}.[/yellow]")
+            return
+
+        if not pid:
+            if as_json:
+                print(json.dumps({"ok": False, "error": "No PID recorded for session"}))
+            else:
+                console.print("[red]No PID recorded for this session.[/red]")
+            sys.exit(1)
+
+        try:
+            os.kill(pid, signal.SIGCONT)
+            db.update_session(full_id, status="running")
+            if as_json:
+                print(
+                    json.dumps({"ok": True, "session_id": full_id, "pid": pid, "signal": "SIGCONT"})
+                )
+            else:
+                console.print(
+                    f"[green]SIGCONT sent[/green] to PID {pid} (session {full_id[:8]}) — resumed"
+                )
+        except ProcessLookupError:
+            if as_json:
+                print(json.dumps({"ok": False, "error": f"Process {pid} not found"}))
+            else:
+                console.print(f"[yellow]Process {pid} not found.[/yellow]")
+        except PermissionError:
+            if as_json:
+                print(json.dumps({"ok": False, "error": f"Permission denied to resume PID {pid}"}))
+            else:
+                console.print(f"[red]Permission denied:[/red] cannot resume PID {pid}")
             sys.exit(1)
 
     finally:

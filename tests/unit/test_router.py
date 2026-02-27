@@ -1253,3 +1253,240 @@ class TestAutoInjectTrustedWorkspace:
         mock_channel.notify.assert_called_once()
         call_args = mock_channel.notify.call_args[0][0]
         assert "auto-confirm failed" in call_args
+
+
+# ---------------------------------------------------------------------------
+# Save prompt to DB on route_event
+# ---------------------------------------------------------------------------
+
+
+class TestSavePromptOnRouteEvent:
+    """Verify that route_event persists prompts to the DB store."""
+
+    @pytest.mark.asyncio
+    async def test_save_prompt_called_with_correct_args(
+        self, session_manager: SessionManager, mock_channel: AsyncMock
+    ) -> None:
+        store = _mock_store()
+        store.save_prompt = MagicMock()
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},
+            store=store,
+        )
+        s = _session()
+        session_manager.register(s)
+        event = _event(s.session_id)
+        await router.route_event(event)
+        store.save_prompt.assert_called_once()
+        call_kwargs = store.save_prompt.call_args
+        assert call_kwargs.kwargs["prompt_id"] == event.prompt_id
+        assert call_kwargs.kwargs["session_id"] == event.session_id
+        assert call_kwargs.kwargs["prompt_type"] == "yes_no"
+        assert call_kwargs.kwargs["confidence"] == "high"
+        assert call_kwargs.kwargs["excerpt"] == event.excerpt
+
+    @pytest.mark.asyncio
+    async def test_save_prompt_failure_does_not_crash_routing(
+        self, session_manager: SessionManager, mock_channel: AsyncMock
+    ) -> None:
+        """If save_prompt raises, routing should continue normally."""
+        store = _mock_store()
+        store.save_prompt = MagicMock(side_effect=Exception("db error"))
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},
+            store=store,
+        )
+        s = _session()
+        session_manager.register(s)
+        event = _event(s.session_id)
+        await router.route_event(event)
+        # Routing should still succeed — channel.send_prompt was called
+        mock_channel.send_prompt.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_save_prompt_skipped_when_no_store(
+        self, session_manager: SessionManager, mock_channel: AsyncMock
+    ) -> None:
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},
+            store=None,
+        )
+        s = _session()
+        session_manager.register(s)
+        event = _event(s.session_id)
+        await router.route_event(event)
+        # No error — routing still works without a store
+        mock_channel.send_prompt.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Autopilot injection path
+# ---------------------------------------------------------------------------
+
+
+class TestAutopilotInjection:
+    """Tests for PromptRouter.inject_autopilot_reply()."""
+
+    @staticmethod
+    def _prepare_sm(router: PromptRouter, event: PromptEvent) -> None:
+        """Pre-populate the state machine so it's ready for REPLY_RECEIVED."""
+        from atlasbridge.core.prompt.state import PromptStateMachine
+
+        sm = PromptStateMachine(event=event)
+        sm.transition(PromptStatus.ROUTED, "test setup")
+        sm.transition(PromptStatus.AWAITING_REPLY, "test setup")
+        router._machines[event.prompt_id] = sm
+
+    @pytest.mark.asyncio
+    async def test_autopilot_inject_success(
+        self, session_manager: SessionManager, mock_channel: AsyncMock
+    ) -> None:
+        adapter = AsyncMock()
+        s = _session()
+        session_manager.register(s)
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={s.session_id: adapter},
+            store=_mock_store(),
+        )
+        event = _event(s.session_id)
+        self._prepare_sm(router, event)
+        await router.inject_autopilot_reply(event, "y")
+        adapter.inject_reply.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_autopilot_inject_no_adapter_escalates(
+        self, session_manager: SessionManager, mock_channel: AsyncMock
+    ) -> None:
+        """When no adapter is found, the prompt should be escalated to the channel."""
+        s = _session()
+        session_manager.register(s)
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={},
+            store=_mock_store(),
+        )
+        event = _event(s.session_id)
+        self._prepare_sm(router, event)
+        await router.inject_autopilot_reply(event, "y")
+        # Should escalate to channel
+        mock_channel.send_prompt.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_autopilot_inject_failure_escalates(
+        self, session_manager: SessionManager, mock_channel: AsyncMock
+    ) -> None:
+        adapter = AsyncMock()
+        adapter.inject_reply.side_effect = RuntimeError("inject failed")
+        s = _session()
+        session_manager.register(s)
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={s.session_id: adapter},
+            store=_mock_store(),
+        )
+        event = _event(s.session_id)
+        self._prepare_sm(router, event)
+        await router.inject_autopilot_reply(event, "y")
+        # Failed injection should escalate to channel
+        mock_channel.send_prompt.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_autopilot_inject_terminal_skipped(
+        self, session_manager: SessionManager, mock_channel: AsyncMock
+    ) -> None:
+        """If the state machine is already terminal, injection is skipped."""
+        from atlasbridge.core.prompt.state import PromptStateMachine
+
+        adapter = AsyncMock()
+        s = _session()
+        session_manager.register(s)
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=mock_channel,
+            adapter_map={s.session_id: adapter},
+            store=_mock_store(),
+        )
+        event = _event(s.session_id)
+        # Pre-create state machine and move to terminal state
+        sm = PromptStateMachine(event=event)
+        sm.transition(PromptStatus.ROUTED, "test")
+        sm.transition(PromptStatus.AWAITING_REPLY, "test")
+        sm.transition(PromptStatus.REPLY_RECEIVED, "test")
+        sm.transition(PromptStatus.INJECTED, "test")
+        sm.transition(PromptStatus.RESOLVED, "test")
+        router._machines[event.prompt_id] = sm
+        await router.inject_autopilot_reply(event, "y")
+        # Adapter should NOT be called since SM is terminal
+        adapter.inject_reply.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Channel routing error path
+# ---------------------------------------------------------------------------
+
+
+class TestChannelRoutingError:
+    """Tests for error handling during channel delivery."""
+
+    @pytest.mark.asyncio
+    async def test_channel_send_failure_marks_failed(self, session_manager: SessionManager) -> None:
+        channel = AsyncMock()
+        channel.send_prompt.side_effect = RuntimeError("network error")
+        channel.is_allowed = MagicMock(return_value=True)
+        channel.get_allowed_identities = MagicMock(return_value=["telegram:12345"])
+        channel.channel_name = "telegram"
+        store = _mock_store()
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=channel,
+            adapter_map={},
+            store=store,
+        )
+        s = _session()
+        session_manager.register(s)
+        event = _event(s.session_id)
+        await router.route_event(event)
+        # The state machine should be in FAILED state
+        sm = router._machines.get(event.prompt_id)
+        assert sm is not None
+        assert sm.status == PromptStatus.FAILED
+
+
+# ---------------------------------------------------------------------------
+# Delivery dedup (already delivered)
+# ---------------------------------------------------------------------------
+
+
+class TestDeliveryDedup:
+    """Tests for the delivery dedup guard in route_event."""
+
+    @pytest.mark.asyncio
+    async def test_already_delivered_skips_send(self, session_manager: SessionManager) -> None:
+        channel = AsyncMock()
+        channel.is_allowed = MagicMock(return_value=True)
+        channel.get_allowed_identities = MagicMock(return_value=["telegram:12345"])
+        channel.channel_name = "telegram"
+        store = _mock_store()
+        store.was_delivered.return_value = True
+        router = PromptRouter(
+            session_manager=session_manager,
+            channel=channel,
+            adapter_map={},
+            store=store,
+        )
+        s = _session()
+        session_manager.register(s)
+        event = _event(s.session_id)
+        await router.route_event(event)
+        # send_prompt should NOT be called since prompt was already delivered
+        channel.send_prompt.assert_not_called()

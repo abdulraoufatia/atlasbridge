@@ -7,6 +7,7 @@ import shutil
 import signal
 import socket
 import subprocess
+import sys
 from pathlib import Path
 
 import click
@@ -139,6 +140,12 @@ def _start_node_dashboard(host: str, port: int, no_browser: bool, dashboard_dir:
         "ATLASBRIDGE_DB_PATH": str(config_dir / DB_FILENAME),
         "ATLASBRIDGE_TRACE_PATH": str(config_dir / TRACE_FILENAME),
         "ATLASBRIDGE_CONFIG": str(config_dir),
+        # Resolve the full binary path so Node.js child processes can find it
+        # even when the shell PATH differs from the launch environment.
+        "ATLASBRIDGE_BIN": (
+            shutil.which("atlasbridge")
+            or (os.path.abspath(sys.argv[0]) if os.path.isfile(sys.argv[0]) else "atlasbridge")
+        ),
     }
 
     # Prefer pre-built dist, fall back to dev mode via npx tsx

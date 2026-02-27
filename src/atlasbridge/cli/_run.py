@@ -34,6 +34,14 @@ console = Console()
     default="",
     help="Agent profile name (provides defaults for label, policy, adapter).",
 )
+@click.option(
+    "--mode",
+    "autonomy_mode",
+    default="assist",
+    type=click.Choice(["off", "assist", "full"], case_sensitive=False),
+    show_default=True,
+    help="AtlasBridge autonomy mode: off=all to human, assist=policy-governed, full=auto where possible.",
+)
 def run_cmd(
     tool: str,
     tool_args: tuple[str, ...],
@@ -42,6 +50,7 @@ def run_cmd(
     policy_file: str,
     dry_run: bool,
     profile_name: str,
+    autonomy_mode: str,
 ) -> None:
     """Launch a CLI tool under AtlasBridge supervision."""
     # Apply profile defaults — explicit CLI flags always win
@@ -69,6 +78,7 @@ def run_cmd(
         cwd=cwd,
         policy_file=policy_file,
         dry_run=dry_run,
+        autonomy_mode=autonomy_mode,
         console=console,
     )
 
@@ -81,6 +91,7 @@ def cmd_run(
     console: Console,
     policy_file: str = "",
     dry_run: bool = False,
+    autonomy_mode: str = "assist",
 ) -> None:
     """Load config and run the tool under AtlasBridge supervision (foreground)."""
     import atlasbridge.adapters  # noqa: F401 — registers all built-in adapters
@@ -153,6 +164,7 @@ def cmd_run(
                 config=config,
                 policy_file=policy_file,
                 dry_run=dry_run,
+                autonomy_mode=autonomy_mode,
             )
         )
     except KeyboardInterrupt:
@@ -168,6 +180,7 @@ async def _run_async(
     config: object,
     policy_file: str = "",
     dry_run: bool = False,
+    autonomy_mode: str = "assist",
 ) -> None:
     from atlasbridge.core.daemon.manager import DaemonManager
 
@@ -186,6 +199,7 @@ async def _run_async(
         config=config,
         policy_file=policy_file,
         dry_run=dry_run,
+        autonomy_mode=autonomy_mode,
     )
 
     manager = DaemonManager(cfg_dict)
@@ -241,6 +255,7 @@ def _config_to_dict(
     config: object,
     policy_file: str = "",
     dry_run: bool = False,
+    autonomy_mode: str = "assist",
 ) -> dict:
     """Convert AtlasBridgeConfig + run params into the DaemonManager config dict."""
     from pathlib import Path
@@ -268,6 +283,7 @@ def _config_to_dict(
         "label": label,
         "cwd": cwd or str(Path.cwd()),
         "channels": channels,
+        "autonomy_mode": autonomy_mode,
         "prompts": {
             "timeout_seconds": config.prompts.timeout_seconds,
             "stuck_timeout_seconds": config.prompts.stuck_timeout_seconds,

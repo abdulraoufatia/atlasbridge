@@ -92,8 +92,8 @@ class Database:
     ) -> None:
         self._db.execute(
             """
-            INSERT INTO sessions (id, tool, command, cwd, label, status)
-            VALUES (?, ?, ?, ?, ?, 'starting')
+            INSERT INTO sessions (id, tool, command, cwd, label, status, started_at)
+            VALUES (?, ?, ?, ?, ?, 'starting', datetime('now'))
             """,
             (session_id, tool, json.dumps(command), cwd, label),
         )

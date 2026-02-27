@@ -1,5 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { randomUUID } from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 import { registerOperatorRoutes } from "./routes/operator";
 import { WebSocketServer, WebSocket } from "ws";
 import { repo } from "./atlasbridge-repo";
@@ -14,6 +17,156 @@ import { handleTerminalConnection } from "./terminal";
 import { requireCsrf } from "./middleware/csrf";
 import { operatorRateLimiter } from "./middleware/rate-limit";
 import { insertOperatorAuditLog } from "./db";
+import { getConfigPath } from "./config";
+import { parse as parseTOML, stringify as stringifyTOML } from "smol-toml";
+
+// ---------------------------------------------------------------------------
+// TOML config helpers — read/write atlasbridge config.toml directly
+// ---------------------------------------------------------------------------
+
+function readAtlasBridgeConfig(): Record<string, unknown> {
+  const cfgPath = getConfigPath();
+  if (!fs.existsSync(cfgPath)) return {};
+  try {
+    return parseTOML(fs.readFileSync(cfgPath, "utf8")) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+function writeAtlasBridgeConfig(data: Record<string, unknown>): void {
+  const cfgPath = getConfigPath();
+  fs.mkdirSync(path.dirname(cfgPath), { recursive: true });
+  if (!data.config_version) data.config_version = 1;
+  fs.writeFileSync(cfgPath, stringifyTOML(data), { encoding: "utf8", mode: 0o600 });
+}
+
+const DEFAULT_POLICY_YAML = `\
+policy_version: "1"
+name: "claude-code-dev"
+autonomy_mode: full
+
+rules:
+
+  - id: "deny-credentials"
+    description: "Never auto-reply to credential prompts"
+    match:
+      prompt_type: [free_text]
+      contains: "password|token|api.?key|secret|passphrase"
+      contains_is_regex: true
+      min_confidence: low
+    action:
+      type: deny
+      reason: "Credential prompts are never auto-replied."
+
+  - id: "deny-force-push"
+    description: "Never auto-approve git force-push"
+    match:
+      contains: "force.push|force push"
+      contains_is_regex: true
+      min_confidence: low
+    action:
+      type: deny
+      reason: "Force-push requires manual approval."
+
+  - id: "require-human-destructive"
+    description: "Escalate destructive operations to human"
+    match:
+      contains: "delete|destroy|drop table|purge|wipe|truncate|rm -rf"
+      contains_is_regex: true
+      min_confidence: low
+    action:
+      type: require_human
+      message: "Destructive operation detected — please review."
+
+  - id: "require-human-are-you-sure"
+    description: "Escalate explicit confirmation prompts"
+    match:
+      contains: "are you sure"
+      contains_is_regex: false
+      min_confidence: low
+    action:
+      type: require_human
+      message: "Explicit confirmation required — please review."
+
+  - id: "claude-code-yes-no"
+    description: "Auto-allow yes/no permission prompts"
+    match:
+      prompt_type: [yes_no]
+      min_confidence: medium
+    action:
+      type: auto_reply
+      value: "y"
+      constraints:
+        allowed_choices: ["y", "n"]
+
+  - id: "claude-code-confirm-enter"
+    description: "Auto-confirm press-enter prompts"
+    match:
+      prompt_type: [confirm_enter]
+      min_confidence: medium
+    action:
+      type: auto_reply
+      value: "\\n"
+
+  - id: "claude-code-select-first"
+    description: "Auto-select option 1 on multiple-choice prompts"
+    match:
+      prompt_type: [multiple_choice]
+      min_confidence: medium
+    action:
+      type: auto_reply
+      value: "1"
+
+  - id: "claude-code-tool-use"
+    description: "Auto-approve tool_use permission prompts"
+    match:
+      prompt_type: [tool_use]
+      min_confidence: medium
+    action:
+      type: auto_reply
+      value: "1"
+
+  - id: "claude-code-free-text-medium"
+    description: "Auto-approve medium-confidence free_text prompts"
+    match:
+      prompt_type: [free_text]
+      min_confidence: medium
+    action:
+      type: auto_reply
+      value: "1"
+
+  - id: "catch-all"
+    description: "Unmatched prompts go to human"
+    match: {}
+    action:
+      type: require_human
+      message: "No policy rule matched — please review and respond."
+
+defaults:
+  no_match: require_human
+  low_confidence: require_human
+`;
+
+function ensureAutopilotReady(): void {
+  const cfgDir = path.dirname(getConfigPath());
+  fs.mkdirSync(cfgDir, { recursive: true });
+
+  // Write default policy if none exists
+  const policyPath = path.join(cfgDir, "policy.yaml");
+  if (!fs.existsSync(policyPath)) {
+    fs.writeFileSync(policyPath, DEFAULT_POLICY_YAML, { encoding: "utf8", mode: 0o600 });
+  }
+
+  // Ensure autopilot state is running
+  const statePath = path.join(cfgDir, "autopilot_state.json");
+  let state: Record<string, unknown> = {};
+  try { state = JSON.parse(fs.readFileSync(statePath, "utf8")); } catch { /* fresh state */ }
+  if (state.state !== "running") {
+    state.state = "running";
+    fs.writeFileSync(statePath, JSON.stringify(state), { encoding: "utf8", mode: 0o600 });
+  }
+}
 
 // Static org settings (stored in dashboard DB via seed, not in AtlasBridge DB)
 import type { RbacPermission, OrgProfile, SsoConfig, ComplianceConfig, SessionPolicyConfig } from "@shared/schema";
@@ -180,7 +333,7 @@ export async function registerRoutes(
 
   app.get("/api/settings/organization", async (_req, res) => {
     try {
-      const [dbUsers, dbGroups, dbRoles, dbApiKeys, dbPolicies, dbNotifications, dbIpAllowlist] = await Promise.all([
+      const [dbUsers, dbGroups, dbRoles, dbApiKeys, dbPolicies, dbNotifications, dbIpAllowlist, dbPermissions] = await Promise.all([
         storage.getUsers(),
         storage.getGroups(),
         storage.getRoles(),
@@ -188,9 +341,14 @@ export async function registerRoutes(
         storage.getSecurityPolicies(),
         storage.getNotifications(),
         storage.getIpAllowlist(),
+        storage.getRbacPermissions(),
       ]);
+      const permissions = dbPermissions.length > 0
+        ? dbPermissions.map(p => ({ id: p.externalId, resource: p.resource, actions: p.actions, description: p.description, category: p.category }))
+        : orgSettingsStatic.permissions;
       res.json({
         ...orgSettingsStatic,
+        permissions,
         users: dbUsers,
         groups: dbGroups,
         roles: dbRoles,
@@ -202,6 +360,57 @@ export async function registerRoutes(
     } catch (e) {
       console.error("Failed to load org settings:", e);
       res.status(500).json({ error: "Failed to load organization settings" });
+    }
+  });
+
+  // Permission matrix CRUD
+  app.post("/api/permissions", requireCsrf, operatorRateLimiter, async (req, res) => {
+    try {
+      const body = req.body;
+      const perm = await storage.createRbacPermission({
+        externalId: `perm-${Date.now()}`,
+        resource: body.resource,
+        actions: body.actions || [],
+        description: body.description || "",
+        category: body.category || "",
+      });
+      res.status(201).json({ id: perm.externalId, resource: perm.resource, actions: perm.actions, description: perm.description, category: perm.category });
+    } catch (e: any) {
+      res.status(400).json({ error: e.message || "Failed to create permission" });
+    }
+  });
+
+  app.patch("/api/permissions/:externalId", requireCsrf, operatorRateLimiter, async (req, res) => {
+    try {
+      const externalId = String(req.params.externalId);
+      const body = req.body;
+      // Look up by externalId to get integer id
+      const all = await storage.getRbacPermissions();
+      const existing = all.find(p => p.externalId === externalId);
+      if (!existing) { res.status(404).json({ error: "Permission not found" }); return; }
+      const perm = await storage.updateRbacPermission(existing.id, {
+        resource: body.resource,
+        actions: body.actions,
+        description: body.description,
+        category: body.category,
+      });
+      if (!perm) { res.status(404).json({ error: "Permission not found" }); return; }
+      res.json({ id: perm.externalId, resource: perm.resource, actions: perm.actions, description: perm.description, category: perm.category });
+    } catch (e: any) {
+      res.status(400).json({ error: e.message || "Failed to update permission" });
+    }
+  });
+
+  app.delete("/api/permissions/:externalId", requireCsrf, operatorRateLimiter, async (req, res) => {
+    try {
+      const externalId = String(req.params.externalId);
+      const all = await storage.getRbacPermissions();
+      const existing = all.find(p => p.externalId === externalId);
+      if (!existing) { res.status(404).json({ error: "Permission not found" }); return; }
+      await storage.deleteRbacPermission(existing.id);
+      res.json({ ok: true });
+    } catch (e: any) {
+      res.status(400).json({ error: e.message || "Failed to delete permission" });
     }
   });
 
@@ -350,6 +559,20 @@ export async function registerRoutes(
     const deleted = await storage.deleteApiKey(id);
     if (!deleted) { res.status(404).json({ error: "API key not found" }); return; }
     res.status(204).end();
+  });
+
+  app.post("/api/api-keys/:id/rotate", requireCsrf, operatorRateLimiter, async (req, res) => {
+    try {
+      const id = parseInt(String(req.params.id));
+      const newExtId = `sk_${randomUUID().replace(/-/g, "").slice(0, 24)}`;
+      const newPrefix = newExtId.slice(0, 10);
+      const updated = await storage.updateApiKey(id, { externalId: newExtId, prefix: newPrefix });
+      if (!updated) { res.status(404).json({ error: "API key not found" }); return; }
+      insertOperatorAuditLog({ method: "POST", path: `/api/api-keys/${id}/rotate`, action: `apikey-rotate:${id}`, body: {}, result: "ok" });
+      res.json({ ok: true, newKey: newExtId, prefix: newPrefix });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Failed to rotate API key" });
+    }
   });
 
   app.patch("/api/security-policies/:id", async (req, res) => {
@@ -724,7 +947,7 @@ export async function registerRoutes(
         });
         res.json({ ok: true, provider: name, detail: stdout.trim() });
       } catch (err: any) {
-        const detail = (err.stderr as string | undefined)?.trim() ?? err.message;
+        const detail = (err.stderr as string | undefined)?.trim() || err.message;
         insertOperatorAuditLog({
           method: "POST",
           path: `/api/providers/${name}/validate`,
@@ -765,36 +988,37 @@ export async function registerRoutes(
   // Channel configuration
   // ---------------------------------------------------------------------------
 
-  app.get("/api/channels", async (_req, res) => {
-    try {
-      const { runAtlasBridge } = await import("./routes/operator");
-      const { stdout } = await runAtlasBridge(["config", "show", "--json"]);
-      const cfg = JSON.parse(stdout);
-      res.json({
-        telegram: cfg.telegram ?? null,
-        slack: cfg.slack ?? null,
-      });
-    } catch (err: any) {
-      res.status(503).json({ error: "Failed to read channel config", detail: err.message });
-    }
+  app.get("/api/channels", (_req, res) => {
+    const cfg = readAtlasBridgeConfig();
+    const tg = cfg.telegram as Record<string, unknown> | undefined;
+    const sl = cfg.slack as Record<string, unknown> | undefined;
+    res.json({
+      telegram: tg ? { configured: true, users: tg.allowed_users } : null,
+      slack: sl ? { configured: true, users: sl.allowed_users } : null,
+    });
   });
 
   app.post(
     "/api/channels/telegram",
     requireCsrf,
     operatorRateLimiter,
-    async (req, res) => {
+    (req, res) => {
       const { token, users } = req.body as { token?: string; users?: string };
       if (!token || !users) {
         res.status(400).json({ error: "token and users are required" });
         return;
       }
       try {
-        const { runAtlasBridge } = await import("./routes/operator");
-        await runAtlasBridge(["channel", "add", "telegram", "--token", token, "--users", String(users)]);
+        const cfg = readAtlasBridgeConfig();
+        const userIds = String(users).split(",").map(u => {
+          const n = parseInt(u.trim(), 10);
+          return isNaN(n) ? u.trim() : n;
+        });
+        cfg.telegram = { bot_token: token, allowed_users: userIds };
+        writeAtlasBridgeConfig(cfg);
         res.json({ ok: true });
       } catch (err: any) {
-        res.status(503).json({ error: "Failed to configure Telegram channel", detail: err.message });
+        res.status(500).json({ error: "Failed to configure Telegram channel", detail: err.message });
       }
     },
   );
@@ -803,18 +1027,20 @@ export async function registerRoutes(
     "/api/channels/slack",
     requireCsrf,
     operatorRateLimiter,
-    async (req, res) => {
+    (req, res) => {
       const { token, appToken, users } = req.body as { token?: string; appToken?: string; users?: string };
       if (!token || !appToken || !users) {
         res.status(400).json({ error: "token, appToken, and users are required" });
         return;
       }
       try {
-        const { runAtlasBridge } = await import("./routes/operator");
-        await runAtlasBridge(["channel", "add", "slack", "--token", token, "--app-token", appToken, "--users", String(users)]);
+        const cfg = readAtlasBridgeConfig();
+        const userIds = String(users).split(",").map(u => u.trim()).filter(Boolean);
+        cfg.slack = { bot_token: token, app_token: appToken, allowed_users: userIds };
+        writeAtlasBridgeConfig(cfg);
         res.json({ ok: true });
       } catch (err: any) {
-        res.status(503).json({ error: "Failed to configure Slack channel", detail: err.message });
+        res.status(500).json({ error: "Failed to configure Slack channel", detail: err.message });
       }
     },
   );
@@ -823,18 +1049,19 @@ export async function registerRoutes(
     "/api/channels/:name",
     requireCsrf,
     operatorRateLimiter,
-    async (req, res) => {
-      const name = req.params.name;
+    (req, res) => {
+      const name = String(req.params.name);
       if (!["telegram", "slack"].includes(name)) {
         res.status(400).json({ error: "Invalid channel name" });
         return;
       }
       try {
-        const { runAtlasBridge } = await import("./routes/operator");
-        await runAtlasBridge(["channel", "remove", name]);
+        const cfg = readAtlasBridgeConfig();
+        delete cfg[name];
+        writeAtlasBridgeConfig(cfg);
         res.json({ ok: true });
       } catch (err: any) {
-        res.status(503).json({ error: "Failed to remove channel", detail: err.message });
+        res.status(500).json({ error: "Failed to remove channel", detail: err.message });
       }
     },
   );
@@ -843,7 +1070,7 @@ export async function registerRoutes(
   // Session start / stop from dashboard
   // ---------------------------------------------------------------------------
 
-  const VALID_ADAPTERS = new Set(["claude", "openai", "gemini", "claude-code"]);
+  const VALID_ADAPTERS = new Set(["claude", "openai", "gemini", "claude-code", "custom"]);
   const VALID_SESSION_MODES = new Set(["off", "assist", "full"]);
 
   app.post(
@@ -858,9 +1085,14 @@ export async function registerRoutes(
       const cwd = typeof body.cwd === "string" ? body.cwd : "";
       const profile = typeof body.profile === "string" ? body.profile : "";
       const label = typeof body.label === "string" ? body.label : "";
+      const customCommand = typeof body.customCommand === "string" ? body.customCommand.trim() : "";
 
       if (!VALID_ADAPTERS.has(adapter)) {
         res.status(400).json({ error: `Invalid adapter. Choose from: ${Array.from(VALID_ADAPTERS).join(", ")}` });
+        return;
+      }
+      if (adapter === "custom" && !customCommand) {
+        res.status(400).json({ error: "A command is required when using the custom adapter." });
         return;
       }
       if (!VALID_SESSION_MODES.has(mode)) {
@@ -868,7 +1100,18 @@ export async function registerRoutes(
         return;
       }
 
+      ensureAutopilotReady();
+
+      // Prevent duplicate session starts from rapid double-clicks.
+      if ((globalThis as any).__lastSessionStart &&
+          Date.now() - (globalThis as any).__lastSessionStart < 3000) {
+        res.status(429).json({ error: "Session start already in progress. Please wait." });
+        return;
+      }
+      (globalThis as any).__lastSessionStart = Date.now();
+
       const args = ["sessions", "start", "--adapter", adapter, "--mode", mode, "--json"];
+      if (customCommand) args.push("--custom-command", customCommand);
       if (cwd) args.push("--cwd", cwd);
       if (profile) args.push("--profile", profile);
       if (label) args.push("--label", label);
@@ -885,7 +1128,7 @@ export async function registerRoutes(
         });
         res.json({ ok: true, ...parsed });
       } catch (err: any) {
-        const detail = (err.stderr as string | undefined)?.trim() ?? err.message;
+        const detail = (err.stderr as string | undefined)?.trim() || err.message;
         insertOperatorAuditLog({
           method: "POST",
           path: "/api/sessions/start",
@@ -918,7 +1161,10 @@ export async function registerRoutes(
         });
         res.json({ ok: true, session_id: sessionId, ...parsed });
       } catch (err: any) {
-        const detail = (err.stderr as string | undefined)?.trim() ?? err.message;
+        const detail =
+          (err.stderr as string | undefined)?.trim() ||
+          (err.stdout as string | undefined)?.trim() ||
+          err.message;
         insertOperatorAuditLog({
           method: "POST",
           path: `/api/sessions/${sessionId}/stop`,
@@ -928,6 +1174,135 @@ export async function registerRoutes(
           error: err.message,
         });
         res.status(503).json({ error: "Failed to stop session", detail });
+      }
+    },
+  );
+
+  // ---------------------------------------------------------------------------
+  // Session pause / resume
+  // ---------------------------------------------------------------------------
+
+  app.post(
+    "/api/sessions/:id/pause",
+    requireCsrf,
+    operatorRateLimiter,
+    async (req, res) => {
+      const { runAtlasBridge } = await import("./routes/operator");
+      const sessionId = String(req.params.id);
+      try {
+        const { stdout } = await runAtlasBridge(["sessions", "pause", sessionId, "--json"]);
+        const parsed = JSON.parse(stdout.trim() || "{}");
+        insertOperatorAuditLog({
+          method: "POST",
+          path: `/api/sessions/${sessionId}/pause`,
+          action: `session-pause:${sessionId}`,
+          body: {},
+          result: "ok",
+        });
+        res.json({ ok: true, session_id: sessionId, ...parsed });
+      } catch (err: any) {
+        const detail =
+          (err.stderr as string | undefined)?.trim() ||
+          (err.stdout as string | undefined)?.trim() ||
+          err.message;
+        insertOperatorAuditLog({
+          method: "POST",
+          path: `/api/sessions/${sessionId}/pause`,
+          action: `session-pause:${sessionId}`,
+          body: {},
+          result: "error",
+          error: err.message,
+        });
+        res.status(503).json({ error: "Failed to pause session", detail });
+      }
+    },
+  );
+
+  app.post(
+    "/api/sessions/:id/resume",
+    requireCsrf,
+    operatorRateLimiter,
+    async (req, res) => {
+      const { runAtlasBridge } = await import("./routes/operator");
+      const sessionId = String(req.params.id);
+      try {
+        const { stdout } = await runAtlasBridge(["sessions", "resume", sessionId, "--json"]);
+        const parsed = JSON.parse(stdout.trim() || "{}");
+        insertOperatorAuditLog({
+          method: "POST",
+          path: `/api/sessions/${sessionId}/resume`,
+          action: `session-resume:${sessionId}`,
+          body: {},
+          result: "ok",
+        });
+        res.json({ ok: true, session_id: sessionId, ...parsed });
+      } catch (err: any) {
+        const detail =
+          (err.stderr as string | undefined)?.trim() ||
+          (err.stdout as string | undefined)?.trim() ||
+          err.message;
+        insertOperatorAuditLog({
+          method: "POST",
+          path: `/api/sessions/${sessionId}/resume`,
+          action: `session-resume:${sessionId}`,
+          body: {},
+          result: "error",
+          error: err.message,
+        });
+        res.status(503).json({ error: "Failed to resume session", detail });
+      }
+    },
+  );
+
+  // ---------------------------------------------------------------------------
+  // Chat panel — pending prompt relay
+  // ---------------------------------------------------------------------------
+
+  app.get("/api/chat/prompts", async (req, res) => {
+    const sessionId = String(req.query.session_id ?? "");
+    const prompts = repo.getPendingPrompts(sessionId);
+    res.json(prompts);
+  });
+
+  app.post(
+    "/api/chat/reply",
+    requireCsrf,
+    operatorRateLimiter,
+    async (req, res) => {
+      const { runAtlasBridge } = await import("./routes/operator");
+      const { session_id, prompt_id, value } = req.body as {
+        session_id?: string;
+        prompt_id?: string;
+        value?: string;
+      };
+      if (!session_id || !prompt_id || !value) {
+        res.status(400).json({ error: "session_id, prompt_id, and value are required" });
+        return;
+      }
+      try {
+        const { stdout } = await runAtlasBridge([
+          "sessions",
+          "reply",
+          session_id,
+          prompt_id,
+          value,
+        ]);
+        const parsed = JSON.parse(stdout.trim() || "{}");
+        if (parsed.ok === false) {
+          res.status(422).json({ error: parsed.error || "Reply failed" });
+          return;
+        }
+        insertOperatorAuditLog({
+          method: "POST",
+          path: "/api/chat/reply",
+          action: `chat-reply:${session_id}:${prompt_id}`,
+          body: { session_id, prompt_id },
+          result: "ok",
+        });
+        res.json({ ok: true });
+      } catch (err: any) {
+        const detail = (err.stderr as string | undefined)?.trim() || err.message;
+        res.status(503).json({ error: "Failed to inject reply", detail });
       }
     },
   );

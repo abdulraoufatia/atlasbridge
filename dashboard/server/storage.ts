@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 import {
-  users, groups, roles, apiKeys, securityPolicies, notifications, ipAllowlist, repoConnections, complianceScans,
+  users, groups, roles, apiKeys, securityPolicies, notifications, ipAllowlist, repoConnections, complianceScans, rbacPermissions,
   type InsertUser, type User,
   type InsertGroup, type Group,
   type InsertRole, type Role,
@@ -11,6 +11,7 @@ import {
   type InsertIpAllowlist, type IpAllowlistEntry,
   type InsertRepoConnection, type RepoConnection,
   type InsertComplianceScan, type ComplianceScan,
+  type InsertRbacPermission, type RbacPermissionRow,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -57,6 +58,11 @@ export interface IStorage {
 
   getComplianceScans(repoId: number): Promise<ComplianceScan[]>;
   createComplianceScan(data: InsertComplianceScan): Promise<ComplianceScan>;
+
+  getRbacPermissions(): Promise<RbacPermissionRow[]>;
+  createRbacPermission(data: InsertRbacPermission): Promise<RbacPermissionRow>;
+  updateRbacPermission(id: number, data: Partial<InsertRbacPermission>): Promise<RbacPermissionRow | undefined>;
+  deleteRbacPermission(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -103,6 +109,11 @@ export class DatabaseStorage implements IStorage {
 
   async getComplianceScans(repoId: number) { return db.select().from(complianceScans).where(eq(complianceScans.repoConnectionId, repoId)); }
   async createComplianceScan(data: InsertComplianceScan) { const [s] = await db.insert(complianceScans).values(data).returning(); return s; }
+
+  async getRbacPermissions() { return db.select().from(rbacPermissions); }
+  async createRbacPermission(data: InsertRbacPermission) { const [p] = await db.insert(rbacPermissions).values(data).returning(); return p; }
+  async updateRbacPermission(id: number, data: Partial<InsertRbacPermission>) { const [p] = await db.update(rbacPermissions).set(data).where(eq(rbacPermissions.id, id)).returning(); return p; }
+  async deleteRbacPermission(id: number) { const result = await db.delete(rbacPermissions).where(eq(rbacPermissions.id, id)).returning(); return result.length > 0; }
 }
 
 export const storage = new DatabaseStorage();

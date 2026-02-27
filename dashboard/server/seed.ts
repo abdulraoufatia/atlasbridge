@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { users, groups, roles, apiKeys, securityPolicies, notifications, ipAllowlist } from "@shared/schema";
+import { users, groups, roles, apiKeys, securityPolicies, notifications, ipAllowlist, rbacPermissions } from "@shared/schema";
 
 const now = new Date();
 const isoNow = now.toISOString();
@@ -96,6 +96,24 @@ export async function seedDatabase() {
     { externalId: "ip-002", cidr: "172.16.0.0/12", label: "VPN Range", addedBy: "j.martinez", addedAt: d(180), lastHit: m(3) },
     { externalId: "ip-003", cidr: "192.168.1.0/24", label: "Office WiFi", addedBy: "a.okonkwo", addedAt: d(90), lastHit: h(1) },
     { externalId: "ip-004", cidr: "127.0.0.1/32", label: "Localhost", addedBy: "system", addedAt: d(180), lastHit: isoNow },
+  ]);
+
+  await db.insert(rbacPermissions).values([
+    { externalId: "perm-001", resource: "Organization", actions: (["manage", "view"]), description: "Organization-level settings and configuration", category: "Administration" },
+    { externalId: "perm-002", resource: "Users", actions: (["manage", "invite", "deactivate", "view"]), description: "User account management and provisioning", category: "Administration" },
+    { externalId: "perm-003", resource: "Roles", actions: (["manage", "assign", "view"]), description: "RBAC role definition and assignment", category: "Access Control" },
+    { externalId: "perm-004", resource: "Groups", actions: (["manage", "assign", "sync", "view"]), description: "GBAC group management and directory sync", category: "Access Control" },
+    { externalId: "perm-005", resource: "Sessions", actions: (["view", "respond", "terminate"]), description: "Agent session monitoring and interaction", category: "Operations" },
+    { externalId: "perm-006", resource: "Prompts", actions: (["view", "respond", "escalate"]), description: "Decision prompt handling and escalation", category: "Operations" },
+    { externalId: "perm-007", resource: "Traces", actions: (["view", "export"]), description: "Decision trace and hash chain access", category: "Observability" },
+    { externalId: "perm-008", resource: "Audit", actions: (["view", "export", "configure"]), description: "Audit log access and retention settings", category: "Compliance" },
+    { externalId: "perm-009", resource: "Integrity", actions: (["verify", "view"]), description: "System integrity verification and monitoring", category: "Security" },
+    { externalId: "perm-010", resource: "Policies", actions: (["manage", "view", "override"]), description: "Governance policy configuration and overrides", category: "Governance" },
+    { externalId: "perm-011", resource: "Escalations", actions: (["review", "override", "configure"]), description: "Escalation routing, review, and threshold configuration", category: "Governance" },
+    { externalId: "perm-012", resource: "Compliance", actions: (["view", "configure", "export"]), description: "Compliance framework configuration and reporting", category: "Compliance" },
+    { externalId: "perm-013", resource: "API Keys", actions: (["manage", "rotate", "revoke", "view"]), description: "API key lifecycle management", category: "Security" },
+    { externalId: "perm-014", resource: "Notifications", actions: (["manage", "view", "test"]), description: "Alert and notification channel configuration", category: "Operations" },
+    { externalId: "perm-015", resource: "Settings", actions: (["view", "manage"]), description: "System-level settings and diagnostics", category: "Administration" },
   ]);
 
   console.log("Database seeded successfully");

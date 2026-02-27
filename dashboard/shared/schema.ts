@@ -266,6 +266,20 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
 
+export const rbacPermissions = sqliteTable("rbac_permissions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  externalId: text("external_id").notNull().unique(),
+  resource: text("resource").notNull(),
+  actions: text("actions", { mode: "json" }).notNull().default("[]").$type<string[]>(),
+  description: text("description").notNull().default(""),
+  category: text("category").notNull().default(""),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+});
+
+export const insertRbacPermissionSchema = createInsertSchema(rbacPermissions).omit({ id: true, createdAt: true });
+export type InsertRbacPermission = z.infer<typeof insertRbacPermissionSchema>;
+export type RbacPermissionRow = typeof rbacPermissions.$inferSelect;
+
 export const ipAllowlist = sqliteTable("ip_allowlist", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   externalId: text("external_id").notNull().unique(),

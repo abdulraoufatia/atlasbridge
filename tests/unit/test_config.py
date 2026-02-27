@@ -175,14 +175,16 @@ allowed_users = ["U1234567890"]
         with pytest.raises(ConfigError):
             load_config(p)
 
-    def test_no_channel_raises(self, tmp_path: Path) -> None:
+    def test_no_channel_valid(self, tmp_path: Path) -> None:
+        """Channels are now optional — no channel config is valid."""
         empty = """
 [prompts]
 timeout_seconds = 300
 """
         p = _write_config(tmp_path, empty)
-        with pytest.raises(ConfigError, match="[Aa]t least one channel"):
-            load_config(p)
+        cfg = load_config(p)
+        assert cfg.telegram is None
+        assert cfg.slack is None
 
     def test_multi_channel_valid(self, tmp_path: Path) -> None:
         both = MINIMAL_TOML + SLACK_ONLY_TOML

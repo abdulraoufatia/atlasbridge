@@ -1,17 +1,41 @@
 import type { Express } from "express";
 import { execFile } from "child_process";
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { requireCsrf } from "../middleware/csrf";
 import { operatorRateLimiter } from "../middleware/rate-limit";
 import { insertOperatorAuditLog, queryOperatorAuditLog } from "../db";
 
-// Allow test injection via env var; defaults to the atlasbridge CLI on PATH.
-const ATLASBRIDGE_BIN = process.env.ATLASBRIDGE_BIN ?? "atlasbridge";
+// Resolve atlasbridge binary: env var > walk up from CWD looking for .venv > PATH.
+function findAtlasBridgeBin(): string {
+  if (process.env.ATLASBRIDGE_BIN) return process.env.ATLASBRIDGE_BIN;
+  // Walk up from CWD until we find .venv/bin/atlasbridge (works from dashboard/ or repo root)
+  let dir = process.cwd();
+  for (let i = 0; i < 5; i++) {
+    const candidate = path.join(dir, ".venv", "bin", "atlasbridge");
+    if (existsSync(candidate)) return candidate;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return "atlasbridge";
+}
+
+const ATLASBRIDGE_BIN = findAtlasBridgeBin();
 const VALID_MODES = new Set(["off", "assist", "full"]);
 
 // Exported for unit testing.
 export function runAtlasBridge(args: string[]): Promise<{ stdout: string; stderr: string }> {
+  // Strip CLAUDECODE so atlasbridge can spawn Claude Code even when the dashboard
+  // itself was launched inside a Claude Code session.
+  // Pass ATLASBRIDGE_BIN so nested atlasbridge invocations (e.g. sessions start → run)
+  // can find the binary even when the venv is not on PATH.
+  const env = { ...process.env };
+  delete env.CLAUDECODE;
+  env.ATLASBRIDGE_BIN = ATLASBRIDGE_BIN;
+
   return new Promise((resolve, reject) => {
-    execFile(ATLASBRIDGE_BIN, args, { timeout: 10_000 }, (err, stdout, stderr) => {
+    execFile(ATLASBRIDGE_BIN, args, { timeout: 10_000, env }, (err, stdout, stderr) => {
       if (err) {
         reject(Object.assign(err, { stdout, stderr }));
       } else {

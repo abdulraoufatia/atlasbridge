@@ -17,8 +17,6 @@ import uuid
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from atlasbridge.core.store.database import Database
 from atlasbridge.core.store.migrations import (
     LATEST_SCHEMA_VERSION,
@@ -184,11 +182,14 @@ class TestAdapterRegistry:
         assert "openai" in adapters
         assert "gemini" in adapters
 
-    def test_get_unknown_raises_keyerror_with_available(self) -> None:
+    def test_get_unknown_falls_back_to_custom_adapter(self) -> None:
+        """Unknown adapter names fall back to CustomCLIAdapter."""
+        import atlasbridge.adapters  # noqa: F401
         from atlasbridge.adapters.base import AdapterRegistry
 
-        with pytest.raises(KeyError, match="Available:"):
-            AdapterRegistry.get("nonexistent-adapter")
+        adapter_cls = AdapterRegistry.get("nonexistent-adapter")
+        assert adapter_cls is not None
+        assert adapter_cls.tool_name == "custom"
 
     def test_adapter_classes_have_required_attributes(self) -> None:
         import atlasbridge.adapters  # noqa: F401
