@@ -54,17 +54,11 @@ _RUNNING_SESSION = _FakeRow(
     metadata="{}",
 )
 
-_PAUSED_SESSION = _FakeRow(
-    **{**_RUNNING_SESSION, "status": "paused"}
-)
+_PAUSED_SESSION = _FakeRow(**{**_RUNNING_SESSION, "status": "paused"})
 
-_COMPLETED_SESSION = _FakeRow(
-    **{**_RUNNING_SESSION, "status": "completed", "pid": 99999}
-)
+_COMPLETED_SESSION = _FakeRow(**{**_RUNNING_SESSION, "status": "completed", "pid": 99999})
 
-_NO_PID_SESSION = _FakeRow(
-    **{**_RUNNING_SESSION, "pid": None}
-)
+_NO_PID_SESSION = _FakeRow(**{**_RUNNING_SESSION, "pid": None})
 
 
 # ---------------------------------------------------------------------------

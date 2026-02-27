@@ -262,8 +262,17 @@ class DaemonManager:
                 if self._autopilot_trace is not None and self._policy is not None:
                     try:
                         from atlasbridge.core.policy.evaluator import evaluate
-                        pt = event.prompt_type.value if hasattr(event.prompt_type, "value") else str(event.prompt_type)
-                        conf_str = event.confidence.value if hasattr(event.confidence, "value") else str(event.confidence)
+
+                        pt = (
+                            event.prompt_type.value
+                            if hasattr(event.prompt_type, "value")
+                            else str(event.prompt_type)
+                        )
+                        conf_str = (
+                            event.confidence.value
+                            if hasattr(event.confidence, "value")
+                            else str(event.confidence)
+                        )
                         decision = evaluate(
                             policy=self._policy,
                             prompt_text=event.excerpt,
@@ -287,7 +296,11 @@ class DaemonManager:
             )
             if self._channel is not None:
                 try:
-                    msg = f"Prompt denied by policy rule '{result.matched_rule_id}': {result.explanation or ''}"
+                    msg = (
+                        f"Prompt denied by policy rule "
+                        f"'{result.matched_rule_id}': "
+                        f"{result.explanation or ''}"
+                    )
                     await self._channel.notify(msg, session_id=event.session_id)
                 except Exception:
                     pass
@@ -389,6 +402,7 @@ class DaemonManager:
             self._session_manager.mark_running(session_id, pid)
             if self._db is not None:
                 import os as _os
+
                 self._db.update_session(session_id, status="running", pid=pid or _os.getpid())
 
         # Re-use the detector the adapter already created for this session.

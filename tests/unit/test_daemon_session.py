@@ -74,12 +74,16 @@ class TestRunAdapterSessionNoop:
         assert len(manager._adapters) == 0
 
     @pytest.mark.asyncio
-    async def test_unknown_tool_logs_error_returns_immediately(self) -> None:
+    async def test_unknown_tool_falls_back_to_custom_adapter(self) -> None:
+        """Unknown tools resolve to CustomCLIAdapter via fallback."""
         manager = DaemonManager({"tool": "nonexistent", "command": ["foo"], "channels": {}})
         manager._session_manager = SessionManager()
         manager._router = AsyncMock()
-        await manager._run_adapter_session()
-        assert len(manager._adapters) == 0
+        mock_adapter = _make_mock_adapter()
+        mock_cls = MagicMock(return_value=mock_adapter)
+        with patch("atlasbridge.adapters.base.AdapterRegistry.get", return_value=mock_cls):
+            await manager._run_adapter_session()
+        mock_cls.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_no_session_manager_returns_immediately(self) -> None:

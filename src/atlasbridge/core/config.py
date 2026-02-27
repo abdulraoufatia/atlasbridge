@@ -8,7 +8,7 @@ import warnings as _warnings
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field, SecretStr, field_validator, model_validator
+from pydantic import BaseModel, Field, SecretStr, field_validator
 
 from atlasbridge.core.constants import (
     AUDIT_FILENAME,

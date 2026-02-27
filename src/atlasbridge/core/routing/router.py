@@ -170,10 +170,19 @@ class PromptRouter:
         # Persist prompt to DB so the dashboard can display it
         if self._store is not None and hasattr(self._store, "save_prompt"):
             try:
-                from datetime import datetime, timezone
-                pt_str = event.prompt_type.value if hasattr(event.prompt_type, "value") else str(event.prompt_type)
-                conf_str = event.confidence.value if hasattr(event.confidence, "value") else str(event.confidence)
-                expires_at = datetime.now(timezone.utc).isoformat()  # TTL baked into event
+                from datetime import UTC, datetime
+
+                pt_str = (
+                    event.prompt_type.value
+                    if hasattr(event.prompt_type, "value")
+                    else str(event.prompt_type)
+                )
+                conf_str = (
+                    event.confidence.value
+                    if hasattr(event.confidence, "value")
+                    else str(event.confidence)
+                )
+                expires_at = datetime.now(UTC).isoformat()
                 self._store.save_prompt(
                     prompt_id=event.prompt_id,
                     session_id=event.session_id,

@@ -368,7 +368,15 @@ def sessions_start(
     if atlas_bin:
         args = [atlas_bin, "run", tool_to_run, "--mode", mode] + extra_tool_args
     else:
-        args = [sys.executable, "-m", "atlasbridge", "run", tool_to_run, "--mode", mode] + extra_tool_args
+        args = [
+            sys.executable,
+            "-m",
+            "atlasbridge",
+            "run",
+            tool_to_run,
+            "--mode",
+            mode,
+        ] + extra_tool_args
 
     if cwd:
         args += ["--cwd", cwd]
@@ -538,7 +546,9 @@ def sessions_stop(session_id: str, as_json: bool = False) -> None:
             if as_json:
                 print(json.dumps({"ok": True, "session_id": full_id, "action": "canceled"}))
             else:
-                console.print(f"[yellow]No PID recorded — marked session {full_id[:8]} as canceled.[/yellow]")
+                console.print(
+                    f"[yellow]No PID recorded — marked session {full_id[:8]} as canceled.[/yellow]"
+                )
             return
 
         try:
@@ -558,8 +568,12 @@ def sessions_stop(session_id: str, as_json: bool = False) -> None:
             if as_json:
                 print(
                     json.dumps(
-                        {"ok": True, "session_id": full_id, "action": "canceled",
-                         "note": f"Process {pid} not found (already stopped)"}
+                        {
+                            "ok": True,
+                            "session_id": full_id,
+                            "action": "canceled",
+                            "note": f"Process {pid} not found (already stopped)",
+                        }
                     )
                 )
             else:
@@ -617,7 +631,9 @@ def sessions_pause(session_id: str, as_json: bool = False) -> None:
 
         if status not in ("running", "awaiting_reply"):
             if as_json:
-                print(json.dumps({"ok": False, "error": f"Cannot pause session in '{status}' state"}))
+                print(
+                    json.dumps({"ok": False, "error": f"Cannot pause session in '{status}' state"})
+                )
             else:
                 console.print(f"[yellow]Cannot pause — session is {status}.[/yellow]")
             return
@@ -633,9 +649,13 @@ def sessions_pause(session_id: str, as_json: bool = False) -> None:
             os.kill(pid, signal.SIGSTOP)
             db.update_session(full_id, status="paused")
             if as_json:
-                print(json.dumps({"ok": True, "session_id": full_id, "pid": pid, "signal": "SIGSTOP"}))
+                print(
+                    json.dumps({"ok": True, "session_id": full_id, "pid": pid, "signal": "SIGSTOP"})
+                )
             else:
-                console.print(f"[green]SIGSTOP sent[/green] to PID {pid} (session {full_id[:8]}) — paused")
+                console.print(
+                    f"[green]SIGSTOP sent[/green] to PID {pid} (session {full_id[:8]}) — paused"
+                )
         except ProcessLookupError:
             if as_json:
                 print(json.dumps({"ok": False, "error": f"Process {pid} not found"}))
@@ -692,7 +712,9 @@ def sessions_resume(session_id: str, as_json: bool = False) -> None:
 
         if status != "paused":
             if as_json:
-                print(json.dumps({"ok": False, "error": f"Session is not paused (status: {status})"}))
+                print(
+                    json.dumps({"ok": False, "error": f"Session is not paused (status: {status})"})
+                )
             else:
                 console.print(f"[yellow]Session is not paused — status is {status}.[/yellow]")
             return
@@ -708,9 +730,13 @@ def sessions_resume(session_id: str, as_json: bool = False) -> None:
             os.kill(pid, signal.SIGCONT)
             db.update_session(full_id, status="running")
             if as_json:
-                print(json.dumps({"ok": True, "session_id": full_id, "pid": pid, "signal": "SIGCONT"}))
+                print(
+                    json.dumps({"ok": True, "session_id": full_id, "pid": pid, "signal": "SIGCONT"})
+                )
             else:
-                console.print(f"[green]SIGCONT sent[/green] to PID {pid} (session {full_id[:8]}) — resumed")
+                console.print(
+                    f"[green]SIGCONT sent[/green] to PID {pid} (session {full_id[:8]}) — resumed"
+                )
         except ProcessLookupError:
             if as_json:
                 print(json.dumps({"ok": False, "error": f"Process {pid} not found"}))

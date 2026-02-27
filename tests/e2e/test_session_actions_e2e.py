@@ -151,9 +151,7 @@ class TestE2ESessionPauseResumeStop:
         assert data["ok"] is True
         assert _read_status(data_dir, SID) == "canceled"
 
-    def test_e2e_short_id_resolution(
-        self, runner: CliRunner, db: Database, data_dir: Path
-    ) -> None:
+    def test_e2e_short_id_resolution(self, runner: CliRunner, db: Database, data_dir: Path) -> None:
         """Short ID prefix should resolve to the full session ID."""
         with _patch_open_db(data_dir), patch("os.kill"):
             result = runner.invoke(cli, ["sessions", "pause", "e2e-sess", "--json"])

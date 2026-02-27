@@ -36,7 +36,13 @@ def db_path(tmp_path: Path) -> Path:
     import os
 
     our_pid = os.getpid()
-    db.save_session("sess-1111-2222-3333-444455556666", "claude", ["claude"], cwd="/tmp", label="test")
+    db.save_session(
+        "sess-1111-2222-3333-444455556666",
+        "claude",
+        ["claude"],
+        cwd="/tmp",
+        label="test",
+    )
     db.update_session("sess-1111-2222-3333-444455556666", status="running", pid=our_pid)
     db.close()
     return path
