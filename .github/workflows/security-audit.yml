@@ -40,6 +40,7 @@ jobs:
             --exclude-files 'dashboard/shared/schema\.ts' \
             --exclude-files 'src/atlasbridge/_dashboard_dist/.*' \
             --exclude-files 'dashboard/client/src/pages/workspaces\.tsx' \
+            --exclude-files '\.secrets\.baseline' \
             --exclude-secrets 'sk-test|xoxb-test|ghp_test|password_input' \
             > .secrets-scan-results.json
           python -c "
