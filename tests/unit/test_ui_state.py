@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from atlasbridge.ui.state import (
     WIZARD_STEPS,
     WIZARD_TOTAL,

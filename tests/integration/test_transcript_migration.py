@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sqlite3
 from pathlib import Path
 
 import pytest
@@ -31,7 +30,8 @@ class TestTranscriptMigration:
 
     def test_transcript_chunks_index_exists(self, db):
         indexes = db._db.execute(
-            "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_transcript_session_seq'"
+            "SELECT name FROM sqlite_master"
+            " WHERE type='index' AND name='idx_transcript_session_seq'"
         ).fetchall()
         assert len(indexes) == 1
 

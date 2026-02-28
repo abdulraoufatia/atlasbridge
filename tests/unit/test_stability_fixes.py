@@ -270,5 +270,3 @@ class TestRunInstructions:
         from atlasbridge.cli._run import cmd_run
 
         assert callable(cmd_run)
-
-

@@ -26,9 +26,7 @@ from atlasbridge import __version__
 )
 @click.version_option(__version__, "--version", "-V", message="atlasbridge %(version)s")
 @click.option("--port", default=3737, show_default=True, help="Dashboard port.")
-@click.option(
-    "--no-browser", is_flag=True, default=False, help="Don't open browser automatically."
-)
+@click.option("--no-browser", is_flag=True, default=False, help="Don't open browser automatically.")
 @click.option(
     "--log-level", default="WARNING", hidden=True, help="Log level for structured logging."
 )
@@ -89,6 +87,7 @@ from atlasbridge.cli._doctor import doctor_cmd  # noqa: E402
 from atlasbridge.cli._enterprise import cloud_group  # noqa: E402
 from atlasbridge.cli._lab import lab_group  # noqa: E402
 from atlasbridge.cli._logs import logs_cmd  # noqa: E402
+from atlasbridge.cli._monitor import monitor_group  # noqa: E402
 from atlasbridge.cli._policy_cmd import policy_group  # noqa: E402
 from atlasbridge.cli._profile import profile_group  # noqa: E402
 from atlasbridge.cli._providers import providers_group  # noqa: E402
@@ -100,7 +99,6 @@ from atlasbridge.cli._setup import setup_cmd  # noqa: E402
 from atlasbridge.cli._status import status_cmd  # noqa: E402
 from atlasbridge.cli._trace_cmd import trace_group  # noqa: E402
 from atlasbridge.cli._version import version_cmd  # noqa: E402
-from atlasbridge.cli._monitor import monitor_group  # noqa: E402
 from atlasbridge.cli._workspace import workspace_group  # noqa: E402
 
 cli.add_command(setup_cmd)

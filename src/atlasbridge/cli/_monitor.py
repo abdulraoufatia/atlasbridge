@@ -54,7 +54,6 @@ def vscode_cmd(dashboard_url: str, poll_interval: float) -> None:
 def status_cmd() -> None:
     """Show which monitors are available and their status."""
     import platform
-    import sys
 
     click.echo("Monitor Status")
     click.echo("=" * 40)
@@ -84,7 +83,7 @@ def status_cmd() -> None:
     # VS Code monitor
     click.echo("\nVS Code / Claude Code Monitor")
     try:
-        from atlasbridge.monitors.vscode import find_claude_sessions, find_claude_processes
+        from atlasbridge.monitors.vscode import find_claude_processes, find_claude_sessions
 
         sessions = find_claude_sessions()
         processes = find_claude_processes()

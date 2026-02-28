@@ -817,7 +817,8 @@ class DaemonManager:
                 # Channelless mode — poll DB for dashboard-originated replies
                 tasks.append(asyncio.create_task(self._db_reply_poller(), name="db_reply_poller"))
             # Operator directives — always active (dashboard free-text input)
-            tasks.append(asyncio.create_task(self._db_directive_poller(), name="db_directive_poller"))
+            directive_task = self._db_directive_poller()
+            tasks.append(asyncio.create_task(directive_task, name="db_directive_poller"))
             if self._config.get("tool") and self._config.get("command"):
                 tasks.append(
                     asyncio.create_task(self._run_adapter_session(), name="adapter_session")

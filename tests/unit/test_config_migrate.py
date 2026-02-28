@@ -15,7 +15,6 @@ from atlasbridge.core.config_migrate import (
 )
 from atlasbridge.core.exceptions import ConfigError
 
-
 MINIMAL_TOML_V0 = """
 [prompts]
 timeout_seconds = 300

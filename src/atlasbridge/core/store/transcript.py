@@ -54,9 +54,7 @@ class TranscriptWriter:
         if self._buffer_chars > _MAX_BUFFER_BYTES:
             self._compact_buffer()
 
-    def record_input(
-        self, text: str, prompt_id: str = "", role: str = "user"
-    ) -> None:
+    def record_input(self, text: str, prompt_id: str = "", role: str = "user") -> None:
         """Record input into the transcript (written immediately).
 
         Args:

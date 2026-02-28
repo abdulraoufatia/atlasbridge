@@ -216,9 +216,7 @@ class IntentRouter:
         """Delegate to the wrapped PromptRouter."""
         await self._prompt_router.handle_reply(reply)
 
-    async def inject_dashboard_reply(
-        self, prompt_id: str, session_id: str, value: str
-    ) -> bool:
+    async def inject_dashboard_reply(self, prompt_id: str, session_id: str, value: str) -> bool:
         """Delegate to the wrapped PromptRouter."""
         return await self._prompt_router.inject_dashboard_reply(prompt_id, session_id, value)
 

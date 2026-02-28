@@ -32,7 +32,7 @@ def poll_state() -> AppState:
 
         cfg_path = _config_file_path()
         if cfg_path.exists():
-            cfg = load_config(cfg_path)
+            load_config(cfg_path)
             config_status = ConfigStatus.LOADED
         else:
             config_status = ConfigStatus.NOT_FOUND

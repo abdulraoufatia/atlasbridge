@@ -14,7 +14,8 @@ import json
 import logging
 import os
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from datetime import UTC
 from pathlib import Path
 from typing import Any
 
@@ -198,23 +199,21 @@ class VSCodeMonitor:
                         content = data.get("content", "")
                         if content:
                             ms.seq += 1
-                            await self._send_message(
-                                ms.session_id, role, content, ms.seq
-                            )
+                            await self._send_message(ms.session_id, role, content, ms.seq)
                     except (json.JSONDecodeError, KeyError):
                         if isinstance(message, (str, bytes)):
-                            text = message if isinstance(message, str) else message.decode("utf-8", errors="replace")
+                            text = (
+                                message
+                                if isinstance(message, str)
+                                else message.decode("utf-8", errors="replace")
+                            )
                             if text.strip():
                                 ms.seq += 1
-                                await self._send_message(
-                                    ms.session_id, "assistant", text, ms.seq
-                                )
+                                await self._send_message(ms.session_id, "assistant", text, ms.seq)
         except Exception as exc:
             logger.debug("WebSocket connection to port %d failed: %s", cs.port, exc)
 
-    async def _send_message(
-        self, session_id: str, role: str, content: str, seq: int
-    ) -> None:
+    async def _send_message(self, session_id: str, role: str, content: str, seq: int) -> None:
         """Send a captured message to the dashboard."""
         try:
             await self._client.post(
@@ -273,7 +272,9 @@ class VSCodeMonitor:
                         vscode_tag = " (VS Code)" if proc["is_vscode"] else ""
                         logger.info(
                             "Registering Claude process: pid=%d %s%s",
-                            pid, proc["name"], vscode_tag,
+                            pid,
+                            proc["name"],
+                            vscode_tag,
                         )
                         await self._register_session(
                             key,
@@ -292,9 +293,9 @@ class VSCodeMonitor:
 
 
 def _iso_now() -> str:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 async def run_vscode_monitor(

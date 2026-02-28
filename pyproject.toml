@@ -264,6 +264,10 @@ omit = [
     "*/atlasbridge/channels/multi.py",
     "*/atlasbridge/adapters/claude_code.py",
     "*/atlasbridge/__main__.py",
+    # Tier 3: Monitor daemons — require macOS Accessibility API / VS Code runtime
+    "*/atlasbridge/monitors/*",
+    # Tier 3: Dashboard Python backend — requires FastAPI runtime
+    "*/atlasbridge/dashboard/*",
     # Tier 3: LLM providers, tools, chat/agent engines — require network/API runtime
     "*/atlasbridge/providers/*",
     "*/atlasbridge/tools/*",

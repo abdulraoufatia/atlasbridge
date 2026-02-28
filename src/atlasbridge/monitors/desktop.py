@@ -16,6 +16,7 @@ import platform
 import sys
 import uuid
 from dataclasses import dataclass, field
+from datetime import UTC
 from typing import Any
 
 import httpx
@@ -96,10 +97,9 @@ def find_target_apps() -> dict[str, int]:
 def read_app_text(pid: int) -> list[str]:
     """Read visible text from a macOS app window via Accessibility API."""
     from ApplicationServices import (  # type: ignore[import-not-found]
-        AXUIElementCreateApplication,
         AXUIElementCopyAttributeValue,
+        AXUIElementCreateApplication,
     )
-    import Cocoa  # type: ignore[import-not-found]  # noqa: F811
 
     app_ref = AXUIElementCreateApplication(pid)
     texts: list[str] = []
@@ -169,9 +169,7 @@ class DesktopMonitor:
         self._seq_counters[session_id] = 0
         return session_id
 
-    async def _send_messages(
-        self, session_id: str, new_texts: list[str], vendor: str
-    ) -> None:
+    async def _send_messages(self, session_id: str, new_texts: list[str], vendor: str) -> None:
         """Send new text chunks to dashboard as messages."""
         messages = []
         for text in new_texts:
@@ -235,9 +233,9 @@ class DesktopMonitor:
 
 
 def _iso_now() -> str:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 async def run_desktop_monitor(

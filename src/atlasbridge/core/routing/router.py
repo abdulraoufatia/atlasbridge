@@ -541,9 +541,7 @@ class PromptRouter:
     # Dashboard relay injection (channelless mode)
     # ------------------------------------------------------------------
 
-    async def inject_dashboard_reply(
-        self, prompt_id: str, session_id: str, value: str
-    ) -> bool:
+    async def inject_dashboard_reply(self, prompt_id: str, session_id: str, value: str) -> bool:
         """Inject a reply submitted via the dashboard Chat page.
 
         Similar to inject_autopilot_reply() but for dashboard-originated

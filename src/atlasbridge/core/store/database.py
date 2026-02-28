@@ -241,9 +241,7 @@ class Database:
 
     def list_reply_received(self) -> list[sqlite3.Row]:
         """Return prompts that have been replied to but not yet injected."""
-        return self._db.execute(
-            "SELECT * FROM prompts WHERE status = 'reply_received'"
-        ).fetchall()
+        return self._db.execute("SELECT * FROM prompts WHERE status = 'reply_received'").fetchall()
 
     def update_prompt_status(self, prompt_id: str, new_status: str) -> None:
         """Update a prompt's status (used after dashboard relay injection)."""
@@ -312,8 +310,7 @@ class Database:
     def list_pending_directives(self) -> list[sqlite3.Row]:
         """Return operator directives awaiting processing."""
         return self._db.execute(
-            "SELECT * FROM operator_directives WHERE status = 'pending' "
-            "ORDER BY created_at ASC"
+            "SELECT * FROM operator_directives WHERE status = 'pending' ORDER BY created_at ASC"
         ).fetchall()
 
     def mark_directive_processed(self, directive_id: str) -> None:

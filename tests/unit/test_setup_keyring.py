@@ -45,11 +45,7 @@ class TestCheckPlaintextTokens:
 
     def test_pass_when_no_plaintext_tokens(self, tmp_path) -> None:
         cfg = tmp_path / "config.toml"
-        cfg.write_text(
-            "config_version = 1\n\n"
-            "[prompts]\n"
-            "timeout_seconds = 300\n"
-        )
+        cfg.write_text("config_version = 1\n\n[prompts]\ntimeout_seconds = 300\n")
         with (
             patch(
                 "atlasbridge.core.keyring_store.is_keyring_available",

@@ -152,7 +152,6 @@ def _check_systemd_service() -> dict | None:
 def _fix_config(console: Console) -> None:
     """Create a config from env vars if available, or a skeleton template."""
     import os
-    import re
 
     cfg_path = _config_path()
     if cfg_path.exists():
@@ -181,9 +180,7 @@ def _fix_config(console: Console) -> None:
         try:
             cfg_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
             cfg_path.write_text(
-                "# AtlasBridge configuration\n"
-                "# Run: atlasbridge setup\n\n"
-                "config_version = 1\n",
+                "# AtlasBridge configuration\n# Run: atlasbridge setup\n\nconfig_version = 1\n",
                 encoding="utf-8",
             )
             cfg_path.chmod(0o600)

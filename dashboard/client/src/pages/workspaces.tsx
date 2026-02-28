@@ -99,7 +99,7 @@ function TrustBadge({ ws }: { ws: WorkspaceRecord }) {
 function RiskTag({ tag }: { tag: string }) {
   const colors: Record<string, string> = {
     iac: "bg-amber-500/15 text-amber-600 border-amber-500/30",
-    secrets_present: "bg-red-500/15 text-red-600 border-red-500/30",
+    secrets_present: "bg-red-500/15 text-red-600 border-red-500/30",  // pragma: allowlist secret
     deployment: "bg-cyan-500/15 text-cyan-600 border-cyan-500/30",
     unknown: "bg-muted text-muted-foreground",
   };

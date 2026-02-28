@@ -518,19 +518,11 @@ def sessions_message(session_id: str, text: str) -> None:
 
         row = db.get_session(full_session_id)
         if row is None or row["status"] not in ("running", "starting", "awaiting_reply"):
-            print(
-                json.dumps(
-                    {"ok": False, "error": "Session is not running"}
-                )
-            )
+            print(json.dumps({"ok": False, "error": "Session is not running"}))
             sys.exit(1)
 
         directive_id = db.insert_operator_directive(full_session_id, text)
-        print(
-            json.dumps(
-                {"ok": True, "directive_id": directive_id, "session_id": full_session_id}
-            )
-        )
+        print(json.dumps({"ok": True, "directive_id": directive_id, "session_id": full_session_id}))
     finally:
         db.close()
 

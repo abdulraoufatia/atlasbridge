@@ -13,6 +13,7 @@ from click.testing import CliRunner
 
 from atlasbridge.cli.main import cli
 
+
 @pytest.fixture
 def runner() -> CliRunner:
     return CliRunner()
@@ -227,9 +228,7 @@ class TestSessionsMessageCommand:
         )
         assert result.exit_code != 0
 
-    def test_message_session_not_found(
-        self, runner: CliRunner, config_path: Path
-    ) -> None:
+    def test_message_session_not_found(self, runner: CliRunner, config_path: Path) -> None:
         """sessions message fails when session doesn't exist."""
         result = runner.invoke(
             cli,

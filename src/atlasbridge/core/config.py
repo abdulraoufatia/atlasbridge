@@ -78,9 +78,6 @@ def _maybe_migrate_legacy(new_dir: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-
-
-
 class PromptsConfig(BaseModel):
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
     reminder_seconds: int | None = None
