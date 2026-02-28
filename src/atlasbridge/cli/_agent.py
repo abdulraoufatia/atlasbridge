@@ -211,18 +211,6 @@ def agent_start_cmd(
     if policy:
         daemon_config["policy_file"] = policy
 
-    if config.telegram:
-        daemon_config["channels"]["telegram"] = {
-            "bot_token": config.telegram.bot_token.get_secret_value(),
-            "allowed_user_ids": config.telegram.allowed_users,
-        }
-    if config.slack:
-        daemon_config["channels"]["slack"] = {
-            "bot_token": config.slack.bot_token.get_secret_value(),
-            "app_token": config.slack.app_token.get_secret_value(),
-            "allowed_user_ids": config.slack.allowed_users,
-        }
-
     console.print(f"[bold]AtlasBridge Expert Agent[/bold] — {provider_name}")
     if model_name:
         console.print(f"Model: [cyan]{model_name}[/cyan]")

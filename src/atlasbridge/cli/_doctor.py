@@ -569,7 +569,8 @@ def _check_plaintext_tokens() -> dict | None:
         return None
 
     plaintext_fields: list[str] = []
-    for section, key in []:
+    token_paths: list[tuple[str, str]] = []
+    for section, key in token_paths:
         val = data.get(section, {}).get(key, "")
         if val and not is_keyring_placeholder(val):
             plaintext_fields.append(f"{section}.{key}")

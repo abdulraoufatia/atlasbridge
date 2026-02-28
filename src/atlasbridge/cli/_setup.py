@@ -68,10 +68,9 @@ def run_setup(
             console.print("Run [cyan]atlasbridge run claude[/cyan] to start supervising.")
             return
 
+    config_data: dict = {}
     if from_env:
         config_data = _setup_from_env(console)
-    else:
-        config_data: dict = {}
 
     # Auto-enable keyring when available (unless --no-keyring)
     use_keyring = False

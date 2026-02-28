@@ -190,7 +190,7 @@ class VSCodeMonitor:
             headers["Authorization"] = f"Bearer {cs.token}"
 
         try:
-            async with websockets.connect(url, additional_headers=headers) as ws:  # type: ignore[attr-defined]
+            async with websockets.connect(url, additional_headers=headers) as ws:
                 logger.info("Connected to Claude Code at port %d", cs.port)
                 async for message in ws:
                     try:

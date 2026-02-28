@@ -893,7 +893,7 @@ class DaemonManager:
                     content = row["content"]
                     directive_id = row["id"]
 
-                    adapter = self._adapter_map.get(sid)
+                    adapter = self._adapters.get(sid)
                     if adapter is None:
                         # No adapter — session not managed by this daemon.
                         # Mark processed to avoid infinite retry loop.

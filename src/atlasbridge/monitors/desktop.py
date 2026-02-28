@@ -63,7 +63,7 @@ def check_accessibility_permission() -> bool:
         )
         return False
 
-    from ApplicationServices import AXIsProcessTrusted  # type: ignore[import-not-found]
+    from ApplicationServices import AXIsProcessTrusted
 
     trusted = AXIsProcessTrusted()
     if not trusted:
@@ -77,7 +77,7 @@ def check_accessibility_permission() -> bool:
 
 def find_target_apps() -> dict[str, int]:
     """Find running AI desktop apps and return {vendor: pid} mapping."""
-    from Cocoa import NSWorkspace  # type: ignore[import-not-found]
+    from Cocoa import NSWorkspace
 
     workspace = NSWorkspace.sharedWorkspace()
     running_apps = workspace.runningApplications()
@@ -96,7 +96,7 @@ def find_target_apps() -> dict[str, int]:
 
 def read_app_text(pid: int) -> list[str]:
     """Read visible text from a macOS app window via Accessibility API."""
-    from ApplicationServices import (  # type: ignore[import-not-found]
+    from ApplicationServices import (
         AXUIElementCopyAttributeValue,
         AXUIElementCreateApplication,
     )
